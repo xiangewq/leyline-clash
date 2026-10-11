@@ -33,7 +33,7 @@ function Layout.SetVisible(ctrl, isVisible)
     end
 end
 
--- 颜色构造工具 (适配千星沙箱 Color 构造函数与 packed uint32 回退)
+-- 颜色构造工具 (适配千星沙箱 Color 构造函数与 packed uint32 整数)
 function Layout.MakeColor(r, g, b, a)
     local R = (r <= 1 and r > 0) and math.floor(r * 255) or math.floor(r or 0)
     local G = (g <= 1 and g > 0) and math.floor(g * 255) or math.floor(g or 0)
@@ -44,14 +44,26 @@ function Layout.MakeColor(r, g, b, a)
     if Color then
         if Color.FromRGBA then
             local ok, col = pcall(function() return Color.FromRGBA(R, G, B, A) end)
-            if ok and col then return col end
+            if ok and col and type(col) == "number" then return math.tointeger(col) or math.floor(col) end
         end
         local ok, col = pcall(function() return Color(R, G, B, A) end)
-        if ok and col then return col end
+        if ok and col and type(col) == "number" then return math.tointeger(col) or math.floor(col) end
     end
-    -- 回退：计算 AARRGGBB 打包数值 (与沙箱 runtime 完全一致)
-    return A * 16777216 + R * 65536 + G * 256 + B
+    -- 回退：计算 AARRGGBB 打包数值 (标准 32 位无符号整数)
+    local val = A * 16777216 + R * 65536 + G * 256 + B
+    return math.tointeger(val) or math.floor(val)
 end
+
+-- 安全转换任何颜色输入（table/number/nil）为合法的整数 ColorValue
+function Layout.ToColorInt(val)
+    if type(val) == "number" then
+        return math.tointeger(val) or math.floor(val)
+    elseif type(val) == "table" then
+        return Layout.MakeColor(val.r or 1, val.g or 1, val.b or 1, val.a or 1)
+    end
+    return 0xFFFFFFFF
+end
+
 
 -- 提瓦特地脉标准调色板 (使用 0..255 整数)
 Layout.PALETTE = {

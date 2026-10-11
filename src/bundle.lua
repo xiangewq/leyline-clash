@@ -211,7 +211,7 @@ function Layout.SetVisible(ctrl, isVisible)
     end
 end
 
--- 颜色构造工具 (适配千星沙箱 Color 构造函数与 packed uint32 回退)
+-- 颜色构造工具 (适配千星沙箱 Color 构造函数与 packed uint32 整数)
 function Layout.MakeColor(r, g, b, a)
     local R = (r <= 1 and r > 0) and math.floor(r * 255) or math.floor(r or 0)
     local G = (g <= 1 and g > 0) and math.floor(g * 255) or math.floor(g or 0)
@@ -222,14 +222,26 @@ function Layout.MakeColor(r, g, b, a)
     if Color then
         if Color.FromRGBA then
             local ok, col = pcall(function() return Color.FromRGBA(R, G, B, A) end)
-            if ok and col then return col end
+            if ok and col and type(col) == "number" then return math.tointeger(col) or math.floor(col) end
         end
         local ok, col = pcall(function() return Color(R, G, B, A) end)
-        if ok and col then return col end
+        if ok and col and type(col) == "number" then return math.tointeger(col) or math.floor(col) end
     end
-    -- 回退：计算 AARRGGBB 打包数值 (与沙箱 runtime 完全一致)
-    return A * 16777216 + R * 65536 + G * 256 + B
+    -- 回退：计算 AARRGGBB 打包数值 (标准 32 位无符号整数)
+    local val = A * 16777216 + R * 65536 + G * 256 + B
+    return math.tointeger(val) or math.floor(val)
 end
+
+-- 安全转换任何颜色输入（table/number/nil）为合法的整数 ColorValue
+function Layout.ToColorInt(val)
+    if type(val) == "number" then
+        return math.tointeger(val) or math.floor(val)
+    elseif type(val) == "table" then
+        return Layout.MakeColor(val.r or 1, val.g or 1, val.b or 1, val.a or 1)
+    end
+    return 0xFFFFFFFF
+end
+
 
 -- 提瓦特地脉标准调色板 (使用 0..255 整数)
 Layout.PALETTE = {
@@ -882,7 +894,7 @@ function CombatResolver.AddSpark(x, y, color)
         y = y + (math.random() - 0.5) * 24,
         life = 0.35,
         maxLife = 0.35,
-        color = color or { r = 1.0, g = 0.4, b = 0.3, a = 1.0 }
+        color = color or 0xFFF43F5E
     })
 end
 
@@ -994,7 +1006,7 @@ function AbilitySystem.CastAbility(slotIndex, targetNodeId, nodes, routeManager,
 
         if onSparkCallback then
             for _ = 1, 10 do
-                onSparkCallback(targetNode.x, targetNode.y, { r = 1.0, g = 0.25, b = 0.1, a = 1.0 })
+                onSparkCallback(targetNode.x, targetNode.y, 0xFFFF3F20)
             end
         end
 
@@ -1257,26 +1269,28 @@ _MODULES["src/ui/dialoguePlayer"] = function()
 -- src/ui/dialoguePlayer.lua
 -- 开场逐字剧情演播器（阿贝多与派蒙台词演出、跳过与推进）
 
+local Layout = require("default_import_file/src/core/layout") or require("src/core/layout")
+
 local DialoguePlayer = {
     DIALOGUES = {
         {
             speaker = "派蒙",
-            color = { r = 1.0, g = 0.85, b = 0.4, a = 1.0 },
+            color = Layout.PALETTE.GOLD,
             content = "哇！阿贝多，这个泛着蓝光的大圆盘是什么呀？上面亮晶晶的小圆点，看起来好像……会发光的甜甜花糖豆！"
         },
         {
             speaker = "阿贝多",
-            color = { r = 0.95, g = 0.75, b = 0.3, a = 1.0 },
+            color = Layout.PALETTE.PLAYER,
             content = "呵呵，派蒙，这可不能吃。这是我和教令院学者共同复原的古代战争推衍法器——「地脉星图棋盘」。"
         },
         {
             speaker = "阿贝多",
-            color = { r = 0.95, g = 0.75, b = 0.3, a = 1.0 },
+            color = Layout.PALETTE.PLAYER,
             content = "盘面上每一个光点都象征着一处地脉灵穴，而流动的光尘则是纯净元素微粒。拖拽己方灵穴铺设光轨，轻点灵穴收拢防御。"
         },
         {
             speaker = "派蒙",
-            color = { r = 1.0, g = 0.85, b = 0.4, a = 1.0 },
+            color = Layout.PALETTE.GOLD,
             content = "听起来很有意思！旅行者，快调配你的战术符印，我们一起执掌星盘赢得推衍吧！"
         }
     },
@@ -1310,8 +1324,12 @@ function DialoguePlayer.Update(dt, speakerTextCtrl, contentTextCtrl)
 
     if speakerTextCtrl and speakerTextCtrl.alive then
         speakerTextCtrl.text = "【" .. line.speaker .. "】"
-        speakerTextCtrl.fontColor = line.color
+        if line.color then
+            local col = type(line.color) == "number" and line.color or (Layout and Layout.ToColorInt and Layout.ToColorInt(line.color) or Layout.PALETTE.GOLD)
+            pcall(function() speakerTextCtrl.fontColor = col end)
+        end
     end
+
 
     DialoguePlayer.charTimer = DialoguePlayer.charTimer + dt
     if DialoguePlayer.charTimer >= 0.03 then

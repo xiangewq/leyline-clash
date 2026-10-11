@@ -17,7 +17,7 @@ function CombatResolver.AddSpark(x, y, color)
         y = y + (math.random() - 0.5) * 24,
         life = 0.35,
         maxLife = 0.35,
-        color = color or { r = 1.0, g = 0.4, b = 0.3, a = 1.0 }
+        color = color or 0xFFF43F5E
     })
 end
 

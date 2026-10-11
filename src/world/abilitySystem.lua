@@ -76,7 +76,7 @@ function AbilitySystem.CastAbility(slotIndex, targetNodeId, nodes, routeManager,
 
         if onSparkCallback then
             for _ = 1, 10 do
-                onSparkCallback(targetNode.x, targetNode.y, { r = 1.0, g = 0.25, b = 0.1, a = 1.0 })
+                onSparkCallback(targetNode.x, targetNode.y, 0xFFFF3F20)
             end
         end
 

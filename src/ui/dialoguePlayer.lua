@@ -1,26 +1,28 @@
 -- src/ui/dialoguePlayer.lua
 -- 开场逐字剧情演播器（阿贝多与派蒙台词演出、跳过与推进）
 
+local Layout = require("default_import_file/src/core/layout") or require("src/core/layout")
+
 local DialoguePlayer = {
     DIALOGUES = {
         {
             speaker = "派蒙",
-            color = { r = 1.0, g = 0.85, b = 0.4, a = 1.0 },
+            color = Layout.PALETTE.GOLD,
             content = "哇！阿贝多，这个泛着蓝光的大圆盘是什么呀？上面亮晶晶的小圆点，看起来好像……会发光的甜甜花糖豆！"
         },
         {
             speaker = "阿贝多",
-            color = { r = 0.95, g = 0.75, b = 0.3, a = 1.0 },
+            color = Layout.PALETTE.PLAYER,
             content = "呵呵，派蒙，这可不能吃。这是我和教令院学者共同复原的古代战争推衍法器——「地脉星图棋盘」。"
         },
         {
             speaker = "阿贝多",
-            color = { r = 0.95, g = 0.75, b = 0.3, a = 1.0 },
+            color = Layout.PALETTE.PLAYER,
             content = "盘面上每一个光点都象征着一处地脉灵穴，而流动的光尘则是纯净元素微粒。拖拽己方灵穴铺设光轨，轻点灵穴收拢防御。"
         },
         {
             speaker = "派蒙",
-            color = { r = 1.0, g = 0.85, b = 0.4, a = 1.0 },
+            color = Layout.PALETTE.GOLD,
             content = "听起来很有意思！旅行者，快调配你的战术符印，我们一起执掌星盘赢得推衍吧！"
         }
     },
@@ -54,8 +56,12 @@ function DialoguePlayer.Update(dt, speakerTextCtrl, contentTextCtrl)
 
     if speakerTextCtrl and speakerTextCtrl.alive then
         speakerTextCtrl.text = "【" .. line.speaker .. "】"
-        speakerTextCtrl.fontColor = line.color
+        if line.color then
+            local col = type(line.color) == "number" and line.color or (Layout and Layout.ToColorInt and Layout.ToColorInt(line.color) or Layout.PALETTE.GOLD)
+            pcall(function() speakerTextCtrl.fontColor = col end)
+        end
     end
+
 
     DialoguePlayer.charTimer = DialoguePlayer.charTimer + dt
     if DialoguePlayer.charTimer >= 0.03 then
