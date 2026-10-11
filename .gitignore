@@ -13,3 +13,5 @@ npm-debug.log*
 # Logs & Temp
 *.log
 .system_generated/
+*.apk
+*:Zone.Identifier
