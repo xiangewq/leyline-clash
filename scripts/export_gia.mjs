@@ -21,7 +21,10 @@ for (const file of pkg.files) {
 
 const combined = studio.exportData('combined');
 const combinedPath = path.join(OUT_DIR, combined.filename);
-fs.writeFileSync(combinedPath, Buffer.from(combined.data, 'base64'));
+const combinedBuffer = Buffer.from(combined.data, 'base64');
+fs.writeFileSync(combinedPath, combinedBuffer);
+fs.writeFileSync(path.join(OUT_DIR, 'starlink.gia'), combinedBuffer);
 console.log(`✓ 导出整合包: ${combined.filename} (${(fs.statSync(combinedPath).size / 1024).toFixed(1)} KB)`);
+console.log(`✓ 同步别名: starlink.gia (${(fs.statSync(path.join(OUT_DIR, 'starlink.gia')).size / 1024).toFixed(1)} KB)`);
 
 console.log('\n全部 GIA 文件导出完成！可直接在官方编辑器【导入模板】中使用。');

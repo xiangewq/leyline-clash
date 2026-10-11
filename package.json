@@ -1,0 +1,13 @@
+{
+  "name": "starlink",
+  "version": "1.0.0",
+  "description": "星轨交错：地脉争锋 - 原神千星奇域 2D RTS 沙箱游戏",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build_all.mjs",
+    "pack": "node scripts/pack_bundle.mjs",
+    "save": "node scripts/build_save.mjs",
+    "gia": "node scripts/export_gia.mjs"
+  }
+}
