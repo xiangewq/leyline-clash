@@ -385,9 +385,19 @@ local function SetupEventHandlers()
         if cardUI.button and cardUI.button.AddCursorEventListener then
             local cardKey = PrepareView.POOL_ORDER[idx]
             cardUI.button:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
-                local ok, err = PrepareView.ToggleCard(cardKey)
-                if not ok and err then
-                    HudView.ShowToast(err)
+                local ok, action, cardId = PrepareView.ToggleCard(cardKey)
+                local card = CardRegistry.GetCardById(cardKey)
+                BalanceConfig.PlayAudioSafe("UI_CLICK")
+                if not ok then
+                    HudView.ShowToast(action or "调配失败")
+                else
+                    local used = PrepareView.GetUsedBudget()
+                    local count = #PrepareView.selectedIds
+                    if action == "equipped" then
+                        HudView.ShowToast(string.format("【已装配】%s (耗能%d) | 预算 %d/12，已选 %d/4 张", card and card.name or "符印", card and card.cost or 0, used, count))
+                    elseif action == "unequipped" then
+                        HudView.ShowToast(string.format("【已卸下】%s (归还%d) | 预算 %d/12，已选 %d/4 张", card and card.name or "符印", card and card.cost or 0, used, count))
+                    end
                 end
                 PrepareView.Render(UI.prepCards, UI.prepBudgetText, UI.prepHint)
             end)
@@ -396,7 +406,10 @@ local function SetupEventHandlers()
 
     if UI.prepStartBtn and UI.prepStartBtn.AddCursorEventListener then
         UI.prepStartBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
-            PrepareView.ConfirmAndStart()
+            local ok, err = PrepareView.ConfirmAndStart()
+            if not ok and err then
+                HudView.ShowToast(err)
+            end
         end)
     end
 

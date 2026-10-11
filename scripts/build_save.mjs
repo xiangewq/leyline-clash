@@ -58,10 +58,10 @@ const LINKS_DEF = [
 const POOL_CARDS = [
   { id: 1, key: 'anemo_shield', name: '千风庇护', cost: 2, desc: '加持免伤结界' },
   { id: 2, key: 'anemo_turb', name: '千风湍流', cost: 3, desc: '流道速度翻倍' },
-  { id: 3, key: 'pyro_blast', name: '轰轰烈焰', cost: 4, desc: '消灭80%敌军' },
+  { id: 3, key: 'pyro_blast', name: '轰轰烈焰', cost: 4, desc: '消灭80%敌方微粒' },
   { id: 4, key: 'hydro_bribe', name: '摩拉律法', cost: 5, desc: '秒占中立灵穴' },
   { id: 5, key: 'geo_wall', name: '坚岩重嶂', cost: 4, desc: '战损减半反震' },
-  { id: 6, key: 'pyro_erosion', name: '烈焰侵蚀', cost: 2, desc: '削减40%微粒' },
+  { id: 6, key: 'pyro_erosion', name: '烈焰侵蚀', cost: 2, desc: '削减40%敌方微粒' },
 ];
 
 // ==========================================
@@ -895,28 +895,28 @@ const nodeGroups = NODES_DEF.map(n => {
       createTextbox({
         id: `part_txt_${n.id}`,
         name: 'ParticleText',
-        text: String(n.parts),
-        fontSize: 20,
+        text: `兵力: ${n.parts}`,
+        fontSize: 15,
         fontColor: parseColor('#f8fafc'),
         horizontalAlignment: 'Middle',
         verticalAlignment: 'Middle',
         transformByPlatform: makeTransform({
-          offset: [0, -12],
-          size: [130, 32],
+          offset: [0, -10],
+          size: [140, 32],
           pivot: [0.5, 0.5]
         })
       }),
       createTextbox({
         id: `title_txt_${n.id}`,
         name: 'TitleText',
-        text: n.name,
+        text: `${n.name} (${n.parts})`,
         fontSize: 14,
         fontColor: parseColor('#f8fafc'),
         horizontalAlignment: 'Middle',
         verticalAlignment: 'Middle',
         transformByPlatform: makeTransform({
-          offset: [0, 12],
-          size: [130, 28],
+          offset: [0, 14],
+          size: [140, 28],
           pivot: [0.5, 0.5]
         })
       }),

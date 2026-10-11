@@ -68,7 +68,7 @@ local CardRegistry = {
             cd = 30,
             duration = 20,
             targetType = "enemy_node",
-            desc = "炽火灼烧敌脉，20秒内目标敌方灵穴被我方微粒攻占的速度翻倍。",
+            desc = "炽火灼烧敌脉，瞬间消灭目标敌方灵穴上 40% 的驻留微粒并切断输出！",
             badgeColor = Layout.MakeColor(244, 63, 94, 255)
         }
     }

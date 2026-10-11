@@ -149,7 +149,7 @@ local CardRegistry = {
             cd = 30,
             duration = 20,
             targetType = "enemy_node",
-            desc = "炽火灼烧敌脉，20秒内目标敌方灵穴被我方微粒攻占的速度翻倍。",
+            desc = "炽火灼烧敌脉，瞬间消灭目标敌方灵穴上 40% 的驻留微粒并切断输出！",
             badgeColor = Layout.MakeColor(244, 63, 94, 255)
         }
     }
@@ -1180,7 +1180,8 @@ function VisualRenderer.UpdateRoutes(routeCtrls, routes, nodes, dragLineCtrl, in
                 if nA and nB then
                     local col = Layout.GetFactionColor(r.faction)
                     local thickness = 4
-                    if nA.anomaly == "WIND_FLOW" or r.boostedUntil > elapsedTime then
+                    -- 仅当释放了【千风湍流】符印对该光轨加速时，才激活专属翠碧光轨特效
+                    if r.boostedUntil > elapsedTime then
                         col = Layout.PALETTE.ANEMO
                         thickness = 6
                     end
@@ -1248,10 +1249,17 @@ function VisualRenderer.UpdateNodes(nodeUIList, nodes, elapsedTime)
                 end
             end
 
-            -- 3. 兵力数值显示 (高对比度纯白亮色，帧级实时刷新)
+            -- 3. 兵力数值显示 (双重保障：标题附加括号数值 + 兵力行独立高对比呈现)
+            local currentParts = math.floor(node.particles or 0)
+            if ui.titleText and ui.titleText.alive then
+                ui.titleText.text = string.format("%s (%d)", node.name, currentParts)
+                ui.titleText.fontColor = Layout.PALETTE.TEXT_LIGHT
+                Layout.SetVisible(ui.titleText, true)
+            end
+
             if ui.particleText and ui.particleText.alive then
-                ui.particleText.text = tostring(math.floor(node.particles or 0))
-                ui.particleText.fontColor = Layout.PALETTE.TEXT_LIGHT
+                ui.particleText.text = string.format("兵力: %d", currentParts)
+                ui.particleText.fontColor = factionColor
                 Layout.SetVisible(ui.particleText, true)
             end
 
@@ -1444,7 +1452,9 @@ local PrepareView = {
 }
 
 function PrepareView.Init(onStartMatchCallback)
-    PrepareView.selectedIds = { "anemo_shield", "anemo_turb", "pyro_blast" }
+    if not PrepareView.selectedIds or #PrepareView.selectedIds == 0 then
+        PrepareView.selectedIds = { "anemo_shield", "anemo_turb", "pyro_blast" }
+    end
     PrepareView.maxBudget = BalanceConfig.MAX_BUDGET or 12
     PrepareView.maxCards = 4
     if onStartMatchCallback then
@@ -1473,7 +1483,7 @@ function PrepareView.ToggleCard(cardId)
     for idx, id in ipairs(PrepareView.selectedIds) do
         if id == cardId then
             table.remove(PrepareView.selectedIds, idx)
-            return true, nil
+            return true, "unequipped", cardId
         end
     end
 
@@ -1491,7 +1501,7 @@ function PrepareView.ToggleCard(cardId)
     end
 
     table.insert(PrepareView.selectedIds, cardId)
-    return true, nil
+    return true, "equipped", cardId
 end
 
 -- 刷新调配界面差分视觉表现（边框高亮、背景深浅、角标切换与预算提示）
@@ -1513,14 +1523,15 @@ function PrepareView.Render(cardUIList, budgetTextCtrl, hintTextCtrl)
                     ui.bgCtrl.imageColor = isSel and Layout.MakeColor(30, 58, 95, 255) or Layout.MakeColor(15, 23, 42, 255)
                 end
 
-                -- 3. 名称文本差分
+                -- 3. 名称文本差分 (选中附带醒目 [✓] 标识)
                 if ui.nameCtrl and ui.nameCtrl.alive then
-                    ui.nameCtrl.fontColor = isSel and Layout.PALETTE.TEXT_LIGHT or Layout.PALETTE.TEXT_MUTED
+                    ui.nameCtrl.text = isSel and ("[✓] " .. card.name) or card.name
+                    ui.nameCtrl.fontColor = isSel and Layout.PALETTE.GOLD or Layout.PALETTE.TEXT_MUTED
                 end
 
                 -- 4. 选中状态角标
                 if ui.checkCtrl and ui.checkCtrl.alive then
-                    ui.checkCtrl.text = isSel and "【✓ 已装配】" or "【点击装配】"
+                    ui.checkCtrl.text = isSel and "【★ 已装配】" or "【点击装配】"
                     ui.checkCtrl.fontColor = isSel and Layout.PALETTE.GOLD or Layout.MakeColor(100, 116, 139, 255)
                 end
             end
@@ -1554,12 +1565,12 @@ end
 
 function PrepareView.ConfirmAndStart()
     if #PrepareView.selectedIds == 0 then
-        -- 兜底：若未选任何卡则自动装配推荐卡
-        PrepareView.selectedIds = { "anemo_shield", "anemo_turb", "pyro_blast" }
+        return false, "请至少装配 1 张战术符印后再启阵出征！"
     end
     if PrepareView.onStartMatch then
         PrepareView.onStartMatch(PrepareView.selectedIds)
     end
+    return true
 end
 
 return PrepareView
@@ -2140,9 +2151,19 @@ local function SetupEventHandlers()
         if cardUI.button and cardUI.button.AddCursorEventListener then
             local cardKey = PrepareView.POOL_ORDER[idx]
             cardUI.button:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
-                local ok, err = PrepareView.ToggleCard(cardKey)
-                if not ok and err then
-                    HudView.ShowToast(err)
+                local ok, action, cardId = PrepareView.ToggleCard(cardKey)
+                local card = CardRegistry.GetCardById(cardKey)
+                BalanceConfig.PlayAudioSafe("UI_CLICK")
+                if not ok then
+                    HudView.ShowToast(action or "调配失败")
+                else
+                    local used = PrepareView.GetUsedBudget()
+                    local count = #PrepareView.selectedIds
+                    if action == "equipped" then
+                        HudView.ShowToast(string.format("【已装配】%s (耗能%d) | 预算 %d/12，已选 %d/4 张", card and card.name or "符印", card and card.cost or 0, used, count))
+                    elseif action == "unequipped" then
+                        HudView.ShowToast(string.format("【已卸下】%s (归还%d) | 预算 %d/12，已选 %d/4 张", card and card.name or "符印", card and card.cost or 0, used, count))
+                    end
                 end
                 PrepareView.Render(UI.prepCards, UI.prepBudgetText, UI.prepHint)
             end)
@@ -2151,7 +2172,10 @@ local function SetupEventHandlers()
 
     if UI.prepStartBtn and UI.prepStartBtn.AddCursorEventListener then
         UI.prepStartBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
-            PrepareView.ConfirmAndStart()
+            local ok, err = PrepareView.ConfirmAndStart()
+            if not ok and err then
+                HudView.ShowToast(err)
+            end
         end)
     end
 

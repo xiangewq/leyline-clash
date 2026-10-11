@@ -22,7 +22,9 @@ local PrepareView = {
 }
 
 function PrepareView.Init(onStartMatchCallback)
-    PrepareView.selectedIds = { "anemo_shield", "anemo_turb", "pyro_blast" }
+    if not PrepareView.selectedIds or #PrepareView.selectedIds == 0 then
+        PrepareView.selectedIds = { "anemo_shield", "anemo_turb", "pyro_blast" }
+    end
     PrepareView.maxBudget = BalanceConfig.MAX_BUDGET or 12
     PrepareView.maxCards = 4
     if onStartMatchCallback then
@@ -51,7 +53,7 @@ function PrepareView.ToggleCard(cardId)
     for idx, id in ipairs(PrepareView.selectedIds) do
         if id == cardId then
             table.remove(PrepareView.selectedIds, idx)
-            return true, nil
+            return true, "unequipped", cardId
         end
     end
 
@@ -69,7 +71,7 @@ function PrepareView.ToggleCard(cardId)
     end
 
     table.insert(PrepareView.selectedIds, cardId)
-    return true, nil
+    return true, "equipped", cardId
 end
 
 -- 刷新调配界面差分视觉表现（边框高亮、背景深浅、角标切换与预算提示）
@@ -91,14 +93,15 @@ function PrepareView.Render(cardUIList, budgetTextCtrl, hintTextCtrl)
                     ui.bgCtrl.imageColor = isSel and Layout.MakeColor(30, 58, 95, 255) or Layout.MakeColor(15, 23, 42, 255)
                 end
 
-                -- 3. 名称文本差分
+                -- 3. 名称文本差分 (选中附带醒目 [✓] 标识)
                 if ui.nameCtrl and ui.nameCtrl.alive then
-                    ui.nameCtrl.fontColor = isSel and Layout.PALETTE.TEXT_LIGHT or Layout.PALETTE.TEXT_MUTED
+                    ui.nameCtrl.text = isSel and ("[✓] " .. card.name) or card.name
+                    ui.nameCtrl.fontColor = isSel and Layout.PALETTE.GOLD or Layout.PALETTE.TEXT_MUTED
                 end
 
                 -- 4. 选中状态角标
                 if ui.checkCtrl and ui.checkCtrl.alive then
-                    ui.checkCtrl.text = isSel and "【✓ 已装配】" or "【点击装配】"
+                    ui.checkCtrl.text = isSel and "【★ 已装配】" or "【点击装配】"
                     ui.checkCtrl.fontColor = isSel and Layout.PALETTE.GOLD or Layout.MakeColor(100, 116, 139, 255)
                 end
             end
@@ -132,12 +135,12 @@ end
 
 function PrepareView.ConfirmAndStart()
     if #PrepareView.selectedIds == 0 then
-        -- 兜底：若未选任何卡则自动装配推荐卡
-        PrepareView.selectedIds = { "anemo_shield", "anemo_turb", "pyro_blast" }
+        return false, "请至少装配 1 张战术符印后再启阵出征！"
     end
     if PrepareView.onStartMatch then
         PrepareView.onStartMatch(PrepareView.selectedIds)
     end
+    return true
 end
 
 return PrepareView

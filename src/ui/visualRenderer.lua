@@ -42,7 +42,8 @@ function VisualRenderer.UpdateRoutes(routeCtrls, routes, nodes, dragLineCtrl, in
                 if nA and nB then
                     local col = Layout.GetFactionColor(r.faction)
                     local thickness = 4
-                    if nA.anomaly == "WIND_FLOW" or r.boostedUntil > elapsedTime then
+                    -- 仅当释放了【千风湍流】符印对该光轨加速时，才激活专属翠碧光轨特效
+                    if r.boostedUntil > elapsedTime then
                         col = Layout.PALETTE.ANEMO
                         thickness = 6
                     end
@@ -110,10 +111,17 @@ function VisualRenderer.UpdateNodes(nodeUIList, nodes, elapsedTime)
                 end
             end
 
-            -- 3. 兵力数值显示 (高对比度纯白亮色，帧级实时刷新)
+            -- 3. 兵力数值显示 (双重保障：标题附加括号数值 + 兵力行独立高对比呈现)
+            local currentParts = math.floor(node.particles or 0)
+            if ui.titleText and ui.titleText.alive then
+                ui.titleText.text = string.format("%s (%d)", node.name, currentParts)
+                ui.titleText.fontColor = Layout.PALETTE.TEXT_LIGHT
+                Layout.SetVisible(ui.titleText, true)
+            end
+
             if ui.particleText and ui.particleText.alive then
-                ui.particleText.text = tostring(math.floor(node.particles or 0))
-                ui.particleText.fontColor = Layout.PALETTE.TEXT_LIGHT
+                ui.particleText.text = string.format("兵力: %d", currentParts)
+                ui.particleText.fontColor = factionColor
                 Layout.SetVisible(ui.particleText, true)
             end
 
