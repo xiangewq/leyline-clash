@@ -110,10 +110,10 @@ function VisualRenderer.UpdateNodes(nodeUIList, nodes, elapsedTime)
                 end
             end
 
-            -- 3. 兵力数值显示与阵营着色
+            -- 3. 兵力数值显示 (高对比度纯白亮色)
             if ui.particleText and ui.particleText.alive then
                 ui.particleText.text = tostring(node.particles)
-                ui.particleText.fontColor = factionColor
+                ui.particleText.fontColor = Layout.PALETTE.TEXT_LIGHT
             end
 
             -- 4. 异象标识文本

@@ -70,6 +70,16 @@ const POOL_CARDS = [
 // 最后一个子节点处于最底层 (Back / Underneath)
 // ==========================================
 
+// 安全创建文本框 (保证 minimumFontSize <= fontSize，关闭模糊描边与背景冲突)
+function createTextbox(opts) {
+  return createNode('textbox', {
+    ...opts,
+    minimumFontSize: opts.minimumFontSize ?? Math.min(opts.fontSize || 12, 10),
+    enableOutline: false,
+    bgColor: 0
+  });
+}
+
 // 1. 终局结算弹窗 SettleModal (最顶层)
 const settleModal = createNode('container', {
   id: 'settle_modal',
@@ -98,7 +108,7 @@ const settleModal = createNode('container', {
             pivot: [0.5, 0.5]
           }),
           children: [
-            createNode('textbox', {
+            createTextbox({
               id: 'settle_retry_txt',
               name: 'Text',
               text: '【重新演练】',
@@ -106,7 +116,7 @@ const settleModal = createNode('container', {
               fontColor: parseColor('#f8fafc'),
               horizontalAlignment: 'Middle',
               verticalAlignment: 'Middle',
-              transformByPlatform: makeTransform({ layout: 'stretch' })
+              transformByPlatform: makeTransform({ offset: [0, 0], size: [170, 44], pivot: [0.5, 0.5] })
             }),
             createNode('image', {
               id: 'settle_retry_bg',
@@ -117,7 +127,7 @@ const settleModal = createNode('container', {
             })
           ]
         }),
-        createNode('textbox', {
+        createTextbox({
           id: 'settle_stats',
           name: 'SettleStats',
           text: '占领灵穴：5/5  |  存活兵力：84  |  耗时：02:45',
@@ -127,11 +137,11 @@ const settleModal = createNode('container', {
           verticalAlignment: 'Middle',
           transformByPlatform: makeTransform({
             offset: [0, -30],
-            size: [520, 32],
+            size: [520, 36],
             pivot: [0.5, 0.5]
           })
         }),
-        createNode('textbox', {
+        createTextbox({
           id: 'settle_desc',
           name: 'SettleDesc',
           text: '星盘之理尽在掌控，地脉灵流归于统御。',
@@ -141,21 +151,21 @@ const settleModal = createNode('container', {
           verticalAlignment: 'Middle',
           transformByPlatform: makeTransform({
             offset: [0, 50],
-            size: [520, 48],
+            size: [520, 50],
             pivot: [0.5, 0.5]
           })
         }),
-        createNode('textbox', {
+        createTextbox({
           id: 'settle_title',
           name: 'SettleTitle',
           text: '【推衍大捷·全域共鸣】',
-          fontSize: 24,
+          fontSize: 22,
           fontColor: parseColor('#38bdf8'),
           horizontalAlignment: 'Middle',
           verticalAlignment: 'Middle',
           transformByPlatform: makeTransform({
             offset: [0, 120],
-            size: [500, 40],
+            size: [500, 44],
             pivot: [0.5, 0.5]
           })
         }),
@@ -207,7 +217,7 @@ const prepCardNodes = POOL_CARDS.map((card, idx) => {
       pivot: [0.5, 0.5]
     }),
     children: [
-      createNode('textbox', {
+      createTextbox({
         id: `prep_cost_${card.id}`,
         name: 'CostText',
         text: `消耗: ${card.cost} 权能`,
@@ -217,11 +227,11 @@ const prepCardNodes = POOL_CARDS.map((card, idx) => {
         verticalAlignment: 'Middle',
         transformByPlatform: makeTransform({
           offset: [0, -28],
-          size: [180, 20],
+          size: [180, 24],
           pivot: [0.5, 0.5]
         })
       }),
-      createNode('textbox', {
+      createTextbox({
         id: `prep_desc_${card.id}`,
         name: 'DescText',
         text: card.desc,
@@ -231,11 +241,11 @@ const prepCardNodes = POOL_CARDS.map((card, idx) => {
         verticalAlignment: 'Middle',
         transformByPlatform: makeTransform({
           offset: [0, -4],
-          size: [180, 24],
+          size: [180, 28],
           pivot: [0.5, 0.5]
         })
       }),
-      createNode('textbox', {
+      createTextbox({
         id: `prep_name_${card.id}`,
         name: 'NameText',
         text: card.name,
@@ -245,7 +255,7 @@ const prepCardNodes = POOL_CARDS.map((card, idx) => {
         verticalAlignment: 'Middle',
         transformByPlatform: makeTransform({
           offset: [0, 24],
-          size: [180, 24],
+          size: [180, 28],
           pivot: [0.5, 0.5]
         })
       }),
@@ -297,7 +307,7 @@ const prepareModal = createNode('container', {
             pivot: [0.5, 0.5]
           }),
           children: [
-            createNode('textbox', {
+            createTextbox({
               id: 'prep_start_txt',
               name: 'Text',
               text: '【开启地脉推衍】',
@@ -305,7 +315,11 @@ const prepareModal = createNode('container', {
               fontColor: parseColor('#f8fafc'),
               horizontalAlignment: 'Middle',
               verticalAlignment: 'Middle',
-              transformByPlatform: makeTransform({ layout: 'stretch' })
+              transformByPlatform: makeTransform({
+                offset: [0, 0],
+                size: [220, 46],
+                pivot: [0.5, 0.5]
+              })
             }),
             createNode('image', {
               id: 'prep_start_bg',
@@ -317,7 +331,7 @@ const prepareModal = createNode('container', {
           ]
         }),
         ...prepCardNodes,
-        createNode('textbox', {
+        createTextbox({
           id: 'prep_hint',
           name: 'PrepHint',
           text: '已预装核心卡组：千风庇护(2点) + 千风湍流(3点) + 轰轰烈焰(4点)',
@@ -327,11 +341,11 @@ const prepareModal = createNode('container', {
           verticalAlignment: 'Middle',
           transformByPlatform: makeTransform({
             offset: [0, 95],
-            size: [600, 24],
+            size: [600, 28],
             pivot: [0.5, 0.5]
           })
         }),
-        createNode('textbox', {
+        createTextbox({
           id: 'prep_budget_txt',
           name: 'PrepBudgetText',
           text: '当前调配权能预算：9 / 12 点',
@@ -341,21 +355,21 @@ const prepareModal = createNode('container', {
           verticalAlignment: 'Middle',
           transformByPlatform: makeTransform({
             offset: [0, 130],
-            size: [400, 28],
+            size: [400, 32],
             pivot: [0.5, 0.5]
           })
         }),
-        createNode('textbox', {
+        createTextbox({
           id: 'prep_title',
           name: 'PrepTitle',
           text: '【战前符印调配】',
-          fontSize: 22,
+          fontSize: 20,
           fontColor: parseColor('#fbbf24'),
           horizontalAlignment: 'Middle',
           verticalAlignment: 'Middle',
           transformByPlatform: makeTransform({
             offset: [0, 175],
-            size: [400, 36],
+            size: [400, 40],
             pivot: [0.5, 0.5]
           })
         }),
@@ -416,7 +430,7 @@ const dialogueModal = createNode('container', {
             pivot: [0.5, 0.5]
           }),
           children: [
-            createNode('textbox', {
+            createTextbox({
               id: 'dlg_skip_txt',
               name: 'Text',
               text: '【跳过】',
@@ -424,7 +438,11 @@ const dialogueModal = createNode('container', {
               fontColor: parseColor('#94a3b8'),
               horizontalAlignment: 'Middle',
               verticalAlignment: 'Middle',
-              transformByPlatform: makeTransform({ layout: 'stretch' })
+              transformByPlatform: makeTransform({
+                offset: [0, 0],
+                size: [88, 34],
+                pivot: [0.5, 0.5]
+              })
             }),
             createNode('image', {
               id: 'dlg_skip_bg',
@@ -446,7 +464,7 @@ const dialogueModal = createNode('container', {
             pivot: [0.5, 0.5]
           }),
           children: [
-            createNode('textbox', {
+            createTextbox({
               id: 'dlg_next_txt',
               name: 'Text',
               text: '【继续】',
@@ -454,7 +472,11 @@ const dialogueModal = createNode('container', {
               fontColor: parseColor('#38bdf8'),
               horizontalAlignment: 'Middle',
               verticalAlignment: 'Middle',
-              transformByPlatform: makeTransform({ layout: 'stretch' })
+              transformByPlatform: makeTransform({
+                offset: [0, 0],
+                size: [88, 34],
+                pivot: [0.5, 0.5]
+              })
             }),
             createNode('image', {
               id: 'dlg_next_bg',
@@ -465,31 +487,31 @@ const dialogueModal = createNode('container', {
             })
           ]
         }),
-        createNode('textbox', {
+        createTextbox({
           id: 'dlg_content',
           name: 'DlgContent',
-          text: '哇！阿贝多，这个泛着蓝光的大圆盘是什么呀？上面亮晶晶的小圆点，看起来好像……会发光的甜甜花糖豆！',
-          fontSize: 14,
+          text: '哇！阿贝多，这个泛着蓝光的大圆盘是什么呀？\\n上面亮晶晶的小圆点，看起来好像……会发光的甜甜花糖豆！',
+          fontSize: 15,
           fontColor: parseColor('#f8fafc'),
           horizontalAlignment: 'Left',
           verticalAlignment: 'Top',
           transformByPlatform: makeTransform({
             offset: [0, -6],
-            size: [820, 64],
+            size: [820, 72],
             pivot: [0.5, 0.5]
           })
         }),
-        createNode('textbox', {
+        createTextbox({
           id: 'dlg_speaker',
           name: 'DlgSpeaker',
           text: '【派蒙】',
-          fontSize: 17,
+          fontSize: 18,
           fontColor: parseColor('#fbbf24'),
           horizontalAlignment: 'Left',
           verticalAlignment: 'Middle',
           transformByPlatform: makeTransform({
-            offset: [-320, 48],
-            size: [180, 32],
+            offset: [-300, 48],
+            size: [220, 36],
             pivot: [0.5, 0.5]
           })
         }),
@@ -537,16 +559,20 @@ const cardSlots = [1, 2, 3, 4].map(idx => {
       pivot: [0.5, 0.5]
     }),
     children: [
-      createNode('textbox', {
+      createTextbox({
         id: `card_cd_txt_${idx}`,
         name: 'CdText',
         text: '',
         visible: false,
-        fontSize: 16,
+        fontSize: 18,
         fontColor: parseColor('#f8fafc'),
         horizontalAlignment: 'Middle',
         verticalAlignment: 'Middle',
-        transformByPlatform: makeTransform({ layout: 'stretch' })
+        transformByPlatform: makeTransform({
+          offset: [0, 0],
+          size: [120, 76],
+          pivot: [0.5, 0.5]
+        })
       }),
       createNode('image', {
         id: `card_cd_mask_${idx}`,
@@ -556,31 +582,31 @@ const cardSlots = [1, 2, 3, 4].map(idx => {
         imageColor: parseColor('#000000', 0.75),
         transformByPlatform: makeTransform({ layout: 'stretch' })
       }),
-      createNode('textbox', {
+      createTextbox({
         id: `card_cost_${idx}`,
         name: 'CostText',
         text: '2点',
-        fontSize: 11,
+        fontSize: 12,
         fontColor: parseColor('#fbbf24'),
         horizontalAlignment: 'Middle',
         verticalAlignment: 'Middle',
         transformByPlatform: makeTransform({
           offset: [0, -16],
-          size: [116, 20],
+          size: [120, 24],
           pivot: [0.5, 0.5]
         })
       }),
-      createNode('textbox', {
+      createTextbox({
         id: `card_name_${idx}`,
         name: 'NameText',
         text: '千风庇护',
-        fontSize: 13,
+        fontSize: 14,
         fontColor: parseColor('#f8fafc'),
         horizontalAlignment: 'Middle',
         verticalAlignment: 'Middle',
         transformByPlatform: makeTransform({
           offset: [0, 14],
-          size: [116, 24],
+          size: [120, 28],
           pivot: [0.5, 0.5]
         })
       }),
@@ -622,7 +648,7 @@ const hudLayer = createNode('container', {
         pivot: [0.5, 0.5]
       }),
       children: [
-        createNode('textbox', {
+        createTextbox({
           id: 'toast_text',
           name: 'ToastText',
           text: '',
@@ -630,7 +656,11 @@ const hudLayer = createNode('container', {
           fontColor: parseColor('#fbbf24'),
           horizontalAlignment: 'Middle',
           verticalAlignment: 'Middle',
-          transformByPlatform: makeTransform({ layout: 'stretch' })
+          transformByPlatform: makeTransform({
+            offset: [0, 0],
+            size: [516, 32],
+            pivot: [0.5, 0.5]
+          })
         }),
         createNode('image', {
           id: 'toast_inner_bg',
@@ -673,7 +703,7 @@ const hudLayer = createNode('container', {
         pivot: [0.5, 0.5]
       }),
       children: [
-        createNode('textbox', {
+        createTextbox({
           id: 'hud_player_pct',
           name: 'HudPlayerPct',
           text: '我方掌控 50%',
@@ -683,25 +713,25 @@ const hudLayer = createNode('container', {
           verticalAlignment: 'Middle',
           transformByPlatform: makeTransform({
             offset: [-200, 6],
-            size: [180, 24],
+            size: [200, 28],
             pivot: [0.5, 0.5]
           })
         }),
-        createNode('textbox', {
+        createTextbox({
           id: 'hud_timer',
           name: 'HudTimer',
           text: '06:00',
-          fontSize: 16,
+          fontSize: 18,
           fontColor: parseColor('#f8fafc'),
           horizontalAlignment: 'Middle',
           verticalAlignment: 'Middle',
           transformByPlatform: makeTransform({
             offset: [0, 6],
-            size: [120, 24],
+            size: [140, 30],
             pivot: [0.5, 0.5]
           })
         }),
-        createNode('textbox', {
+        createTextbox({
           id: 'hud_enemy_pct',
           name: 'HudEnemyPct',
           text: '敌方压制 50%',
@@ -711,7 +741,7 @@ const hudLayer = createNode('container', {
           verticalAlignment: 'Middle',
           transformByPlatform: makeTransform({
             offset: [200, 6],
-            size: [180, 24],
+            size: [200, 28],
             pivot: [0.5, 0.5]
           })
         }),
@@ -809,61 +839,61 @@ const nodeGroups = NODES_DEF.map(n => {
       pivot: [0.5, 0.5]
     }),
     children: [
-      createNode('textbox', {
+      createTextbox({
         id: `status_txt_${n.id}`,
         name: 'StatusText',
         text: '[驻阵固守]',
         visible: false,
-        fontSize: 11,
+        fontSize: 12,
         fontColor: parseColor('#fbbf24'),
         horizontalAlignment: 'Middle',
         verticalAlignment: 'Middle',
         transformByPlatform: makeTransform({
           offset: [0, -(n.r + 14)],
-          size: [110, 18],
+          size: [130, 24],
           pivot: [0.5, 0.5]
         })
       }),
-      createNode('textbox', {
+      createTextbox({
         id: `anom_txt_${n.id}`,
         name: 'AnomalyText',
         text: anomText,
         visible: Boolean(anomText),
-        fontSize: 11,
+        fontSize: 12,
         fontColor: parseColor('#fbbf24'),
         horizontalAlignment: 'Middle',
         verticalAlignment: 'Middle',
         transformByPlatform: makeTransform({
           offset: [0, n.r + 14],
-          size: [110, 18],
+          size: [130, 24],
           pivot: [0.5, 0.5]
         })
       }),
-      createNode('textbox', {
+      createTextbox({
         id: `part_txt_${n.id}`,
         name: 'ParticleText',
         text: String(n.parts),
-        fontSize: 18,
-        fontColor: parseColor(factionColor),
+        fontSize: 20,
+        fontColor: parseColor('#f8fafc'),
         horizontalAlignment: 'Middle',
         verticalAlignment: 'Middle',
         transformByPlatform: makeTransform({
-          offset: [0, -10],
-          size: [110, 26],
+          offset: [0, -12],
+          size: [130, 32],
           pivot: [0.5, 0.5]
         })
       }),
-      createNode('textbox', {
+      createTextbox({
         id: `title_txt_${n.id}`,
         name: 'TitleText',
         text: n.name,
-        fontSize: 13,
+        fontSize: 14,
         fontColor: parseColor('#f8fafc'),
         horizontalAlignment: 'Middle',
         verticalAlignment: 'Middle',
         transformByPlatform: makeTransform({
           offset: [0, 12],
-          size: [110, 22],
+          size: [130, 28],
           pivot: [0.5, 0.5]
         })
       }),

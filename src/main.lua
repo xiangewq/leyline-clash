@@ -436,6 +436,11 @@ function OnInit()
     -- 初始化 HUD
     HudView.Init()
 
+    -- 首次初始画面渲染填充 (确保文字与状态在开局立即呈现)
+    VisualRenderer.UpdateNodes(UI.nodeUIList, gameState.nodes, 0)
+    CardBar.Update(UI.cardSlots, AbilitySystem.deck, AbilitySystem.cooldowns, nil)
+    HudView.UpdateTopBar(gameState.timeRemaining, gameState.nodes, UI.playerPctText, UI.enemyPctText, UI.timerText, UI.barPlayer, UI.barEnemy)
+
     -- 注册输入
     SetupEventHandlers()
     print("[Starlink] OnInit: 装配完成！")

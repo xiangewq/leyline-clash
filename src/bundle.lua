@@ -1217,10 +1217,10 @@ function VisualRenderer.UpdateNodes(nodeUIList, nodes, elapsedTime)
                 end
             end
 
-            -- 3. 兵力数值显示与阵营着色
+            -- 3. 兵力数值显示 (高对比度纯白亮色)
             if ui.particleText and ui.particleText.alive then
                 ui.particleText.text = tostring(node.particles)
-                ui.particleText.fontColor = factionColor
+                ui.particleText.fontColor = Layout.PALETTE.TEXT_LIGHT
             end
 
             -- 4. 异象标识文本
@@ -1276,22 +1276,22 @@ local DialoguePlayer = {
         {
             speaker = "派蒙",
             color = Layout.PALETTE.GOLD,
-            content = "哇！阿贝多，这个泛着蓝光的大圆盘是什么呀？上面亮晶晶的小圆点，看起来好像……会发光的甜甜花糖豆！"
+            content = "哇！阿贝多，这个泛着蓝光的大圆盘是什么呀？\n上面亮晶晶的小圆点，看起来好像……会发光的甜甜花糖豆！"
         },
         {
             speaker = "阿贝多",
             color = Layout.PALETTE.PLAYER,
-            content = "呵呵，派蒙，这可不能吃。这是我和教令院学者共同复原的古代战争推衍法器——「地脉星图棋盘」。"
+            content = "呵呵，派蒙，这可不能吃。这是我和教令院学者共同复原的\n古代战争推衍法器——「地脉星图棋盘」。"
         },
         {
             speaker = "阿贝多",
             color = Layout.PALETTE.PLAYER,
-            content = "盘面上每一个光点都象征着一处地脉灵穴，而流动的光尘则是纯净元素微粒。拖拽己方灵穴铺设光轨，轻点灵穴收拢防御。"
+            content = "盘面上每一个光点都象征着一处地脉灵穴，而流动的光尘则是纯净元素微粒。\n拖拽己方灵穴铺设光轨，轻点灵穴收拢防御。"
         },
         {
             speaker = "派蒙",
             color = Layout.PALETTE.GOLD,
-            content = "听起来很有意思！旅行者，快调配你的战术符印，我们一起执掌星盘赢得推衍吧！"
+            content = "听起来很有意思！旅行者，快调配你的战术符印，\n我们一起执掌星盘赢得推衍吧！"
         }
     },
     currentIndex = 1,
@@ -2068,6 +2068,11 @@ function OnInit()
 
     -- 初始化 HUD
     HudView.Init()
+
+    -- 首次初始画面渲染填充 (确保文字与状态在开局立即呈现)
+    VisualRenderer.UpdateNodes(UI.nodeUIList, gameState.nodes, 0)
+    CardBar.Update(UI.cardSlots, AbilitySystem.deck, AbilitySystem.cooldowns, nil)
+    HudView.UpdateTopBar(gameState.timeRemaining, gameState.nodes, UI.playerPctText, UI.enemyPctText, UI.timerText, UI.barPlayer, UI.barEnemy)
 
     -- 注册输入
     SetupEventHandlers()

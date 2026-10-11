@@ -8,22 +8,22 @@ local DialoguePlayer = {
         {
             speaker = "派蒙",
             color = Layout.PALETTE.GOLD,
-            content = "哇！阿贝多，这个泛着蓝光的大圆盘是什么呀？上面亮晶晶的小圆点，看起来好像……会发光的甜甜花糖豆！"
+            content = "哇！阿贝多，这个泛着蓝光的大圆盘是什么呀？\n上面亮晶晶的小圆点，看起来好像……会发光的甜甜花糖豆！"
         },
         {
             speaker = "阿贝多",
             color = Layout.PALETTE.PLAYER,
-            content = "呵呵，派蒙，这可不能吃。这是我和教令院学者共同复原的古代战争推衍法器——「地脉星图棋盘」。"
+            content = "呵呵，派蒙，这可不能吃。这是我和教令院学者共同复原的\n古代战争推衍法器——「地脉星图棋盘」。"
         },
         {
             speaker = "阿贝多",
             color = Layout.PALETTE.PLAYER,
-            content = "盘面上每一个光点都象征着一处地脉灵穴，而流动的光尘则是纯净元素微粒。拖拽己方灵穴铺设光轨，轻点灵穴收拢防御。"
+            content = "盘面上每一个光点都象征着一处地脉灵穴，而流动的光尘则是纯净元素微粒。\n拖拽己方灵穴铺设光轨，轻点灵穴收拢防御。"
         },
         {
             speaker = "派蒙",
             color = Layout.PALETTE.GOLD,
-            content = "听起来很有意思！旅行者，快调配你的战术符印，我们一起执掌星盘赢得推衍吧！"
+            content = "听起来很有意思！旅行者，快调配你的战术符印，\n我们一起执掌星盘赢得推衍吧！"
         }
     },
     currentIndex = 1,
