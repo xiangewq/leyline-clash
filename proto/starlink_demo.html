@@ -1,0 +1,1596 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>《星轨交错：地脉争锋》- 2D关卡试玩Demo (v1.0.0)</title>
+  <!--
+    设计基准：1600 × 900 (16:9)
+    基准来源：根据《星轨交错_地脉争锋_2D关卡设计稿.md》实施
+    生成时间：2026-10-09
+    版本号：v1.0.0
+    声明：本文件为开发基准与玩法手感试玩Demo，用于验证核心循环、手感与多端锚定，不是最终交付物。
+  -->
+  <style>
+    :root {
+      --stage-width: 1600px;
+      --stage-height: 900px;
+      --safe-inset: 24px;
+      --color-bg: #0b111e;
+      --color-player: #38bdf8;
+      --color-player-glow: rgba(56, 189, 248, 0.4);
+      --color-enemy: #f43f5e;
+      --color-enemy-glow: rgba(244, 63, 94, 0.4);
+      --color-neutral: #94a3b8;
+      --color-gold: #fbbf24;
+      --color-anemo: #34d399;
+      --color-hud-bg: rgba(15, 23, 42, 0.85);
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      background: #020617;
+      color: #f8fafc;
+      font-family: var(--font-family);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    /* 顶部开发工具条 */
+    #dev-toolbar {
+      position: absolute;
+      top: 8px;
+      left: 12px;
+      right: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 100;
+      font-size: 12px;
+      color: #94a3b8;
+      pointer-events: none;
+    }
+    .dev-controls {
+      display: flex;
+      gap: 8px;
+      pointer-events: auto;
+    }
+    .dev-btn {
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid #475569;
+      color: #e2e8f0;
+      padding: 4px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 11px;
+      transition: all 0.2s;
+    }
+    .dev-btn:hover {
+      background: #334155;
+      border-color: #38bdf8;
+      color: #38bdf8;
+    }
+    .dev-btn.active {
+      background: #0284c7;
+      color: #fff;
+      border-color: #38bdf8;
+    }
+
+    /* 舞台主视口外包裹器 */
+    #stage-container {
+      position: relative;
+      width: var(--stage-width);
+      height: var(--stage-height);
+      transform-origin: center center;
+      transition: transform 0.1s ease-out;
+      box-shadow: 0 0 60px rgba(0, 0, 0, 0.8), 0 0 0 1px #1e293b;
+      background: var(--color-bg);
+      overflow: hidden;
+    }
+
+    /* 主Canvas画布 */
+    #game-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: crosshair;
+    }
+
+    /* 参考线层 */
+    #guidelines-layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      display: none;
+      z-index: 50;
+    }
+    .safe-zone-box {
+      position: absolute;
+      top: var(--safe-inset);
+      left: var(--safe-inset);
+      right: var(--safe-inset);
+      bottom: var(--safe-inset);
+      border: 1px dashed rgba(245, 158, 11, 0.6);
+    }
+    .crosshair-center {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 24px;
+      height: 24px;
+      transform: translate(-50%, -50%);
+    }
+    .crosshair-center::before, .crosshair-center::after {
+      content: '';
+      position: absolute;
+      background: rgba(245, 158, 11, 0.5);
+    }
+    .crosshair-center::before { top: 0; bottom: 0; left: 11px; width: 2px; }
+    .crosshair-center::after { left: 0; right: 0; top: 11px; height: 2px; }
+
+    /* UI 控件容器与锚定元素 */
+    .ui-element {
+      position: absolute;
+      outline: 1px dashed rgba(56, 189, 248, 0.3);
+      transition: outline-color 0.2s;
+    }
+    .ui-element:hover {
+      outline-color: rgba(56, 189, 248, 0.9);
+    }
+
+    /* 顶部 HUD */
+    #top-hud {
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 640px;
+      height: 52px;
+      background: var(--color-hud-bg);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 26px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      z-index: 20;
+    }
+    .hud-faction-box {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .hud-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      box-shadow: 0 0 8px currentColor;
+    }
+    .hud-timer-box {
+      text-align: center;
+    }
+    .hud-timer-label {
+      font-size: 10px;
+      letter-spacing: 1px;
+      color: #94a3b8;
+    }
+    .hud-timer-val {
+      font-size: 20px;
+      font-weight: 700;
+      color: #fbbf24;
+      font-family: monospace;
+    }
+    .hud-progress-bar {
+      position: absolute;
+      bottom: -4px;
+      left: 40px;
+      right: 40px;
+      height: 4px;
+      background: rgba(244, 63, 94, 0.6);
+      border-radius: 2px;
+      overflow: hidden;
+      display: flex;
+    }
+    .hud-progress-fill {
+      height: 100%;
+      background: var(--color-player);
+      box-shadow: 0 0 6px var(--color-player);
+      transition: width 0.3s;
+    }
+
+    /* 飘字与战报浮层 */
+    #toast-msg {
+      position: absolute;
+      top: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 8px 20px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid #38bdf8;
+      border-radius: 20px;
+      color: #38bdf8;
+      font-size: 13px;
+      font-weight: 500;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s, transform 0.3s;
+      z-index: 30;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+    }
+    #toast-msg.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    /* 底部战术符印栏 */
+    #bottom-cardbar {
+      bottom: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 98px;
+      background: var(--color-hud-bg);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 8px 16px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      z-index: 20;
+    }
+    .card-slot {
+      position: relative;
+      width: 120px;
+      height: 82px;
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid #475569;
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      overflow: hidden;
+    }
+    .card-slot:hover {
+      border-color: #38bdf8;
+      transform: translateY(-4px);
+      box-shadow: 0 6px 16px rgba(56, 189, 248, 0.3);
+    }
+    .card-slot.selected {
+      border-color: #fbbf24;
+      background: rgba(251, 191, 36, 0.15);
+      box-shadow: 0 0 16px rgba(251, 191, 36, 0.4);
+      transform: translateY(-6px);
+    }
+    .card-cost {
+      position: absolute;
+      top: 4px;
+      left: 6px;
+      font-size: 10px;
+      color: #94a3b8;
+      font-weight: 700;
+      background: rgba(15, 23, 42, 0.8);
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+    .card-element-tag {
+      position: absolute;
+      top: 4px;
+      right: 6px;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+    .elem-wind { color: #34d399; background: rgba(52, 211, 153, 0.2); }
+    .elem-fire { color: #f87171; background: rgba(248, 113, 113, 0.2); }
+    .elem-water { color: #60a5fa; background: rgba(96, 165, 250, 0.2); }
+    .elem-cryo { color: #a5f3fc; background: rgba(165, 243, 252, 0.2); }
+    .card-name {
+      font-size: 12px;
+      font-weight: 700;
+      color: #f1f5f9;
+      margin-top: 14px;
+    }
+    .card-desc {
+      font-size: 9px;
+      color: #94a3b8;
+      margin-top: 2px;
+      text-align: center;
+      padding: 0 4px;
+    }
+    .card-cooldown-mask {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(15, 23, 42, 0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: 700;
+      color: #f8fafc;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .card-slot.cooling .card-cooldown-mask {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* 左下角提示板 */
+    #left-info-panel {
+      bottom: 20px;
+      left: 24px;
+      width: 240px;
+      background: var(--color-hud-bg);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 11px;
+      line-height: 1.5;
+      color: #cbd5e1;
+      backdrop-filter: blur(8px);
+      z-index: 20;
+    }
+    #left-info-panel h4 {
+      color: #fbbf24;
+      font-size: 12px;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tip-bullet {
+      margin-bottom: 4px;
+    }
+    .tip-bullet strong {
+      color: #38bdf8;
+    }
+
+    /* 结算弹窗 */
+    #settle-modal {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(2, 6, 23, 0.8);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 80;
+      backdrop-filter: blur(10px);
+    }
+    .settle-card {
+      background: #0f172a;
+      border: 2px solid #38bdf8;
+      border-radius: 20px;
+      padding: 36px 48px;
+      text-align: center;
+      max-width: 520px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 40px rgba(56, 189, 248, 0.2);
+    }
+    .settle-card.win { border-color: #38bdf8; }
+    .settle-card.lose { border-color: #f43f5e; box-shadow: 0 0 40px rgba(244, 63, 94, 0.2); }
+    .settle-title {
+      font-size: 26px;
+      font-weight: 800;
+      margin-bottom: 12px;
+      letter-spacing: 1px;
+    }
+    .settle-card.win .settle-title { color: #38bdf8; }
+    .settle-card.lose .settle-title { color: #f43f5e; }
+    .settle-desc {
+      font-size: 14px;
+      color: #94a3b8;
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+    .settle-stats {
+      display: flex;
+      justify-content: space-around;
+      margin-bottom: 28px;
+      background: rgba(30, 41, 59, 0.6);
+      padding: 12px;
+      border-radius: 12px;
+    }
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .stat-num {
+      font-size: 18px;
+      font-weight: 700;
+      color: #fbbf24;
+    }
+    .stat-lbl {
+      font-size: 11px;
+      color: #64748b;
+    }
+    .btn-restart {
+      background: #0284c7;
+      color: #fff;
+      border: none;
+      padding: 12px 36px;
+      font-size: 15px;
+      font-weight: 700;
+      border-radius: 25px;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4);
+    }
+    .btn-restart:hover {
+      background: #0369a1;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(2, 132, 199, 0.6);
+    }
+
+    /* 右上角快捷重置按钮 */
+    #btn-fast-restart {
+      top: 18px;
+      right: 24px;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: var(--color-hud-bg);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #cbd5e1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 18px;
+      z-index: 20;
+      transition: all 0.2s;
+    }
+    #btn-fast-restart:hover {
+      color: #38bdf8;
+      border-color: #38bdf8;
+      transform: rotate(90deg);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 顶部开发工具条 -->
+  <div id="dev-toolbar">
+    <div><strong>《星轨交错：地脉争锋》</strong> 试玩基准 Demo · 1600×900 (v1.0.0)</div>
+    <div class="dev-controls">
+      <button class="dev-btn" id="btn-toggle-guides">显示锚点参考线</button>
+      <button class="dev-btn" id="btn-measure">运行探针测量</button>
+      <button class="dev-btn" id="btn-viewport-pc" class="active">电脑 (1600×900)</button>
+      <button class="dev-btn" id="btn-viewport-mobile">手机 (1280×720)</button>
+      <button class="dev-btn" id="btn-viewport-fit">窗口自适应</button>
+    </div>
+  </div>
+
+  <!-- 舞台包裹层 -->
+  <div id="stage-container">
+    <!-- 主渲染画布 -->
+    <canvas id="game-canvas" width="1600" height="900"></canvas>
+
+    <!-- 参考线层 -->
+    <div id="guidelines-layer">
+      <div class="safe-zone-box"></div>
+      <div class="crosshair-center"></div>
+    </div>
+
+    <!-- 顶部 HUD (带锚点属性) -->
+    <div id="top-hud" class="ui-element" data-anchor-id="HUD_TOP_BAR" data-pivot="0.5,0.0" data-anchor-min="0.5,0.0" data-anchor-max="0.5,0.0">
+      <div class="hud-faction-box">
+        <div class="hud-dot" style="background:#38bdf8; color:#38bdf8;"></div>
+        <span>我方领地: <span id="lbl-player-share">33%</span></span>
+      </div>
+      <div class="hud-timer-box">
+        <div class="hud-timer-label">对局倒计时</div>
+        <div class="hud-timer-val" id="lbl-timer">06:00</div>
+      </div>
+      <div class="hud-faction-box">
+        <span>敌方领地: <span id="lbl-enemy-share">33%</span></span>
+        <div class="hud-dot" style="background:#f43f5e; color:#f43f5e;"></div>
+      </div>
+      <div class="hud-progress-bar">
+        <div class="hud-progress-fill" id="hud-progress-fill" style="width: 50%;"></div>
+      </div>
+    </div>
+
+    <!-- 战报飘字提示 -->
+    <div id="toast-msg">灵流通道已建立</div>
+
+    <!-- 左下角操作提示板 -->
+    <div id="left-info-panel" class="ui-element" data-anchor-id="PANEL_TIPS" data-pivot="0.0,1.0" data-anchor-min="0.0,1.0" data-anchor-max="0.0,1.0">
+      <h4>✦ 提瓦特推衍操作法则</h4>
+      <div class="tip-bullet">• <strong>建立航线</strong>：按住己方节点，拖拽至目标节点释放。</div>
+      <div class="tip-bullet">• <strong>驻阵固守</strong>：轻点已有航线的己方节点切断光轨，激活 <strong>50% 减伤结界</strong>。</div>
+      <div class="tip-bullet">• <strong>腹地休眠</strong>：和平且四周全为友方的节点会暂停产兵，需手动拉设中继管道向外输送！</div>
+      <div class="tip-bullet">• <strong>战术符印</strong>：点击或拖拽卡牌至目标节点施法。</div>
+    </div>
+
+    <!-- 底部符印卡牌栏 -->
+    <div id="bottom-cardbar" class="ui-element" data-anchor-id="HUD_CARDBAR" data-pivot="0.5,1.0" data-anchor-min="0.5,1.0" data-anchor-max="0.5,1.0">
+      <!-- 卡牌 1 -->
+      <div class="card-slot" id="card-0" data-index="0">
+        <div class="card-cost">2点</div>
+        <div class="card-element-tag elem-wind">风</div>
+        <div class="card-name">千风庇护</div>
+        <div class="card-desc">己星免疫侵蚀20s</div>
+        <div class="card-cooldown-mask" id="cd-0">30</div>
+      </div>
+      <!-- 卡牌 2 -->
+      <div class="card-slot" id="card-1" data-index="1">
+        <div class="card-cost">3点</div>
+        <div class="card-element-tag elem-wind">风</div>
+        <div class="card-name">千风湍流</div>
+        <div class="card-desc">单轨流速翻倍30s</div>
+        <div class="card-cooldown-mask" id="cd-1">20</div>
+      </div>
+      <!-- 卡牌 3 -->
+      <div class="card-slot" id="card-2" data-index="2">
+        <div class="card-cost">4点</div>
+        <div class="card-element-tag elem-fire">火</div>
+        <div class="card-name">轰轰烈焰</div>
+        <div class="card-desc">秒杀目标80%敌军</div>
+        <div class="card-cooldown-mask" id="cd-2">15</div>
+      </div>
+      <!-- 卡牌 4 -->
+      <div class="card-slot" id="card-3" data-index="3">
+        <div class="card-cost">5点</div>
+        <div class="card-element-tag elem-water">水</div>
+        <div class="card-name">摩拉律法</div>
+        <div class="card-desc">秒占中立灵穴</div>
+        <div class="card-cooldown-mask" id="cd-3">25</div>
+      </div>
+    </div>
+
+    <!-- 右上角快捷重置 -->
+    <div id="btn-fast-restart" class="ui-element" title="重开对局" data-anchor-id="BTN_FAST_RESTART" data-pivot="1.0,0.0" data-anchor-min="1.0,0.0" data-anchor-max="1.0,0.0">
+      ↺
+    </div>
+
+    <!-- 结算弹窗 -->
+    <div id="settle-modal">
+      <div class="settle-card win" id="settle-card-box">
+        <div class="settle-title" id="settle-title-txt">【推衍大捷·全域共鸣】</div>
+        <div class="settle-desc" id="settle-desc-txt">星盘之理尽在掌控，地脉灵流归于统御。</div>
+        <div class="settle-stats">
+          <div class="stat-item">
+            <span class="stat-num" id="stat-capture">5/5</span>
+            <span class="stat-lbl">掌控灵穴</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-num" id="stat-particles">82</span>
+            <span class="stat-lbl">存活微粒</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-num" id="stat-time">02:15</span>
+            <span class="stat-lbl">推衍用时</span>
+          </div>
+        </div>
+        <button class="btn-restart" id="btn-restart-action">再试一次推演</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 游戏主逻辑与探针脚本 -->
+  <script>
+    /* =====================================================================
+       1. 探针模块 (遵守代码规范 8.7.6，供自动化和人工量测)
+       ===================================================================== */
+    const BASE_W = 1600, BASE_H = 900;
+    function measure() {
+      const base = document.getElementById('stage-container').getBoundingClientRect();
+      const out = [];
+      document.querySelectorAll('[data-anchor-id]').forEach(function (el) {
+        const r = el.getBoundingClientRect();
+        out.push({
+          id: el.getAttribute('data-anchor-id'),
+          leftPct: +((r.left - base.left) / BASE_W * 100).toFixed(3),
+          topPct: +((r.top - base.top) / BASE_H * 100).toFixed(3),
+          wPct: +(r.width / BASE_W * 100).toFixed(3),
+          hPct: +(r.height / BASE_H * 100).toFixed(3),
+          cxPct: +((r.left + r.width / 2 - base.left) / BASE_W * 100).toFixed(3),
+          cyPct: +((r.top + r.height / 2 - base.top) / BASE_H * 100).toFixed(3),
+          pivot: el.getAttribute('data-pivot') || '0.5,0.5',
+          anchorMin: el.getAttribute('data-anchor-min') || '0.5,0.5',
+          anchorMax: el.getAttribute('data-anchor-max') || '0.5,0.5'
+        });
+      });
+      return out;
+    }
+    window.__measure = function () {
+      const data = measure();
+      document.title = 'MEASURE_READY';
+      console.log('MEASURE_RESULT ' + JSON.stringify(data));
+      return JSON.stringify(data, null, 2);
+    };
+
+    /* =====================================================================
+       2. 游戏核心状态与数据模型
+       ===================================================================== */
+    const canvas = document.getElementById('game-canvas');
+    const ctx = canvas.getContext('2d');
+
+    // 关卡常数配置 (严格对齐 6 分钟紧凑对决与设计稿)
+    const MATCH_DURATION = 360; // 360秒 (6分钟)
+    const SPAWN_INTERVAL = 0.75; // 0.75秒孕育1个微粒
+    const CAPTURE_INTERVAL = 0.8; // 0.8秒结算一次占领
+    const COMBAT_INTERVAL = 0.5; // 0.5秒一轮交火
+    const PARTICLE_SPEED = 200; // 200像素/秒
+    const MAX_NODE_CAP = 50; // 单节点上限50粒
+
+    let gameState = {
+      timeRemaining: MATCH_DURATION,
+      elapsedTime: 0,
+      isPaused: false,
+      isGameOver: false,
+      nodes: [],
+      routes: [],
+      movingParticles: [],
+      combatEffects: [],
+      selectedCardIndex: -1,
+      cardCooldowns: [0, 0, 0, 0],
+      dragSourceNode: null,
+      dragCurrentPos: { x: 0, y: 0 },
+      isDragging: false
+    };
+
+    // 7种提瓦特环境异象说明
+    const ANOMALY_TYPES = {
+      NORMAL: { name: '标准灵穴', color: '#94a3b8' },
+      AMBER_MINE: { name: '石珀晶矿', color: '#f59e0b', desc: '双倍产兵' },
+      WIND_FLOW: { name: '疾风流道', color: '#34d399', desc: '输送翻倍' },
+      PLASMA: { name: '赤阳熔核', color: '#ef4444', desc: '上限25粒' }
+    };
+
+    // 初始化关卡星图拓扑 (5个典型节点，构成试玩最小闭环)
+    function initLevelNodes() {
+      gameState.nodes = [
+        {
+          id: 0,
+          name: '西风枢纽',
+          x: 320,
+          y: 450,
+          radius: 54,
+          faction: 'player',
+          particles: 25,
+          control: 100,
+          anomaly: 'NORMAL',
+          routeTo: null,
+          isDefensive: false,
+          protectedUntil: 0,
+          spawnTimer: 0
+        },
+        {
+          id: 1,
+          name: '石珀晶矿',
+          x: 650,
+          y: 280,
+          radius: 46,
+          faction: 'neutral',
+          particles: 10,
+          control: 0,
+          anomaly: 'AMBER_MINE',
+          routeTo: null,
+          isDefensive: false,
+          protectedUntil: 0,
+          spawnTimer: 0
+        },
+        {
+          id: 2,
+          name: '千风隘口',
+          x: 800,
+          y: 520,
+          radius: 48,
+          faction: 'neutral',
+          particles: 15,
+          control: 0,
+          anomaly: 'WIND_FLOW',
+          routeTo: null,
+          isDefensive: false,
+          protectedUntil: 0,
+          spawnTimer: 0
+        },
+        {
+          id: 3,
+          name: '迷雾荒墟',
+          x: 950,
+          y: 300,
+          radius: 44,
+          faction: 'neutral',
+          particles: 8,
+          control: 0,
+          anomaly: 'NORMAL',
+          routeTo: null,
+          isDefensive: false,
+          protectedUntil: 0,
+          spawnTimer: 0
+        },
+        {
+          id: 4,
+          name: '愚人坚垒',
+          x: 1280,
+          y: 450,
+          radius: 54,
+          faction: 'enemy',
+          particles: 25,
+          control: 100,
+          anomaly: 'NORMAL',
+          routeTo: null,
+          isDefensive: false,
+          protectedUntil: 0,
+          spawnTimer: 0
+        }
+      ];
+
+      // 合法航道连通拓扑关系 (无交叉网络)
+      gameState.graphLinks = [
+        [0, 1], [0, 2],
+        [1, 2], [1, 3],
+        [2, 3], [2, 4],
+        [3, 4]
+      ];
+
+      gameState.routes = [];
+      gameState.movingParticles = [];
+      gameState.combatEffects = [];
+      gameState.timeRemaining = MATCH_DURATION;
+      gameState.elapsedTime = 0;
+      gameState.isGameOver = false;
+      gameState.selectedCardIndex = -1;
+      gameState.cardCooldowns = [0, 0, 0, 0];
+      document.getElementById('settle-modal').style.display = 'none';
+      updateCardUI();
+    }
+
+    // 检查两点是否具有连通航道
+    function areNodesLinked(idA, idB) {
+      return gameState.graphLinks.some(link => 
+        (link[0] === idA && link[1] === idB) || (link[0] === idB && link[1] === idA)
+      );
+    }
+
+    /* =====================================================================
+       3. 核心游戏循环 (Tick & Update)
+       ===================================================================== */
+    let lastTime = performance.now();
+    let captureTimer = 0;
+    let combatTimer = 0;
+    let aiTimer = 0;
+
+    function gameLoop(now) {
+      const dt = Math.min((now - lastTime) / 1000, 0.1);
+      lastTime = now;
+
+      if (!gameState.isPaused && !gameState.isGameOver) {
+        updateGame(dt);
+      }
+
+      renderGame();
+      requestAnimationFrame(gameLoop);
+    }
+
+    function updateGame(dt) {
+      gameState.elapsedTime += dt;
+      gameState.timeRemaining = Math.max(0, gameState.timeRemaining - dt);
+
+      // 更新倒计时显示
+      const minutes = Math.floor(gameState.timeRemaining / 60);
+      const seconds = Math.floor(gameState.timeRemaining % 60);
+      document.getElementById('lbl-timer').innerText = 
+        `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+      // 倒计时结束结算
+      if (gameState.timeRemaining <= 0) {
+        checkGameEnd(true);
+      }
+
+      // 卡牌冷却递减
+      for (let i = 0; i < 4; i++) {
+        if (gameState.cardCooldowns[i] > 0) {
+          gameState.cardCooldowns[i] = Math.max(0, gameState.cardCooldowns[i] - dt);
+        }
+      }
+      updateCardUI();
+
+      // 1. 节点微粒孕育 (带腹地休眠机制)
+      gameState.nodes.forEach(node => {
+        if (node.faction === 'neutral') return;
+
+        // 检查腹地休眠：和平、无向外光轨、四周全为友军
+        const isPeace = !node.hasEnemyThreat;
+        const hasNoRoute = (node.routeTo === null);
+        const neighbors = getNeighborNodes(node.id);
+        const allNeighborsFriendly = neighbors.length > 0 && neighbors.every(n => n.faction === node.faction);
+        
+        node.isIdle = (isPeace && hasNoRoute && allNeighborsFriendly);
+
+        if (!node.isIdle) {
+          node.spawnTimer = (node.spawnTimer || 0) + dt;
+          let interval = SPAWN_INTERVAL;
+          if (node.anomaly === 'AMBER_MINE') interval *= 0.5; // 石珀矿双倍产出
+          if (node.anomaly === 'PLASMA') interval *= 1.2;
+
+          // 依据共鸣度做冷却拉长插值
+          const efficiency = Math.max(0.33, node.control / 100);
+          interval /= efficiency;
+
+          if (node.spawnTimer >= interval) {
+            node.spawnTimer = 0;
+            const cap = (node.anomaly === 'PLASMA') ? 25 : MAX_NODE_CAP;
+            if (node.particles < cap) {
+              node.particles += 1;
+            }
+          }
+        }
+      });
+
+      // 2. 物流光轨发射微粒
+      gameState.routes.forEach(route => {
+        route.sendTimer = (route.sendTimer || 0) + dt;
+        let rate = 5; // 标准 5 粒/秒
+        const fromNode = getNode(route.fromId);
+        if (fromNode.anomaly === 'WIND_FLOW' || route.boostedUntil > gameState.elapsedTime) {
+          rate = 10; // 疾风翻倍至 10 粒/秒
+        }
+
+        const sendInterval = 1.0 / rate;
+        if (route.sendTimer >= sendInterval) {
+          route.sendTimer = 0;
+          if (fromNode.particles > 1) { // 保持至少1粒驻防底子
+            fromNode.particles -= 1;
+            const toNode = getNode(route.toId);
+            gameState.movingParticles.push({
+              fromId: fromNode.id,
+              toId: toNode.id,
+              faction: route.faction,
+              progress: 0,
+              startX: fromNode.x,
+              startY: fromNode.y,
+              targetX: toNode.x,
+              targetY: toNode.y,
+              totalDist: Math.hypot(toNode.x - fromNode.x, toNode.y - fromNode.y)
+            });
+          }
+        }
+      });
+
+      // 3. 飞行微粒位移更新
+      for (let i = gameState.movingParticles.length - 1; i >= 0; i--) {
+        const p = gameState.movingParticles[i];
+        const step = (PARTICLE_SPEED * dt) / p.totalDist;
+        p.progress += step;
+
+        if (p.progress >= 1.0) {
+          // 到达目标节点
+          const targetNode = getNode(p.toId);
+          onParticleArrive(p, targetNode);
+          gameState.movingParticles.splice(i, 1);
+        }
+      }
+
+      // 4. 定期结算节点占领与共鸣度 (0.8s 周期)
+      captureTimer += dt;
+      if (captureTimer >= CAPTURE_INTERVAL) {
+        captureTimer = 0;
+        updateNodeCaptures();
+      }
+
+      // 5. 轨道遭遇战战损结算 (0.5s 周期)
+      combatTimer += dt;
+      if (combatTimer >= COMBAT_INTERVAL) {
+        combatTimer = 0;
+        updateCombats();
+      }
+
+      // 6. 简易智能 AI 调度 (2.5s 周期)
+      aiTimer += dt;
+      if (aiTimer >= 2.5) {
+        aiTimer = 0;
+        updateSimpleAI();
+      }
+
+      // 7. 特效生命周期衰减
+      for (let i = gameState.combatEffects.length - 1; i >= 0; i--) {
+        const eff = gameState.combatEffects[i];
+        eff.life -= dt;
+        if (eff.life <= 0) gameState.combatEffects.splice(i, 1);
+      }
+
+      // 更新顶部领地掌控占比
+      updateSharesUI();
+    }
+
+    // 邻居节点获取
+    function getNeighborNodes(nodeId) {
+      const neighbors = [];
+      gameState.graphLinks.forEach(link => {
+        if (link[0] === nodeId) neighbors.push(getNode(link[1]));
+        else if (link[1] === nodeId) neighbors.push(getNode(link[0]));
+      });
+      return neighbors;
+    }
+
+    function getNode(id) {
+      return gameState.nodes.find(n => n.id === id);
+    }
+
+    // 微粒到达目标节点
+    function onParticleArrive(particle, node) {
+      if (node.faction === particle.faction) {
+        // 同盟微粒汇入
+        const cap = (node.anomaly === 'PLASMA') ? 25 : MAX_NODE_CAP;
+        if (node.particles < cap) {
+          node.particles += 1;
+        }
+      } else {
+        // 敌对交火与抵消
+        if (node.particles > 0) {
+          let defenseDamp = (node.isDefensive ? 0.6 : 1.0);
+          if (Math.random() < defenseDamp) {
+            node.particles -= 1;
+          }
+          // 产生交火火花
+          addCombatEffect(node.x, node.y, '#f87171');
+        } else {
+          // 节点无兵，侵蚀共鸣度
+          node.contenderFaction = particle.faction;
+          node.contenderParticles = (node.contenderParticles || 0) + 1;
+        }
+      }
+    }
+
+    // 占领共鸣度步进 (封顶 5 点/轮防滚雪球)
+    function updateNodeCaptures() {
+      gameState.nodes.forEach(node => {
+        if (node.protectedUntil > gameState.elapsedTime) return; // 处于千风庇护
+
+        if (node.contenderFaction && node.contenderParticles > 0) {
+          const excess = node.contenderParticles;
+          let baseGrowth = Math.min(5, Math.round(excess / 5) || 1); // 封顶 5点/轮
+
+          if (node.faction === 'neutral') {
+            node.control = Math.min(100, node.control + baseGrowth * 6);
+            if (node.control >= 100) {
+              node.faction = node.contenderFaction;
+              node.particles = 5;
+              node.contenderParticles = 0;
+              node.contenderFaction = null;
+              showToast(`【${node.name}】已被 ${node.faction === 'player' ? '我方' : '敌方'} 完全共鸣掌控！`);
+              checkGameEnd();
+            }
+          } else if (node.faction !== node.contenderFaction) {
+            // 剥夺原主人控制度
+            node.control -= baseGrowth * 4;
+            if (node.control <= 20) {
+              // 降级为中立争夺态
+              node.faction = 'neutral';
+              node.routeTo = null;
+              removeRouteFrom(node.id);
+              showToast(`【${node.name}】原统治动摇，已沦为中立争夺！`);
+            }
+          }
+          node.contenderParticles = Math.max(0, node.contenderParticles - 1);
+        }
+      });
+    }
+
+    // 轨道遭遇战处理
+    function updateCombats() {
+      gameState.nodes.forEach(node => {
+        node.hasEnemyThreat = false;
+        // 判定周围是否存在敌对光轨
+        const incomingEnemy = gameState.movingParticles.some(p => p.toId === node.id && p.faction !== node.faction);
+        if (incomingEnemy) {
+          node.hasEnemyThreat = true;
+        }
+      });
+    }
+
+    // 简易敌方 AI 策略
+    function updateSimpleAI() {
+      const enemyNodes = gameState.nodes.filter(n => n.faction === 'enemy');
+      if (enemyNodes.length === 0) return;
+
+      enemyNodes.forEach(eNode => {
+        if (eNode.particles > 15 && eNode.routeTo === null) {
+          // 寻找相邻的中立或玩家节点推进
+          const neighbors = getNeighborNodes(eNode.id);
+          const targets = neighbors.filter(n => n.faction !== 'enemy');
+          if (targets.length > 0) {
+            const target = targets[0];
+            setRoute(eNode.id, target.id, 'enemy');
+          }
+        } else if (eNode.particles < 5 && eNode.routeTo !== null) {
+          // 兵力过低，切断航线激活固守
+          removeRouteFrom(eNode.id);
+          eNode.routeTo = null;
+          eNode.isDefensive = true;
+        }
+      });
+    }
+
+    function addCombatEffect(x, y, color) {
+      gameState.combatEffects.push({
+        x: x + (Math.random() - 0.5) * 30,
+        y: y + (Math.random() - 0.5) * 30,
+        color: color,
+        radius: 3 + Math.random() * 4,
+        life: 0.3
+      });
+    }
+
+    /* =====================================================================
+       4. 航线管理与交互响应
+       ===================================================================== */
+    function setRoute(fromId, toId, faction) {
+      if (!areNodesLinked(fromId, toId)) {
+        showToast('两灵穴间不存在直通地脉流道！');
+        return false;
+      }
+
+      // 单节点只能同时对外输出 1 条航线
+      removeRouteFrom(fromId);
+
+      const fromNode = getNode(fromId);
+      fromNode.routeTo = toId;
+      fromNode.isDefensive = false; // 外出输送自动解除纯防御固守
+
+      gameState.routes.push({
+        fromId: fromId,
+        toId: toId,
+        faction: faction,
+        sendTimer: 0,
+        boostedUntil: 0
+      });
+
+      if (faction === 'player') {
+        showToast(`灵流通道已建立：${fromNode.name} ➔ ${getNode(toId).name}`);
+      }
+      return true;
+    }
+
+    function removeRouteFrom(fromId) {
+      const idx = gameState.routes.findIndex(r => r.fromId === fromId);
+      if (idx !== -1) {
+        gameState.routes.splice(idx, 1);
+        const fromNode = getNode(fromId);
+        fromNode.routeTo = null;
+        return true;
+      }
+      return false;
+    }
+
+    // 胜负结算判定
+    function checkGameEnd(isTimeout = false) {
+      if (gameState.isGameOver) return;
+
+      const playerNodes = gameState.nodes.filter(n => n.faction === 'player');
+      const enemyNodes = gameState.nodes.filter(n => n.faction === 'enemy');
+
+      const modal = document.getElementById('settle-modal');
+      const cardBox = document.getElementById('settle-card-box');
+      const titleTxt = document.getElementById('settle-title-txt');
+      const descTxt = document.getElementById('settle-desc-txt');
+
+      const formatTime = () => {
+        const t = Math.floor(gameState.elapsedTime);
+        return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+      };
+
+      if (enemyNodes.length === 0) {
+        // 玩家胜利
+        gameState.isGameOver = true;
+        cardBox.className = 'settle-card win';
+        titleTxt.innerText = '【推衍大捷·全域共鸣】';
+        descTxt.innerText = '星盘之理尽在掌控，地脉灵流归于统御。全域敌对势力已被彻底肃清！';
+        document.getElementById('stat-capture').innerText = `${playerNodes.length}/${gameState.nodes.length}`;
+        document.getElementById('stat-particles').innerText = playerNodes.reduce((a, b) => a + b.particles, 0);
+        document.getElementById('stat-time').innerText = formatTime();
+        modal.style.display = 'flex';
+      } else if (playerNodes.length === 0) {
+        // 玩家失败
+        gameState.isGameOver = true;
+        cardBox.className = 'settle-card lose';
+        titleTxt.innerText = '【推衍中止·灵脉耗竭】';
+        descTxt.innerText = '地脉紊乱，推衍消散。我方灵穴已全部失守，请重新注灵推演。';
+        document.getElementById('stat-capture').innerText = `0/${gameState.nodes.length}`;
+        document.getElementById('stat-particles').innerText = '0';
+        document.getElementById('stat-time').innerText = formatTime();
+        modal.style.display = 'flex';
+      } else if (isTimeout) {
+        // 6分钟压哨积分判定
+        gameState.isGameOver = true;
+        const playerScore = playerNodes.length * 1000 + playerNodes.reduce((a, b) => a + b.particles, 0) * 10;
+        const enemyScore = enemyNodes.length * 1000 + enemyNodes.reduce((a, b) => a + b.particles, 0) * 10;
+        const isWin = playerScore >= enemyScore;
+
+        cardBox.className = `settle-card ${isWin ? 'win' : 'lose'}`;
+        titleTxt.innerText = isWin ? '【时限推衍·优势胜出】' : '【时限终止·压制惜败】';
+        descTxt.innerText = `6分钟推衍时限已至。我方总积分：${playerScore}，敌方总积分：${enemyScore}。`;
+        document.getElementById('stat-capture').innerText = `${playerNodes.length}/${gameState.nodes.length}`;
+        document.getElementById('stat-particles').innerText = playerNodes.reduce((a, b) => a + b.particles, 0);
+        document.getElementById('stat-time').innerText = '06:00';
+        modal.style.display = 'flex';
+      }
+    }
+
+    /* =====================================================================
+       5. 战术符印技能系统
+       ===================================================================== */
+    const CARDS = [
+      { id: 'anemo_shield', name: '千风庇护', cost: 2, cd: 30, elem: 'elem-wind' },
+      { id: 'anemo_turb', name: '千风湍流', cost: 3, cd: 20, elem: 'elem-wind' },
+      { id: 'pyro_blast', name: '轰轰烈焰', cost: 4, cd: 25, elem: 'elem-fire' },
+      { id: 'hydro_bribe', name: '摩拉律法', cost: 5, cd: 35, elem: 'elem-water' }
+    ];
+
+    function activateCard(cardIndex, targetNode) {
+      if (gameState.cardCooldowns[cardIndex] > 0) {
+        showToast('该符印权能仍在凝聚中！');
+        return;
+      }
+
+      if (cardIndex === 0) {
+        // 千风庇护：己方节点20秒免疫侵蚀
+        if (targetNode.faction !== 'player') {
+          showToast('千风庇护只能施加于我方灵穴！');
+          return;
+        }
+        targetNode.protectedUntil = gameState.elapsedTime + 20;
+        showToast(`【千风庇护】已加持在 ${targetNode.name}，20秒内免疫侵蚀！`);
+      } else if (cardIndex === 1) {
+        // 千风湍流：加速己方输出航线
+        if (!targetNode.routeTo) {
+          showToast('请选择一条正在向外输送的灵穴！');
+          return;
+        }
+        const route = gameState.routes.find(r => r.fromId === targetNode.id);
+        if (route) {
+          route.boostedUntil = gameState.elapsedTime + 30;
+          showToast(`【千风湍流】已激发！从 ${targetNode.name} 出发的流速翻倍！`);
+        }
+      } else if (cardIndex === 2) {
+        // 轰轰烈焰：秒杀目标80%敌军
+        if (targetNode.faction !== 'enemy' && targetNode.particles === 0) {
+          showToast('轰轰烈焰只能轰击敌对势力据点！');
+          return;
+        }
+        const removed = Math.floor(targetNode.particles * 0.8);
+        targetNode.particles -= removed;
+        for (let i = 0; i < 15; i++) addCombatEffect(targetNode.x, targetNode.y, '#f87171');
+        showToast(`【轰轰烈焰】轰爆了 ${targetNode.name} 的 ${removed} 艘进犯微粒！`);
+      } else if (cardIndex === 3) {
+        // 摩拉律法：直接秒占中立星
+        if (targetNode.faction === 'neutral') {
+          targetNode.faction = 'player';
+          targetNode.control = 100;
+          targetNode.particles = 15;
+          showToast(`【摩拉律法】生效！已直接同化掌管中立灵穴 ${targetNode.name}！`);
+          checkGameEnd();
+        } else if (targetNode.faction === 'enemy') {
+          targetNode.control = Math.max(0, targetNode.control - 65);
+          showToast(`【摩拉律法】瓦解了 ${targetNode.name} 65% 的敌方共鸣！`);
+        }
+      }
+
+      gameState.cardCooldowns[cardIndex] = CARDS[cardIndex].cd;
+      gameState.selectedCardIndex = -1;
+      updateCardUI();
+    }
+
+    function updateCardUI() {
+      for (let i = 0; i < 4; i++) {
+        const slot = document.getElementById(`card-${i}`);
+        const cdMask = document.getElementById(`cd-${i}`);
+        const cd = gameState.cardCooldowns[i];
+        if (cd > 0) {
+          slot.classList.add('cooling');
+          cdMask.innerText = Math.ceil(cd) + 's';
+        } else {
+          slot.classList.remove('cooling');
+        }
+        if (gameState.selectedCardIndex === i) {
+          slot.classList.add('selected');
+        } else {
+          slot.classList.remove('selected');
+        }
+      }
+    }
+
+    /* =====================================================================
+       6. Canvas 渲染器 (原神星图美学与2D光效)
+       ===================================================================== */
+    function renderGame() {
+      ctx.clearRect(0, 0, BASE_W, BASE_H);
+
+      // 背景星图装饰网格
+      renderBackground();
+
+      // 绘制基础拓扑虚线航道
+      renderGraphLinks();
+
+      // 绘制活跃的地脉光轨 (发光连线)
+      renderActiveRoutes();
+
+      // 绘制流动的微粒
+      renderMovingParticles();
+
+      // 绘制地脉节点 (圆形能量核心)
+      renderNodes();
+
+      // 绘制交火爆炸微粒
+      renderCombatEffects();
+
+      // 绘制拖拽预览虚线
+      renderDragLine();
+    }
+
+    function renderBackground() {
+      // 提瓦特神秘星宿经纬线
+      ctx.strokeStyle = 'rgba(30, 41, 59, 0.4)';
+      ctx.lineWidth = 1;
+      for (let x = 100; x < BASE_W; x += 150) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, BASE_H);
+        ctx.stroke();
+      }
+      for (let y = 100; y < BASE_H; y += 150) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(BASE_W, y);
+        ctx.stroke();
+      }
+    }
+
+    function renderGraphLinks() {
+      ctx.strokeStyle = 'rgba(71, 85, 105, 0.35)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 6]);
+      gameState.graphLinks.forEach(link => {
+        const nA = getNode(link[0]);
+        const nB = getNode(link[1]);
+        ctx.beginPath();
+        ctx.moveTo(nA.x, nA.y);
+        ctx.lineTo(nB.x, nB.y);
+        ctx.stroke();
+      });
+      ctx.setLineDash([]);
+    }
+
+    function renderActiveRoutes() {
+      gameState.routes.forEach(route => {
+        const nA = getNode(route.fromId);
+        const nB = getNode(route.toId);
+        const isBoosted = route.boostedUntil > gameState.elapsedTime;
+        const color = (route.faction === 'player') ? 'rgba(56, 189, 248, 0.6)' : 'rgba(244, 63, 94, 0.6)';
+
+        ctx.strokeStyle = isBoosted ? '#34d399' : color;
+        ctx.lineWidth = isBoosted ? 6 : 4;
+        ctx.shadowColor = isBoosted ? '#34d399' : color;
+        ctx.shadowBlur = 10;
+
+        ctx.beginPath();
+        ctx.moveTo(nA.x, nA.y);
+        ctx.lineTo(nB.x, nB.y);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      });
+    }
+
+    function renderMovingParticles() {
+      gameState.movingParticles.forEach(p => {
+        const curX = p.startX + (p.targetX - p.startX) * p.progress;
+        const curY = p.startY + (p.targetY - p.startY) * p.progress;
+        const color = (p.faction === 'player') ? '#38bdf8' : '#f43f5e';
+
+        ctx.fillStyle = color;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.arc(curX, curY, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      });
+    }
+
+    function renderNodes() {
+      gameState.nodes.forEach(node => {
+        const isPlayer = node.faction === 'player';
+        const isEnemy = node.faction === 'enemy';
+        const color = isPlayer ? '#38bdf8' : (isEnemy ? '#f43f5e' : '#94a3b8');
+
+        // 1. 固守状态外环结界 (若无输出航线本土驻防，显示结界)
+        if (node.isDefensive && !node.routeTo) {
+          ctx.strokeStyle = 'rgba(251, 191, 36, 0.8)';
+          ctx.lineWidth = 3;
+          ctx.setLineDash([6, 4]);
+          ctx.beginPath();
+          ctx.arc(node.x, node.y, node.radius + 12, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+
+        // 2. 庇护结界
+        if (node.protectedUntil > gameState.elapsedTime) {
+          ctx.strokeStyle = '#34d399';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(node.x, node.y, node.radius + 8, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        // 3. 节点主体底盘
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 4. 外圈共鸣进度环
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 4;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 12;
+        ctx.beginPath();
+        const progressAngle = (node.control / 100) * (Math.PI * 2);
+        ctx.arc(node.x, node.y, node.radius, -Math.PI / 2, -Math.PI / 2 + progressAngle);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        // 5. 异象小标识
+        if (node.anomaly !== 'NORMAL') {
+          const anom = ANOMALY_TYPES[node.anomaly];
+          ctx.fillStyle = anom.color;
+          ctx.font = '10px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(anom.name, node.x, node.y - node.radius - 8);
+        }
+
+        // 6. 节点中央文字信息 (名称、兵力、休眠标志)
+        ctx.fillStyle = '#f8fafc';
+        ctx.font = 'bold 13px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(node.name, node.x, node.y - 6);
+
+        ctx.font = 'bold 16px monospace';
+        ctx.fillStyle = color;
+        ctx.fillText(node.particles, node.x, node.y + 16);
+
+        // 休眠标志
+        if (node.isIdle) {
+          ctx.font = '10px sans-serif';
+          ctx.fillStyle = '#64748b';
+          ctx.fillText('[休眠]', node.x, node.y + 28);
+        } else if (node.isDefensive) {
+          ctx.font = '10px sans-serif';
+          ctx.fillStyle = '#fbbf24';
+          ctx.fillText('[固守中]', node.x, node.y + 28);
+        }
+      });
+    }
+
+    function renderCombatEffects() {
+      gameState.combatEffects.forEach(eff => {
+        ctx.fillStyle = eff.color;
+        ctx.beginPath();
+        ctx.arc(eff.x, eff.y, eff.radius, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    function renderDragLine() {
+      if (gameState.isDragging && gameState.dragSourceNode) {
+        ctx.strokeStyle = '#fbbf24';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([8, 6]);
+        ctx.beginPath();
+        ctx.moveTo(gameState.dragSourceNode.x, gameState.dragSourceNode.y);
+        ctx.lineTo(gameState.dragCurrentPos.x, gameState.dragCurrentPos.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    /* =====================================================================
+       7. 玩家输入控制事件监听
+       ===================================================================== */
+    function getCanvasPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      return {
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top) * scaleY
+      };
+    }
+
+    function findNodeAt(pos) {
+      return gameState.nodes.find(n => Math.hypot(n.x - pos.x, n.y - pos.y) <= n.radius + 15);
+    }
+
+    canvas.addEventListener('mousedown', e => {
+      const pos = getCanvasPos(e);
+      const clickedNode = findNodeAt(pos);
+
+      // 如果当前处于符印施法状态，单击直接施法
+      if (gameState.selectedCardIndex !== -1 && clickedNode) {
+        activateCard(gameState.selectedCardIndex, clickedNode);
+        return;
+      }
+
+      if (clickedNode && clickedNode.faction === 'player') {
+        gameState.dragSourceNode = clickedNode;
+        gameState.dragCurrentPos = pos;
+        gameState.isDragging = true;
+      }
+    });
+
+    canvas.addEventListener('mousemove', e => {
+      if (gameState.isDragging) {
+        gameState.dragCurrentPos = getCanvasPos(e);
+      }
+    });
+
+    canvas.addEventListener('mouseup', e => {
+      if (!gameState.isDragging) return;
+      const pos = getCanvasPos(e);
+      const targetNode = findNodeAt(pos);
+
+      if (targetNode && targetNode.id !== gameState.dragSourceNode.id) {
+        // 拖拽至目标节点：建立航线
+        setRoute(gameState.dragSourceNode.id, targetNode.id, 'player');
+      } else if (targetNode && targetNode.id === gameState.dragSourceNode.id) {
+        // 原地点击节点：切断航线激活固守
+        if (gameState.dragSourceNode.routeTo !== null) {
+          removeRouteFrom(gameState.dragSourceNode.id);
+          gameState.dragSourceNode.isDefensive = true;
+          showToast(`【固守结界已展开】${gameState.dragSourceNode.name} 损伤削减 50%`);
+        }
+      }
+
+      gameState.isDragging = false;
+      gameState.dragSourceNode = null;
+    });
+
+    // 符印卡牌点击选择
+    document.querySelectorAll('.card-slot').forEach(slot => {
+      slot.addEventListener('click', () => {
+        const idx = parseInt(slot.dataset.index);
+        if (gameState.selectedCardIndex === idx) {
+          gameState.selectedCardIndex = -1; // 取消选择
+        } else {
+          gameState.selectedCardIndex = idx;
+          showToast(`已选定【${CARDS[idx].name}】，请轻点目标灵穴释放！`);
+        }
+        updateCardUI();
+      });
+    });
+
+    // 飘字提示显示
+    let toastTimeout = null;
+    function showToast(text) {
+      const toast = document.getElementById('toast-msg');
+      toast.innerText = text;
+      toast.classList.add('show');
+      if (toastTimeout) clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2400);
+    }
+
+    function updateSharesUI() {
+      const total = gameState.nodes.length;
+      const playerCnt = gameState.nodes.filter(n => n.faction === 'player').length;
+      const enemyCnt = gameState.nodes.filter(n => n.faction === 'enemy').length;
+      const playerPct = Math.round((playerCnt / total) * 100);
+      const enemyPct = Math.round((enemyCnt / total) * 100);
+
+      document.getElementById('lbl-player-share').innerText = playerPct + '%';
+      document.getElementById('lbl-enemy-share').innerText = enemyPct + '%';
+      document.getElementById('hud-progress-fill').style.width = playerPct + '%';
+    }
+
+    // 重新开始游戏绑定
+    document.getElementById('btn-fast-restart').addEventListener('click', () => initLevelNodes());
+    document.getElementById('btn-restart-action').addEventListener('click', () => initLevelNodes());
+
+    /* =====================================================================
+       8. 开发者工具栏与视口切换
+       ===================================================================== */
+    const stageContainer = document.getElementById('stage-container');
+    const guidelinesLayer = document.getElementById('guidelines-layer');
+
+    document.getElementById('btn-toggle-guides').addEventListener('click', function () {
+      const isVisible = guidelinesLayer.style.display === 'block';
+      guidelinesLayer.style.display = isVisible ? 'none' : 'block';
+      this.classList.toggle('active', !isVisible);
+    });
+
+    document.getElementById('btn-measure').addEventListener('click', () => {
+      const json = window.__measure();
+      alert('探针数据已输出至控制台，包含所有带 data-anchor-id 元素的量测值！\n\n示例：\n' + json.substring(0, 300) + '...');
+    });
+
+    function applyViewportScale(scale) {
+      stageContainer.style.transform = `scale(${scale})`;
+    }
+
+    function updateViewportFit() {
+      const padW = window.innerWidth - 40;
+      const padH = window.innerHeight - 80;
+      const s = Math.min(padW / BASE_W, padH / BASE_H);
+      applyViewportScale(s);
+    }
+
+    document.getElementById('btn-viewport-pc').addEventListener('click', function () {
+      setActiveDevBtn(this);
+      updateViewportFit();
+    });
+
+    document.getElementById('btn-viewport-mobile').addEventListener('click', function () {
+      setActiveDevBtn(this);
+      // 模拟 1280x720 紧凑视口
+      const s = 1280 / BASE_W;
+      applyViewportScale(s);
+    });
+
+    document.getElementById('btn-viewport-fit').addEventListener('click', function () {
+      setActiveDevBtn(this);
+      updateViewportFit();
+    });
+
+    function setActiveDevBtn(btn) {
+      document.querySelectorAll('.dev-controls .dev-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+
+    window.addEventListener('resize', () => {
+      if (document.getElementById('btn-viewport-fit').classList.contains('active') ||
+          document.getElementById('btn-viewport-pc').classList.contains('active')) {
+        updateViewportFit();
+      }
+    });
+
+    // 页面启动
+    window.addEventListener('load', () => {
+      initLevelNodes();
+      updateViewportFit();
+      window.__measure(); // 自动执行一次布局量测
+      requestAnimationFrame(gameLoop);
+    });
+  </script>
+</body>
+</html>
