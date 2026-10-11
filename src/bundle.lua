@@ -1032,6 +1032,37 @@ function AbilitySystem.CastAbility(slotIndex, targetNodeId, nodes, routeManager,
         else
             return false, "不可对己方灵穴使用摩拉律法"
         end
+
+    elseif card.id == "geo_wall" then
+        -- 坚岩重嶂：己方据点坚盾加持，增加10微粒并固守20秒
+        if targetNode.faction ~= "player" then
+            return false, "【坚岩重嶂】只能施加于我方灵穴！"
+        end
+        targetNode.isDefensive = true
+        targetNode.protectedUntil = elapsedTime + card.duration
+        targetNode.particles = targetNode.particles + 10
+        AbilitySystem.cooldowns[slotIndex] = card.cd
+        BalanceConfig.PlayAudioSafe("UI_CLICK")
+        return true, "【坚岩重嶂】磐岩升起！增生10微粒并展开20秒坚盾！"
+
+    elseif card.id == "pyro_erosion" then
+        -- 烈焰侵蚀：重创敌对据点并切断其输出航线
+        if targetNode.faction ~= "enemy" then
+            return false, "【烈焰侵蚀】只能施加于敌方灵穴！"
+        end
+        local cut = math.max(8, math.floor(targetNode.particles * 0.4))
+        targetNode.particles = math.max(0, targetNode.particles - cut)
+        if routeManager and routeManager.RemoveRouteFrom then
+            routeManager.RemoveRouteFrom(targetNode.id, nodes)
+        end
+        if onSparkCallback then
+            for _ = 1, 8 do
+                onSparkCallback(targetNode.x, targetNode.y, 0xFFFF3F20)
+            end
+        end
+        AbilitySystem.cooldowns[slotIndex] = card.cd
+        BalanceConfig.PlayAudioSafe("SKILL_BLAST")
+        return true, "【烈焰侵蚀】灼烧敌穴！削减 " .. cut .. " 微粒并截断其输出！"
     end
 
     return false, "未知符印效果"
@@ -1217,10 +1248,11 @@ function VisualRenderer.UpdateNodes(nodeUIList, nodes, elapsedTime)
                 end
             end
 
-            -- 3. 兵力数值显示 (高对比度纯白亮色)
+            -- 3. 兵力数值显示 (高对比度纯白亮色，帧级实时刷新)
             if ui.particleText and ui.particleText.alive then
-                ui.particleText.text = tostring(node.particles)
+                ui.particleText.text = tostring(math.floor(node.particles or 0))
                 ui.particleText.fontColor = Layout.PALETTE.TEXT_LIGHT
+                Layout.SetVisible(ui.particleText, true)
             end
 
             -- 4. 异象标识文本
@@ -1242,15 +1274,31 @@ function VisualRenderer.UpdateNodes(nodeUIList, nodes, elapsedTime)
                 end
             end
 
-            -- 5. 状态标签 (固守中 / 休眠中)
+            -- 5. 占领进度与状态标签 (占领中/动摇中/输送中/固守中/休眠中)
             if ui.statusText and ui.statusText.alive then
-                if node.isIdle then
+                if node.faction == "neutral" and (node.control > 0 or (node.contenderParticles and node.contenderParticles > 0)) then
+                    local fName = (node.contenderFaction == "player") and "我方" or (node.contenderFaction == "enemy" and "敌方" or "")
+                    local col = (node.contenderFaction == "player") and Layout.PALETTE.PLAYER or Layout.PALETTE.ENEMY
+                    ui.statusText.text = string.format("[%s占领中 %d%%]", fName, math.floor(node.control))
+                    ui.statusText.fontColor = col
+                    Layout.SetVisible(ui.statusText, true)
+                elseif node.faction ~= "neutral" and node.control < 100 then
+                    local statusDesc = (node.faction == "player") and "敌袭动摇" or "我方攻克"
+                    local col = (node.faction == "player") and Layout.PALETTE.ENEMY or Layout.PALETTE.PLAYER
+                    ui.statusText.text = string.format("[%s %d%%]", statusDesc, math.floor(node.control))
+                    ui.statusText.fontColor = col
+                    Layout.SetVisible(ui.statusText, true)
+                elseif node.isIdle then
                     ui.statusText.text = "[腹地休眠]"
                     ui.statusText.fontColor = Layout.PALETTE.TEXT_MUTED
                     Layout.SetVisible(ui.statusText, true)
                 elseif node.isDefensive and node.routeTo == nil then
                     ui.statusText.text = "[驻阵固守]"
                     ui.statusText.fontColor = Layout.PALETTE.GOLD
+                    Layout.SetVisible(ui.statusText, true)
+                elseif node.routeTo ~= nil then
+                    ui.statusText.text = "[输送中 ➔]"
+                    ui.statusText.fontColor = factionColor
                     Layout.SetVisible(ui.statusText, true)
                 else
                     Layout.SetVisible(ui.statusText, false)
@@ -1373,21 +1421,35 @@ _MODULES["ui/dialoguePlayer"] = _MODULES["src/ui/dialoguePlayer"]
 
 _MODULES["src/ui/prepareView"] = function()
 -- src/ui/prepareView.lua
--- 战前符印调配界面（12点权能预算、自选卡组装配与确认开启）
+-- 战前符印调配界面（12点权能预算、自选卡组装配、视觉差分效果与确认开启）
 
 local CardRegistry = require("default_import_file/src/data/cardRegistry") or require("src/data/cardRegistry")
 local BalanceConfig = require("default_import_file/src/data/balanceConfig") or require("src/data/balanceConfig")
+local Layout = require("default_import_file/src/core/layout") or require("src/core/layout")
 
 local PrepareView = {
     selectedIds = { "anemo_shield", "anemo_turb", "pyro_blast" }, -- 初始预选 9 点预算 (2+3+4)
     maxBudget = 12,
-    onStartMatch = nil
+    maxCards = 4,
+    onStartMatch = nil,
+
+    POOL_ORDER = {
+        "anemo_shield",
+        "anemo_turb",
+        "pyro_blast",
+        "hydro_bribe",
+        "geo_wall",
+        "pyro_erosion"
+    }
 }
 
 function PrepareView.Init(onStartMatchCallback)
     PrepareView.selectedIds = { "anemo_shield", "anemo_turb", "pyro_blast" }
-    PrepareView.maxBudget = BalanceConfig.MAX_BUDGET
-    PrepareView.onStartMatch = onStartMatchCallback
+    PrepareView.maxBudget = BalanceConfig.MAX_BUDGET or 12
+    PrepareView.maxCards = 4
+    if onStartMatchCallback then
+        PrepareView.onStartMatch = onStartMatchCallback
+    end
 end
 
 function PrepareView.GetUsedBudget()
@@ -1407,32 +1469,92 @@ function PrepareView.IsCardSelected(cardId)
 end
 
 function PrepareView.ToggleCard(cardId)
+    -- 若已选，则反选移除
     for idx, id in ipairs(PrepareView.selectedIds) do
         if id == cardId then
             table.remove(PrepareView.selectedIds, idx)
-            return true
+            return true, nil
         end
     end
 
-    -- 尝试添加
-    if #PrepareView.selectedIds >= 4 then
-        return false, "最多仅能携带 4 张战术符印！"
+    -- 尝试添加装配
+    if #PrepareView.selectedIds >= PrepareView.maxCards then
+        return false, string.format("最多仅能装配 %d 张战术符印！请先点击卸下已选符印。", PrepareView.maxCards)
     end
 
     local card = CardRegistry.GetCardById(cardId)
-    if not card then return false, "未知符印" end
+    if not card then return false, "未知符印类型！" end
 
-    if (PrepareView.GetUsedBudget() + card.cost) > PrepareView.maxBudget then
-        return false, "权能预算不足！当前上限 12 点。"
+    local currentUsed = PrepareView.GetUsedBudget()
+    if (currentUsed + card.cost) > PrepareView.maxBudget then
+        return false, string.format("权能预算不足！当前已用 %d 点，该符印需 %d 点（上限 %d 点）。", currentUsed, card.cost, PrepareView.maxBudget)
     end
 
     table.insert(PrepareView.selectedIds, cardId)
-    return true
+    return true, nil
+end
+
+-- 刷新调配界面差分视觉表现（边框高亮、背景深浅、角标切换与预算提示）
+function PrepareView.Render(cardUIList, budgetTextCtrl, hintTextCtrl)
+    if cardUIList then
+        for idx, cardKey in ipairs(PrepareView.POOL_ORDER) do
+            local ui = cardUIList[idx]
+            local card = CardRegistry.GetCardById(cardKey)
+            if ui and card then
+                local isSel = PrepareView.IsCardSelected(cardKey)
+
+                -- 1. 边框高光差分
+                if ui.borderCtrl and ui.borderCtrl.alive then
+                    ui.borderCtrl.imageColor = isSel and Layout.PALETTE.GOLD or Layout.MakeColor(71, 85, 105, 255)
+                end
+
+                -- 2. 背景明暗差分
+                if ui.bgCtrl and ui.bgCtrl.alive then
+                    ui.bgCtrl.imageColor = isSel and Layout.MakeColor(30, 58, 95, 255) or Layout.MakeColor(15, 23, 42, 255)
+                end
+
+                -- 3. 名称文本差分
+                if ui.nameCtrl and ui.nameCtrl.alive then
+                    ui.nameCtrl.fontColor = isSel and Layout.PALETTE.TEXT_LIGHT or Layout.PALETTE.TEXT_MUTED
+                end
+
+                -- 4. 选中状态角标
+                if ui.checkCtrl and ui.checkCtrl.alive then
+                    ui.checkCtrl.text = isSel and "【✓ 已装配】" or "【点击装配】"
+                    ui.checkCtrl.fontColor = isSel and Layout.PALETTE.GOLD or Layout.MakeColor(100, 116, 139, 255)
+                end
+            end
+        end
+    end
+
+    local used = PrepareView.GetUsedBudget()
+    local count = #PrepareView.selectedIds
+
+    -- 5. 预算文字更新
+    if budgetTextCtrl and budgetTextCtrl.alive then
+        budgetTextCtrl.text = string.format("当前调配权能预算：%d / %d 点 （已装配 %d / %d 张）", used, PrepareView.maxBudget, count, PrepareView.maxCards)
+    end
+
+    -- 6. 卡组概要提示更新
+    if hintTextCtrl and hintTextCtrl.alive then
+        if count > 0 then
+            local names = {}
+            for _, id in ipairs(PrepareView.selectedIds) do
+                local c = CardRegistry.GetCardById(id)
+                if c then
+                    table.insert(names, string.format("%s(%d点)", c.name, c.cost))
+                end
+            end
+            hintTextCtrl.text = "已选符印：" .. table.concat(names, " + ")
+        else
+            hintTextCtrl.text = "尚未装配任何符印，请点击上方卡牌进行调配！"
+        end
+    end
 end
 
 function PrepareView.ConfirmAndStart()
     if #PrepareView.selectedIds == 0 then
-        -- 若未选则装配推荐卡
+        -- 兜底：若未选任何卡则自动装配推荐卡
         PrepareView.selectedIds = { "anemo_shield", "anemo_turb", "pyro_blast" }
     end
     if PrepareView.onStartMatch then
@@ -1886,9 +2008,26 @@ local function CacheUIControls()
 
     -- 战前调配弹窗
     UI.prepareModal = FindDeepChild(root, "PrepareModal")
+    UI.prepCards = {}
     if UI.prepareModal then
         UI.prepBudgetText = FindDeepChild(UI.prepareModal, "PrepBudgetText")
+        UI.prepHint       = FindDeepChild(UI.prepareModal, "PrepHint")
+        UI.prepTitle      = FindDeepChild(UI.prepareModal, "PrepTitle")
         UI.prepStartBtn   = FindDeepChild(UI.prepareModal, "PrepStartBtn")
+        for k = 1, 6 do
+            local cardBtn = FindDeepChild(UI.prepareModal, "PrepCard_" .. k)
+            if cardBtn then
+                table.insert(UI.prepCards, {
+                    button     = cardBtn,
+                    checkCtrl  = FindDeepChild(cardBtn, "CheckTag"),
+                    costCtrl   = FindDeepChild(cardBtn, "CostText"),
+                    descCtrl   = FindDeepChild(cardBtn, "DescText"),
+                    nameCtrl   = FindDeepChild(cardBtn, "NameText"),
+                    bgCtrl     = FindDeepChild(cardBtn, "CardBg"),
+                    borderCtrl = FindDeepChild(cardBtn, "CardBorder")
+                })
+            end
+        end
     end
 
     -- 结算弹窗
@@ -1996,18 +2135,37 @@ local function SetupEventHandlers()
         end)
     end
 
-    -- 4. 战前调配确认按钮
+    -- 4. 战前调配卡牌点击选择与差分渲染
+    for idx, cardUI in ipairs(UI.prepCards) do
+        if cardUI.button and cardUI.button.AddCursorEventListener then
+            local cardKey = PrepareView.POOL_ORDER[idx]
+            cardUI.button:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
+                local ok, err = PrepareView.ToggleCard(cardKey)
+                if not ok and err then
+                    HudView.ShowToast(err)
+                end
+                PrepareView.Render(UI.prepCards, UI.prepBudgetText, UI.prepHint)
+            end)
+        end
+    end
+
     if UI.prepStartBtn and UI.prepStartBtn.AddCursorEventListener then
         UI.prepStartBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
             PrepareView.ConfirmAndStart()
         end)
     end
 
-    -- 5. 符印槽位点击选择
+    -- 5. 符印槽位点击选择 (冷却中拦截)
     for idx, slot in ipairs(UI.cardSlots) do
         if slot.container and slot.container.AddCursorEventListener then
             slot.container:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
                 if gameState.currentState == STATE_PLAYING then
+                    if AbilitySystem.cooldowns[idx] and AbilitySystem.cooldowns[idx] > 0 then
+                        local card = AbilitySystem.deck[idx]
+                        local name = card and card.name or "符印"
+                        HudView.ShowToast(string.format("【%s】仍在冷却中（还剩 %d 秒）", name, math.ceil(AbilitySystem.cooldowns[idx])))
+                        return
+                    end
                     if Input.GetSelectedCard() == idx then
                         Input.ClearSelectedCard()
                     else
@@ -2018,19 +2176,33 @@ local function SetupEventHandlers()
         end
     end
 
-    -- 6. 重试按钮
+    -- 6. 重试按钮 (重开时重置并返回符印调配环节)
     if UI.settleRetryBtn and UI.settleRetryBtn.AddCursorEventListener then
         UI.settleRetryBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
-            -- 重新开启一局
+            print("[Starlink] 玩家选择重新演练，重置战场并返回战前调配环节...")
             InitNodes()
             RouteManager.Init()
             CombatResolver.Init()
             gameState.elapsedTime = 0
             gameState.timeRemaining = BalanceConfig.MATCH_DURATION
             gameState.isGameOver = false
-            gameState.currentState = STATE_PLAYING
+            AbilitySystem.cooldowns = { 0, 0, 0, 0 }
+
+            -- 隐藏结算弹窗，打开战前调配弹窗
             Layout.SetVisible(UI.settleModal, false)
-            HudView.ShowToast("【重新注灵】对局开始，执掌地脉星盘！")
+            Layout.SetVisible(UI.prepareModal, true)
+            gameState.currentState = STATE_PREPARE
+
+            -- 重新初始化调配界面并刷新差分呈现
+            PrepareView.Init(function(selectedDeck)
+                print("[Starlink] 战前构筑完成，开启动态推演！")
+                AbilitySystem.InitDeck(selectedDeck)
+                Layout.SetVisible(UI.prepareModal, false)
+                gameState.currentState = STATE_PLAYING
+                HudView.ShowToast("【推衍开启】铺设光轨，争夺中立灵穴！")
+            end)
+            PrepareView.Render(UI.prepCards, UI.prepBudgetText, UI.prepHint)
+            HudView.ShowToast("【重新演练】请调配本局战术符印！")
         end)
     end
 end
@@ -2049,12 +2221,13 @@ function OnInit()
     RouteManager.Init()
     CombatResolver.Init()
 
-    -- 初始化剧情回调
+    -- 初始化剧情回调 (演播完毕后进入符印调配并初始化差分样式)
     DialoguePlayer.Init(function()
         print("[Starlink] 剧情演播完毕，进入战前符印调配...")
         Layout.SetVisible(UI.dialogueModal, false)
         Layout.SetVisible(UI.prepareModal, true)
         gameState.currentState = STATE_PREPARE
+        PrepareView.Render(UI.prepCards, UI.prepBudgetText, UI.prepHint)
     end)
 
     -- 初始化战前构筑回调
@@ -2095,9 +2268,9 @@ function OnUpdate(dt)
         DialoguePlayer.Update(dt, UI.dlgSpeaker, UI.dlgContent)
 
     elseif gameState.currentState == STATE_PREPARE then
-        if UI.prepBudgetText and UI.prepBudgetText.alive then
-            local used = PrepareView.GetUsedBudget()
-            UI.prepBudgetText.text = string.format("当前调配权能预算：%d / 12 点", used)
+        if not gameState._prepRendered then
+            gameState._prepRendered = true
+            PrepareView.Render(UI.prepCards, UI.prepBudgetText, UI.prepHint)
         end
 
     elseif gameState.currentState == STATE_PLAYING then

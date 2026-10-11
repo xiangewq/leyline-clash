@@ -54,14 +54,14 @@ const LINKS_DEF = [
   [0, 1], [0, 2], [1, 2], [1, 3], [2, 3], [2, 4], [3, 4]
 ];
 
-// 6 备选战术卡
+// 6 备选战术卡 (对齐 CardRegistry 17种战术符印体系)
 const POOL_CARDS = [
-  { id: 1, name: '千风庇护', cost: 2, desc: '6秒免伤结界' },
-  { id: 2, name: '千风湍流', cost: 3, desc: '6秒极速疾驰' },
-  { id: 3, name: '轰轰烈焰', cost: 4, desc: '瞬发轰杀30兵' },
-  { id: 4, name: '摩拉律法', cost: 2, desc: '立刻产出8兵' },
-  { id: 5, name: '坚岩重嶂', cost: 3, desc: '反弹50%损伤' },
-  { id: 6, name: '烈焰侵蚀', cost: 4, desc: '目标灵穴重创' },
+  { id: 1, key: 'anemo_shield', name: '千风庇护', cost: 2, desc: '加持免伤结界' },
+  { id: 2, key: 'anemo_turb', name: '千风湍流', cost: 3, desc: '流道速度翻倍' },
+  { id: 3, key: 'pyro_blast', name: '轰轰烈焰', cost: 4, desc: '消灭80%敌军' },
+  { id: 4, key: 'hydro_bribe', name: '摩拉律法', cost: 5, desc: '秒占中立灵穴' },
+  { id: 5, key: 'geo_wall', name: '坚岩重嶂', cost: 4, desc: '战损减半反震' },
+  { id: 6, key: 'pyro_erosion', name: '烈焰侵蚀', cost: 2, desc: '削减40%微粒' },
 ];
 
 // ==========================================
@@ -207,16 +207,31 @@ const prepCardNodes = POOL_CARDS.map((card, idx) => {
   const posX = -220 + col * 220;
   const posY = 35 - row * 110;
 
-  return createNode('container', {
+  return createNode('button', {
     id: `prep_card_${card.id}`,
     name: `PrepCard_${card.id}`,
     raycastTarget: true,
+    interactable: true,
     transformByPlatform: makeTransform({
       offset: [posX, posY],
       size: [200, 96],
       pivot: [0.5, 0.5]
     }),
     children: [
+      createTextbox({
+        id: `prep_check_${card.id}`,
+        name: 'CheckTag',
+        text: idx < 3 ? '【✓ 已装配】' : '【点击装配】',
+        fontSize: 11,
+        fontColor: parseColor(idx < 3 ? '#fbbf24' : '#64748b'),
+        horizontalAlignment: 'Right',
+        verticalAlignment: 'Middle',
+        transformByPlatform: makeTransform({
+          offset: [45, 24],
+          size: [90, 24],
+          pivot: [0.5, 0.5]
+        })
+      }),
       createTextbox({
         id: `prep_cost_${card.id}`,
         name: 'CostText',
@@ -250,12 +265,12 @@ const prepCardNodes = POOL_CARDS.map((card, idx) => {
         name: 'NameText',
         text: card.name,
         fontSize: 14,
-        fontColor: parseColor('#f8fafc'),
-        horizontalAlignment: 'Middle',
+        fontColor: parseColor(idx < 3 ? '#f8fafc' : '#94a3b8'),
+        horizontalAlignment: 'Left',
         verticalAlignment: 'Middle',
         transformByPlatform: makeTransform({
-          offset: [0, 24],
-          size: [180, 28],
+          offset: [-30, 24],
+          size: [110, 28],
           pivot: [0.5, 0.5]
         })
       }),
@@ -263,10 +278,10 @@ const prepCardNodes = POOL_CARDS.map((card, idx) => {
         id: `prep_cbg_${card.id}`,
         name: 'CardBg',
         imageId: 100001,
-        imageColor: parseColor('#1e293b'),
+        imageColor: parseColor(idx < 3 ? '#1e3a5f' : '#0f172a'),
         transformByPlatform: makeTransform({
           offset: [0, 0],
-          size: [196, 92],
+          size: [194, 90],
           pivot: [0.5, 0.5]
         })
       }),
@@ -274,8 +289,12 @@ const prepCardNodes = POOL_CARDS.map((card, idx) => {
         id: `prep_cbdr_${card.id}`,
         name: 'CardBorder',
         imageId: 100001,
-        imageColor: parseColor('#38bdf8'),
-        transformByPlatform: makeTransform({ layout: 'stretch' })
+        imageColor: parseColor(idx < 3 ? '#fbbf24' : '#475569'),
+        transformByPlatform: makeTransform({
+          offset: [0, 0],
+          size: [200, 96],
+          pivot: [0.5, 0.5]
+        })
       })
     ]
   });
@@ -580,7 +599,11 @@ const cardSlots = [1, 2, 3, 4].map(idx => {
         visible: false,
         imageId: 100001,
         imageColor: parseColor('#000000', 0.75),
-        transformByPlatform: makeTransform({ layout: 'stretch' })
+        transformByPlatform: makeTransform({
+          offset: [0, 0],
+          size: [120, 76],
+          pivot: [0.5, 0.5]
+        })
       }),
       createTextbox({
         id: `card_cost_${idx}`,
@@ -844,13 +867,13 @@ const nodeGroups = NODES_DEF.map(n => {
         name: 'StatusText',
         text: '[驻阵固守]',
         visible: false,
-        fontSize: 12,
+        fontSize: 11,
         fontColor: parseColor('#fbbf24'),
         horizontalAlignment: 'Middle',
         verticalAlignment: 'Middle',
         transformByPlatform: makeTransform({
           offset: [0, -(n.r + 14)],
-          size: [130, 24],
+          size: [150, 26],
           pivot: [0.5, 0.5]
         })
       }),

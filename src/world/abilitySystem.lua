@@ -102,6 +102,37 @@ function AbilitySystem.CastAbility(slotIndex, targetNodeId, nodes, routeManager,
         else
             return false, "不可对己方灵穴使用摩拉律法"
         end
+
+    elseif card.id == "geo_wall" then
+        -- 坚岩重嶂：己方据点坚盾加持，增加10微粒并固守20秒
+        if targetNode.faction ~= "player" then
+            return false, "【坚岩重嶂】只能施加于我方灵穴！"
+        end
+        targetNode.isDefensive = true
+        targetNode.protectedUntil = elapsedTime + card.duration
+        targetNode.particles = targetNode.particles + 10
+        AbilitySystem.cooldowns[slotIndex] = card.cd
+        BalanceConfig.PlayAudioSafe("UI_CLICK")
+        return true, "【坚岩重嶂】磐岩升起！增生10微粒并展开20秒坚盾！"
+
+    elseif card.id == "pyro_erosion" then
+        -- 烈焰侵蚀：重创敌对据点并切断其输出航线
+        if targetNode.faction ~= "enemy" then
+            return false, "【烈焰侵蚀】只能施加于敌方灵穴！"
+        end
+        local cut = math.max(8, math.floor(targetNode.particles * 0.4))
+        targetNode.particles = math.max(0, targetNode.particles - cut)
+        if routeManager and routeManager.RemoveRouteFrom then
+            routeManager.RemoveRouteFrom(targetNode.id, nodes)
+        end
+        if onSparkCallback then
+            for _ = 1, 8 do
+                onSparkCallback(targetNode.x, targetNode.y, 0xFFFF3F20)
+            end
+        end
+        AbilitySystem.cooldowns[slotIndex] = card.cd
+        BalanceConfig.PlayAudioSafe("SKILL_BLAST")
+        return true, "【烈焰侵蚀】灼烧敌穴！削减 " .. cut .. " 微粒并截断其输出！"
     end
 
     return false, "未知符印效果"

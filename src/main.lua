@@ -253,9 +253,26 @@ local function CacheUIControls()
 
     -- 战前调配弹窗
     UI.prepareModal = FindDeepChild(root, "PrepareModal")
+    UI.prepCards = {}
     if UI.prepareModal then
         UI.prepBudgetText = FindDeepChild(UI.prepareModal, "PrepBudgetText")
+        UI.prepHint       = FindDeepChild(UI.prepareModal, "PrepHint")
+        UI.prepTitle      = FindDeepChild(UI.prepareModal, "PrepTitle")
         UI.prepStartBtn   = FindDeepChild(UI.prepareModal, "PrepStartBtn")
+        for k = 1, 6 do
+            local cardBtn = FindDeepChild(UI.prepareModal, "PrepCard_" .. k)
+            if cardBtn then
+                table.insert(UI.prepCards, {
+                    button     = cardBtn,
+                    checkCtrl  = FindDeepChild(cardBtn, "CheckTag"),
+                    costCtrl   = FindDeepChild(cardBtn, "CostText"),
+                    descCtrl   = FindDeepChild(cardBtn, "DescText"),
+                    nameCtrl   = FindDeepChild(cardBtn, "NameText"),
+                    bgCtrl     = FindDeepChild(cardBtn, "CardBg"),
+                    borderCtrl = FindDeepChild(cardBtn, "CardBorder")
+                })
+            end
+        end
     end
 
     -- 结算弹窗
@@ -363,18 +380,37 @@ local function SetupEventHandlers()
         end)
     end
 
-    -- 4. 战前调配确认按钮
+    -- 4. 战前调配卡牌点击选择与差分渲染
+    for idx, cardUI in ipairs(UI.prepCards) do
+        if cardUI.button and cardUI.button.AddCursorEventListener then
+            local cardKey = PrepareView.POOL_ORDER[idx]
+            cardUI.button:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
+                local ok, err = PrepareView.ToggleCard(cardKey)
+                if not ok and err then
+                    HudView.ShowToast(err)
+                end
+                PrepareView.Render(UI.prepCards, UI.prepBudgetText, UI.prepHint)
+            end)
+        end
+    end
+
     if UI.prepStartBtn and UI.prepStartBtn.AddCursorEventListener then
         UI.prepStartBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
             PrepareView.ConfirmAndStart()
         end)
     end
 
-    -- 5. 符印槽位点击选择
+    -- 5. 符印槽位点击选择 (冷却中拦截)
     for idx, slot in ipairs(UI.cardSlots) do
         if slot.container and slot.container.AddCursorEventListener then
             slot.container:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
                 if gameState.currentState == STATE_PLAYING then
+                    if AbilitySystem.cooldowns[idx] and AbilitySystem.cooldowns[idx] > 0 then
+                        local card = AbilitySystem.deck[idx]
+                        local name = card and card.name or "符印"
+                        HudView.ShowToast(string.format("【%s】仍在冷却中（还剩 %d 秒）", name, math.ceil(AbilitySystem.cooldowns[idx])))
+                        return
+                    end
                     if Input.GetSelectedCard() == idx then
                         Input.ClearSelectedCard()
                     else
@@ -385,19 +421,33 @@ local function SetupEventHandlers()
         end
     end
 
-    -- 6. 重试按钮
+    -- 6. 重试按钮 (重开时重置并返回符印调配环节)
     if UI.settleRetryBtn and UI.settleRetryBtn.AddCursorEventListener then
         UI.settleRetryBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
-            -- 重新开启一局
+            print("[Starlink] 玩家选择重新演练，重置战场并返回战前调配环节...")
             InitNodes()
             RouteManager.Init()
             CombatResolver.Init()
             gameState.elapsedTime = 0
             gameState.timeRemaining = BalanceConfig.MATCH_DURATION
             gameState.isGameOver = false
-            gameState.currentState = STATE_PLAYING
+            AbilitySystem.cooldowns = { 0, 0, 0, 0 }
+
+            -- 隐藏结算弹窗，打开战前调配弹窗
             Layout.SetVisible(UI.settleModal, false)
-            HudView.ShowToast("【重新注灵】对局开始，执掌地脉星盘！")
+            Layout.SetVisible(UI.prepareModal, true)
+            gameState.currentState = STATE_PREPARE
+
+            -- 重新初始化调配界面并刷新差分呈现
+            PrepareView.Init(function(selectedDeck)
+                print("[Starlink] 战前构筑完成，开启动态推演！")
+                AbilitySystem.InitDeck(selectedDeck)
+                Layout.SetVisible(UI.prepareModal, false)
+                gameState.currentState = STATE_PLAYING
+                HudView.ShowToast("【推衍开启】铺设光轨，争夺中立灵穴！")
+            end)
+            PrepareView.Render(UI.prepCards, UI.prepBudgetText, UI.prepHint)
+            HudView.ShowToast("【重新演练】请调配本局战术符印！")
         end)
     end
 end
@@ -416,12 +466,13 @@ function OnInit()
     RouteManager.Init()
     CombatResolver.Init()
 
-    -- 初始化剧情回调
+    -- 初始化剧情回调 (演播完毕后进入符印调配并初始化差分样式)
     DialoguePlayer.Init(function()
         print("[Starlink] 剧情演播完毕，进入战前符印调配...")
         Layout.SetVisible(UI.dialogueModal, false)
         Layout.SetVisible(UI.prepareModal, true)
         gameState.currentState = STATE_PREPARE
+        PrepareView.Render(UI.prepCards, UI.prepBudgetText, UI.prepHint)
     end)
 
     -- 初始化战前构筑回调
@@ -462,9 +513,9 @@ function OnUpdate(dt)
         DialoguePlayer.Update(dt, UI.dlgSpeaker, UI.dlgContent)
 
     elseif gameState.currentState == STATE_PREPARE then
-        if UI.prepBudgetText and UI.prepBudgetText.alive then
-            local used = PrepareView.GetUsedBudget()
-            UI.prepBudgetText.text = string.format("当前调配权能预算：%d / 12 点", used)
+        if not gameState._prepRendered then
+            gameState._prepRendered = true
+            PrepareView.Render(UI.prepCards, UI.prepBudgetText, UI.prepHint)
         end
 
     elseif gameState.currentState == STATE_PLAYING then

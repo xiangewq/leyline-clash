@@ -110,10 +110,11 @@ function VisualRenderer.UpdateNodes(nodeUIList, nodes, elapsedTime)
                 end
             end
 
-            -- 3. 兵力数值显示 (高对比度纯白亮色)
+            -- 3. 兵力数值显示 (高对比度纯白亮色，帧级实时刷新)
             if ui.particleText and ui.particleText.alive then
-                ui.particleText.text = tostring(node.particles)
+                ui.particleText.text = tostring(math.floor(node.particles or 0))
                 ui.particleText.fontColor = Layout.PALETTE.TEXT_LIGHT
+                Layout.SetVisible(ui.particleText, true)
             end
 
             -- 4. 异象标识文本
@@ -135,15 +136,31 @@ function VisualRenderer.UpdateNodes(nodeUIList, nodes, elapsedTime)
                 end
             end
 
-            -- 5. 状态标签 (固守中 / 休眠中)
+            -- 5. 占领进度与状态标签 (占领中/动摇中/输送中/固守中/休眠中)
             if ui.statusText and ui.statusText.alive then
-                if node.isIdle then
+                if node.faction == "neutral" and (node.control > 0 or (node.contenderParticles and node.contenderParticles > 0)) then
+                    local fName = (node.contenderFaction == "player") and "我方" or (node.contenderFaction == "enemy" and "敌方" or "")
+                    local col = (node.contenderFaction == "player") and Layout.PALETTE.PLAYER or Layout.PALETTE.ENEMY
+                    ui.statusText.text = string.format("[%s占领中 %d%%]", fName, math.floor(node.control))
+                    ui.statusText.fontColor = col
+                    Layout.SetVisible(ui.statusText, true)
+                elseif node.faction ~= "neutral" and node.control < 100 then
+                    local statusDesc = (node.faction == "player") and "敌袭动摇" or "我方攻克"
+                    local col = (node.faction == "player") and Layout.PALETTE.ENEMY or Layout.PALETTE.PLAYER
+                    ui.statusText.text = string.format("[%s %d%%]", statusDesc, math.floor(node.control))
+                    ui.statusText.fontColor = col
+                    Layout.SetVisible(ui.statusText, true)
+                elseif node.isIdle then
                     ui.statusText.text = "[腹地休眠]"
                     ui.statusText.fontColor = Layout.PALETTE.TEXT_MUTED
                     Layout.SetVisible(ui.statusText, true)
                 elseif node.isDefensive and node.routeTo == nil then
                     ui.statusText.text = "[驻阵固守]"
                     ui.statusText.fontColor = Layout.PALETTE.GOLD
+                    Layout.SetVisible(ui.statusText, true)
+                elseif node.routeTo ~= nil then
+                    ui.statusText.text = "[输送中 ➔]"
+                    ui.statusText.fontColor = factionColor
                     Layout.SetVisible(ui.statusText, true)
                 else
                     Layout.SetVisible(ui.statusText, false)
