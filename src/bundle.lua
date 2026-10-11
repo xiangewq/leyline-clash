@@ -1758,7 +1758,27 @@ end
 
 -- 缓存控件树引用
 local function CacheUIControls()
-    local root = script.object
+    local root = nil
+    -- 1. 优先尝试脚本变量绑定（如在编辑器中配置了客户端控件ID变量）
+    if script and script.GetParam then
+        local pId = script:GetParam("RootCanvasID")
+        if pId and type(pId) == "number" and game and game.GetClientUIControl then
+            root = game.GetClientUIControl(pId)
+        end
+    end
+    -- 2. 其次获取挂载宿主对象
+    if not root and script and script.object then
+        root = script.object
+    end
+    -- 3. 再次通过名称查找全局根
+    if not root and game and game.FindClientUIRoot then
+        root = game.FindClientUIRoot("StarlinkCanvas") or game.FindClientUIRoot("GameRoot")
+    end
+    -- 4. 兜底获取当前活跃的第一个根容器
+    if not root and game and game.GetClientUIRoots then
+        local roots = game.GetClientUIRoots()
+        if roots and #roots > 0 then root = roots[1] end
+    end
     UI.root = root
 
     -- 全局检测层与拖拽导引线
