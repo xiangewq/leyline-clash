@@ -138,4 +138,56 @@ function AbilitySystem.CastAbility(slotIndex, targetNodeId, nodes, routeManager,
     return false, "未知符印效果"
 end
 
+-- 智能索敌推荐目标（针对玩家快捷双击或自动施法）
+function AbilitySystem.GetSmartTarget(cardId, nodes, routeManager)
+    if cardId == "anemo_shield" or cardId == "geo_wall" then
+        -- 优先选受到敌袭动摇或兵力最少的己方节点
+        local best = nil
+        for _, n in ipairs(nodes) do
+            if n.faction == "player" then
+                if not best or (n.particles < best.particles) then
+                    best = n
+                end
+            end
+        end
+        return best and best.id or nil
+
+    elseif cardId == "anemo_turb" then
+        -- 优先选正在向外输出光轨的己方灵穴
+        for _, n in ipairs(nodes) do
+            if n.faction == "player" and n.routeTo ~= nil then
+                return n.id
+            end
+        end
+        -- 次选任意己方灵穴
+        for _, n in ipairs(nodes) do
+            if n.faction == "player" then return n.id end
+        end
+        return nil
+
+    elseif cardId == "pyro_blast" or cardId == "pyro_erosion" then
+        -- 优先选兵力最多的敌方灵穴
+        local best = nil
+        for _, n in ipairs(nodes) do
+            if n.faction == "enemy" then
+                if not best or (n.particles > best.particles) then
+                    best = n
+                end
+            end
+        end
+        return best and best.id or nil
+
+    elseif cardId == "hydro_bribe" then
+        -- 优先选中立灵穴，其次选敌方灵穴
+        for _, n in ipairs(nodes) do
+            if n.faction == "neutral" then return n.id end
+        end
+        for _, n in ipairs(nodes) do
+            if n.faction == "enemy" then return n.id end
+        end
+        return nil
+    end
+    return nil
+end
+
 return AbilitySystem

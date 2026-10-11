@@ -413,11 +413,19 @@ function Input.OnCursorDown(x, y, nodes)
     print(string.format("[Starlink Input] Down at (%.1f, %.1f), hit = %s", x, y, clickedNode and clickedNode.name or "none"))
 
     -- 若当前已选中卡牌，直接作为技能目标拾取
-    if Input.selectedCardIndex and clickedNode then
-        if Input.onCardCast then
-            Input.onCardCast(Input.selectedCardIndex, clickedNode.id)
+    if Input.selectedCardIndex then
+        local slotIdx = Input.selectedCardIndex
+        if clickedNode then
+            if Input.onCardCast then
+                Input.onCardCast(slotIdx, clickedNode.id)
+            end
+            Input.selectedCardIndex = nil
+        else
+            if Input.onCardCancelled then
+                Input.onCardCancelled(slotIdx)
+            end
+            Input.selectedCardIndex = nil
         end
-        Input.selectedCardIndex = nil
         return
     end
 
@@ -1068,6 +1076,58 @@ function AbilitySystem.CastAbility(slotIndex, targetNodeId, nodes, routeManager,
     return false, "未知符印效果"
 end
 
+-- 智能索敌推荐目标（针对玩家快捷双击或自动施法）
+function AbilitySystem.GetSmartTarget(cardId, nodes, routeManager)
+    if cardId == "anemo_shield" or cardId == "geo_wall" then
+        -- 优先选受到敌袭动摇或兵力最少的己方节点
+        local best = nil
+        for _, n in ipairs(nodes) do
+            if n.faction == "player" then
+                if not best or (n.particles < best.particles) then
+                    best = n
+                end
+            end
+        end
+        return best and best.id or nil
+
+    elseif cardId == "anemo_turb" then
+        -- 优先选正在向外输出光轨的己方灵穴
+        for _, n in ipairs(nodes) do
+            if n.faction == "player" and n.routeTo ~= nil then
+                return n.id
+            end
+        end
+        -- 次选任意己方灵穴
+        for _, n in ipairs(nodes) do
+            if n.faction == "player" then return n.id end
+        end
+        return nil
+
+    elseif cardId == "pyro_blast" or cardId == "pyro_erosion" then
+        -- 优先选兵力最多的敌方灵穴
+        local best = nil
+        for _, n in ipairs(nodes) do
+            if n.faction == "enemy" then
+                if not best or (n.particles > best.particles) then
+                    best = n
+                end
+            end
+        end
+        return best and best.id or nil
+
+    elseif cardId == "hydro_bribe" then
+        -- 优先选中立灵穴，其次选敌方灵穴
+        for _, n in ipairs(nodes) do
+            if n.faction == "neutral" then return n.id end
+        end
+        for _, n in ipairs(nodes) do
+            if n.faction == "enemy" then return n.id end
+        end
+        return nil
+    end
+    return nil
+end
+
 return AbilitySystem
 
 end
@@ -1179,9 +1239,8 @@ function VisualRenderer.UpdateRoutes(routeCtrls, routes, nodes, dragLineCtrl, in
 
                 if nA and nB then
                     local col = Layout.GetFactionColor(r.faction)
-                    local thickness = 4
-                    -- 仅当释放了【千风湍流】符印对该光轨加速时，才激活专属翠碧光轨特效
-                    if r.boostedUntil > elapsedTime then
+                    -- 处于「疾风流道」(千风隘口) 或施加「千风湍流」符印：激活提瓦特千风翠绿粗流道特效 (10粒/秒高速流)
+                    if nA.anomaly == "WIND_FLOW" or r.boostedUntil > elapsedTime then
                         col = Layout.PALETTE.ANEMO
                         thickness = 6
                     end
@@ -1724,11 +1783,18 @@ function CardBar.Update(cardSlots, deck, cooldowns, selectedSlotIndex)
                 Layout.SetVisible(slot.container, true)
 
                 if slot.nameCtrl and slot.nameCtrl.alive then
-                    slot.nameCtrl.text = card.name
+                    if selectedSlotIndex == i then
+                        slot.nameCtrl.text = "★ " .. card.name
+                        slot.nameCtrl.fontColor = Layout.PALETTE.GOLD
+                    else
+                        slot.nameCtrl.text = card.name
+                        slot.nameCtrl.fontColor = Layout.PALETTE.TEXT_LIGHT
+                    end
                 end
 
                 if slot.costCtrl and slot.costCtrl.alive then
                     slot.costCtrl.text = tostring(card.cost) .. "点"
+                    slot.costCtrl.fontColor = (selectedSlotIndex == i) and Layout.PALETTE.GOLD or Layout.MakeColor(251, 191, 36, 255)
                 end
 
                 if slot.borderCtrl and slot.borderCtrl.alive then
@@ -2131,7 +2197,18 @@ local function SetupEventHandlers()
             gameState.elapsedTime,
             function(x, y, col) CombatResolver.AddSpark(x, y, col) end
         )
+        if ok then
+            BalanceConfig.PlayAudioSafe("SKILL_BLAST")
+        end
         if msg then HudView.ShowToast(msg) end
+        CardBar.Update(UI.cardSlots, AbilitySystem.deck, AbilitySystem.cooldowns, nil)
+    end
+
+    Input.onCardCancelled = function(slotIndex)
+        local card = AbilitySystem.deck[slotIndex]
+        BalanceConfig.PlayAudioSafe("UI_CLICK")
+        HudView.ShowToast(string.format("【取消施法】%s", card and card.name or ""))
+        CardBar.Update(UI.cardSlots, AbilitySystem.deck, AbilitySystem.cooldowns, nil)
     end
 
     -- 3. 剧情按钮监听
@@ -2179,22 +2256,66 @@ local function SetupEventHandlers()
         end)
     end
 
-    -- 5. 符印槽位点击选择 (冷却中拦截)
+    -- 5. 符印槽位点击选择 (冷却中拦截，支持点击选定目标施法与再次点击智能自动施法)
     for idx, slot in ipairs(UI.cardSlots) do
         if slot.container and slot.container.AddCursorEventListener then
             slot.container:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
                 if gameState.currentState == STATE_PLAYING then
+                    local card = AbilitySystem.deck[idx]
+                    if not card then return end
+
+                    -- 1. 冷却中拦截
                     if AbilitySystem.cooldowns[idx] and AbilitySystem.cooldowns[idx] > 0 then
-                        local card = AbilitySystem.deck[idx]
-                        local name = card and card.name or "符印"
-                        HudView.ShowToast(string.format("【%s】仍在冷却中（还剩 %d 秒）", name, math.ceil(AbilitySystem.cooldowns[idx])))
+                        BalanceConfig.PlayAudioSafe("UI_CLICK")
+                        HudView.ShowToast(string.format("【%s】仍在冷却中（还剩 %d 秒）", card.name, math.ceil(AbilitySystem.cooldowns[idx])))
                         return
                     end
+
+                    -- 2. 若再次点击同一张已选中的卡牌：触发快捷智能施法！
                     if Input.GetSelectedCard() == idx then
-                        Input.ClearSelectedCard()
-                    else
-                        Input.SetSelectedCard(idx)
+                        local smartTargetId = AbilitySystem.GetSmartTarget(card.id, gameState.nodes, RouteManager)
+                        if smartTargetId ~= nil then
+                            Input.ClearSelectedCard()
+                            local ok, msg = AbilitySystem.CastAbility(
+                                idx,
+                                smartTargetId,
+                                gameState.nodes,
+                                RouteManager,
+                                gameState.elapsedTime,
+                                function(x, y, col) CombatResolver.AddSpark(x, y, col) end
+                            )
+                            if ok then
+                                BalanceConfig.PlayAudioSafe("SKILL_BLAST")
+                                if msg then HudView.ShowToast("【快捷施法】" .. msg) end
+                            else
+                                if msg then HudView.ShowToast(msg) end
+                            end
+                            CardBar.Update(UI.cardSlots, AbilitySystem.deck, AbilitySystem.cooldowns, nil)
+                            return
+                        else
+                            Input.ClearSelectedCard()
+                            BalanceConfig.PlayAudioSafe("UI_CLICK")
+                            HudView.ShowToast(string.format("【取消选定】%s", card.name))
+                            CardBar.Update(UI.cardSlots, AbilitySystem.deck, AbilitySystem.cooldowns, nil)
+                            return
+                        end
                     end
+
+                    -- 3. 首次点击卡牌：进入选定施法态
+                    Input.SetSelectedCard(idx)
+                    BalanceConfig.PlayAudioSafe("UI_CLICK")
+                    local targetHint = ""
+                    if card.targetType == "enemy_node" then
+                        targetHint = "轻点敌方灵穴轰炸，或再点卡牌自动生效！"
+                    elseif card.targetType == "player_node" then
+                        targetHint = "轻点我方灵穴加持，或再点卡牌自动生效！"
+                    elseif card.targetType == "player_route_node" then
+                        targetHint = "轻点输送中灵穴提速，或再点卡牌自动生效！"
+                    else
+                        targetHint = "轻点战场灵穴施法，或再点卡牌自动生效！"
+                    end
+                    HudView.ShowToast(string.format("【已准备】%s（%s）", card.name, targetHint))
+                    CardBar.Update(UI.cardSlots, AbilitySystem.deck, AbilitySystem.cooldowns, idx)
                 end
             end)
         end

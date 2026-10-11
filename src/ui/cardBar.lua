@@ -16,11 +16,18 @@ function CardBar.Update(cardSlots, deck, cooldowns, selectedSlotIndex)
                 Layout.SetVisible(slot.container, true)
 
                 if slot.nameCtrl and slot.nameCtrl.alive then
-                    slot.nameCtrl.text = card.name
+                    if selectedSlotIndex == i then
+                        slot.nameCtrl.text = "★ " .. card.name
+                        slot.nameCtrl.fontColor = Layout.PALETTE.GOLD
+                    else
+                        slot.nameCtrl.text = card.name
+                        slot.nameCtrl.fontColor = Layout.PALETTE.TEXT_LIGHT
+                    end
                 end
 
                 if slot.costCtrl and slot.costCtrl.alive then
                     slot.costCtrl.text = tostring(card.cost) .. "点"
+                    slot.costCtrl.fontColor = (selectedSlotIndex == i) and Layout.PALETTE.GOLD or Layout.MakeColor(251, 191, 36, 255)
                 end
 
                 if slot.borderCtrl and slot.borderCtrl.alive then

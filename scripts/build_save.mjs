@@ -567,7 +567,7 @@ const dialogueModal = createNode('container', {
 // 4. 顶部 HUD 与底部符印栏 HudLayer
 const cardSlots = [1, 2, 3, 4].map(idx => {
   const offsetX = -210 + (idx - 1) * 140;
-  return createNode('container', {
+  return createNode('button', {
     id: `card_slot_${idx}`,
     name: `CardSlot_${idx}`,
     raycastTarget: true,
@@ -646,7 +646,7 @@ const cardSlots = [1, 2, 3, 4].map(idx => {
       }),
       createNode('image', {
         id: `card_border_${idx}`,
-        name: 'Border',
+        name: 'CardBorder',
         imageId: 100001,
         imageColor: parseColor('#fbbf24'),
         transformByPlatform: makeTransform({ layout: 'stretch' })

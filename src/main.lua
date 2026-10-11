@@ -365,7 +365,18 @@ local function SetupEventHandlers()
             gameState.elapsedTime,
             function(x, y, col) CombatResolver.AddSpark(x, y, col) end
         )
+        if ok then
+            BalanceConfig.PlayAudioSafe("SKILL_BLAST")
+        end
         if msg then HudView.ShowToast(msg) end
+        CardBar.Update(UI.cardSlots, AbilitySystem.deck, AbilitySystem.cooldowns, nil)
+    end
+
+    Input.onCardCancelled = function(slotIndex)
+        local card = AbilitySystem.deck[slotIndex]
+        BalanceConfig.PlayAudioSafe("UI_CLICK")
+        HudView.ShowToast(string.format("【取消施法】%s", card and card.name or ""))
+        CardBar.Update(UI.cardSlots, AbilitySystem.deck, AbilitySystem.cooldowns, nil)
     end
 
     -- 3. 剧情按钮监听
@@ -413,22 +424,66 @@ local function SetupEventHandlers()
         end)
     end
 
-    -- 5. 符印槽位点击选择 (冷却中拦截)
+    -- 5. 符印槽位点击选择 (冷却中拦截，支持点击选定目标施法与再次点击智能自动施法)
     for idx, slot in ipairs(UI.cardSlots) do
         if slot.container and slot.container.AddCursorEventListener then
             slot.container:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
                 if gameState.currentState == STATE_PLAYING then
+                    local card = AbilitySystem.deck[idx]
+                    if not card then return end
+
+                    -- 1. 冷却中拦截
                     if AbilitySystem.cooldowns[idx] and AbilitySystem.cooldowns[idx] > 0 then
-                        local card = AbilitySystem.deck[idx]
-                        local name = card and card.name or "符印"
-                        HudView.ShowToast(string.format("【%s】仍在冷却中（还剩 %d 秒）", name, math.ceil(AbilitySystem.cooldowns[idx])))
+                        BalanceConfig.PlayAudioSafe("UI_CLICK")
+                        HudView.ShowToast(string.format("【%s】仍在冷却中（还剩 %d 秒）", card.name, math.ceil(AbilitySystem.cooldowns[idx])))
                         return
                     end
+
+                    -- 2. 若再次点击同一张已选中的卡牌：触发快捷智能施法！
                     if Input.GetSelectedCard() == idx then
-                        Input.ClearSelectedCard()
-                    else
-                        Input.SetSelectedCard(idx)
+                        local smartTargetId = AbilitySystem.GetSmartTarget(card.id, gameState.nodes, RouteManager)
+                        if smartTargetId ~= nil then
+                            Input.ClearSelectedCard()
+                            local ok, msg = AbilitySystem.CastAbility(
+                                idx,
+                                smartTargetId,
+                                gameState.nodes,
+                                RouteManager,
+                                gameState.elapsedTime,
+                                function(x, y, col) CombatResolver.AddSpark(x, y, col) end
+                            )
+                            if ok then
+                                BalanceConfig.PlayAudioSafe("SKILL_BLAST")
+                                if msg then HudView.ShowToast("【快捷施法】" .. msg) end
+                            else
+                                if msg then HudView.ShowToast(msg) end
+                            end
+                            CardBar.Update(UI.cardSlots, AbilitySystem.deck, AbilitySystem.cooldowns, nil)
+                            return
+                        else
+                            Input.ClearSelectedCard()
+                            BalanceConfig.PlayAudioSafe("UI_CLICK")
+                            HudView.ShowToast(string.format("【取消选定】%s", card.name))
+                            CardBar.Update(UI.cardSlots, AbilitySystem.deck, AbilitySystem.cooldowns, nil)
+                            return
+                        end
                     end
+
+                    -- 3. 首次点击卡牌：进入选定施法态
+                    Input.SetSelectedCard(idx)
+                    BalanceConfig.PlayAudioSafe("UI_CLICK")
+                    local targetHint = ""
+                    if card.targetType == "enemy_node" then
+                        targetHint = "轻点敌方灵穴轰炸，或再点卡牌自动生效！"
+                    elseif card.targetType == "player_node" then
+                        targetHint = "轻点我方灵穴加持，或再点卡牌自动生效！"
+                    elseif card.targetType == "player_route_node" then
+                        targetHint = "轻点输送中灵穴提速，或再点卡牌自动生效！"
+                    else
+                        targetHint = "轻点战场灵穴施法，或再点卡牌自动生效！"
+                    end
+                    HudView.ShowToast(string.format("【已准备】%s（%s）", card.name, targetHint))
+                    CardBar.Update(UI.cardSlots, AbilitySystem.deck, AbilitySystem.cooldowns, idx)
                 end
             end)
         end

@@ -41,9 +41,8 @@ function VisualRenderer.UpdateRoutes(routeCtrls, routes, nodes, dragLineCtrl, in
 
                 if nA and nB then
                     local col = Layout.GetFactionColor(r.faction)
-                    local thickness = 4
-                    -- 仅当释放了【千风湍流】符印对该光轨加速时，才激活专属翠碧光轨特效
-                    if r.boostedUntil > elapsedTime then
+                    -- 处于「疾风流道」(千风隘口) 或施加「千风湍流」符印：激活提瓦特千风翠绿粗流道特效 (10粒/秒高速流)
+                    if nA.anomaly == "WIND_FLOW" or r.boostedUntil > elapsedTime then
                         col = Layout.PALETTE.ANEMO
                         thickness = 6
                     end

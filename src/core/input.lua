@@ -52,11 +52,19 @@ function Input.OnCursorDown(x, y, nodes)
     print(string.format("[Starlink Input] Down at (%.1f, %.1f), hit = %s", x, y, clickedNode and clickedNode.name or "none"))
 
     -- 若当前已选中卡牌，直接作为技能目标拾取
-    if Input.selectedCardIndex and clickedNode then
-        if Input.onCardCast then
-            Input.onCardCast(Input.selectedCardIndex, clickedNode.id)
+    if Input.selectedCardIndex then
+        local slotIdx = Input.selectedCardIndex
+        if clickedNode then
+            if Input.onCardCast then
+                Input.onCardCast(slotIdx, clickedNode.id)
+            end
+            Input.selectedCardIndex = nil
+        else
+            if Input.onCardCancelled then
+                Input.onCardCancelled(slotIdx)
+            end
+            Input.selectedCardIndex = nil
         end
-        Input.selectedCardIndex = nil
         return
     end
 
