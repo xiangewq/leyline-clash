@@ -1062,6 +1062,12 @@ function RouteManager.SetRoute(fromId, toId, faction, nodes)
     -- 单节点同一时间仅允许存在 1 条对外输出光轨
     RouteManager.RemoveRouteFrom(fromId, nodes)
 
+    -- 核心死循环防御：禁止两灵穴间双向对冲输送 (若目标灵穴正向源灵穴输送，切断反向光轨)
+    local revRoute = RouteManager.GetRouteFrom(toId)
+    if revRoute and revRoute.toId == fromId then
+        RouteManager.RemoveRouteFrom(toId, nodes)
+    end
+
     fromNode.routeTo = toId
     fromNode.isDefensive = false -- 开启输出自动解除纯驻阵固守
 
@@ -1463,6 +1469,18 @@ local FactionAI = {
     AI_INTERVAL = 1.5 -- 1.5 秒决策一轮，反应敏捷
 }
 
+-- 辅助判定灵穴是否处于接敌前线 (拥有非己方邻居)
+local function HasHostileNeighbor(node, allNodes, fac)
+    local neighbors = StarMap.GetNeighbors(node.id)
+    for _, nId in ipairs(neighbors) do
+        local n = allNodes[nId + 1]
+        if n and n.faction ~= fac then
+            return true
+        end
+    end
+    return false
+end
+
 function FactionAI.Update(dt, nodes, routeManager)
     FactionAI.aiTimer = FactionAI.aiTimer + dt
     if FactionAI.aiTimer < FactionAI.AI_INTERVAL then
@@ -1474,17 +1492,56 @@ function FactionAI.Update(dt, nodes, routeManager)
     for _, eNode in ipairs(nodes) do
         local fac = eNode.faction
         if fac ~= "player" and fac ~= "neutral" then
-            if eNode.particles > 10 and eNode.routeTo == nil then
+
+            -- 1. 活跃光轨动态监测与适时切断 (核心防死循环机制)
+            if eNode.routeTo ~= nil then
+                local targetNode = nodes[eNode.routeTo + 1]
+                local shouldCut = false
+
+                if targetNode then
+                    if targetNode.faction == fac then
+                        -- 目标为友军据点：
+                        -- a) 目标守军充裕 (已达 14 粒) -> 增援任务圆满达成，立即切断，防止持续抽干源节点
+                        -- b) 源节点自身兵力降至 8 粒 -> 保留自身驻防底线，停止无底洞抽血
+                        -- c) 目标节点正向源节点反向输送 -> 严重对冲，立即切断
+                        if targetNode.particles >= 14 or eNode.particles <= 8 or targetNode.routeTo == eNode.id then
+                            shouldCut = true
+                        end
+                    else
+                        -- 目标为敌方/中立据点：
+                        -- a) 自身兵力消耗至危急水平 (< 5 粒) -> 进攻受挫，撤退固守
+                        if eNode.particles < 5 then
+                            shouldCut = true
+                        end
+                    end
+                else
+                    shouldCut = true
+                end
+
+                if shouldCut then
+                    routeManager.RemoveRouteFrom(eNode.id, nodes)
+                    eNode.isDefensive = true
+                end
+
+            -- 2. 空闲节点决策与目标选择 (仅当 routeTo 为 nil 时执行)
+            elseif eNode.particles >= 10 then
                 local neighbors = StarMap.GetNeighbors(eNode.id)
 
-                -- 1. 战术互援：若相邻同阵营据点陷入危局 (守军不足 8 粒或面临敌情)，且自身兵力充裕 (>12)，架设光轨增援
+                -- 2.1 战术互援判定 (严格前线受困条件，杜绝后方无意义对流)
                 local needAlly = nil
-                if eNode.particles > 12 then
+                -- 只有当自身兵力充裕 (>= 16 粒) 且自身未面临直接受袭威胁时，才考虑增援邻近友军
+                if eNode.particles >= 16 and not eNode.hasEnemyThreat then
                     for _, nId in ipairs(neighbors) do
                         local n = nodes[nId + 1]
-                        if n and n.faction == fac and (n.hasEnemyThreat or n.particles < 8) and n.id ~= eNode.id then
-                            needAlly = n
-                            break
+                        if n and n.faction == fac and n.id ~= eNode.id then
+                            -- 关键约束：
+                            -- a) 友军不能已经在向我输送 (杜绝互援死锁)
+                            -- b) 友军处于前线或面临敌情
+                            -- c) 友军兵力确实不足 (< 8 粒)
+                            if n.routeTo ~= eNode.id and n.particles < 8 and (n.hasEnemyThreat or HasHostileNeighbor(n, nodes, fac)) then
+                                needAlly = n
+                                break
+                            end
                         end
                     end
                 end
@@ -1492,7 +1549,7 @@ function FactionAI.Update(dt, nodes, routeManager)
                 if needAlly then
                     routeManager.SetRoute(eNode.id, needAlly.id, fac, nodes)
                 else
-                    -- 2. 战线拓展与针对性进攻
+                    -- 2.2 战线拓展与针对性进攻
                     local targets = {}
                     for _, nId in ipairs(neighbors) do
                         local n = nodes[nId + 1]
@@ -1517,11 +1574,6 @@ function FactionAI.Update(dt, nodes, routeManager)
                         routeManager.SetRoute(eNode.id, chosen.id, fac, nodes)
                     end
                 end
-
-            elseif eNode.particles < 4 and eNode.routeTo ~= nil then
-                -- 兵力紧缺危急：主动切断光轨收拢力量固守
-                routeManager.RemoveRouteFrom(eNode.id, nodes)
-                eNode.isDefensive = true
             end
         end
     end
