@@ -132,9 +132,9 @@ function RouteManager.OnParticleArrive(particle, node, onCombatHitCallback)
             node.particles = node.particles + 1
         end
     else
-        -- 敌对交火与侵蚀 (固守减伤调整为 25%，命中率 75%，兼顾防守优势与进攻可行性)
+        -- 敌对交火与侵蚀 (固守减伤 30%，命中率 70%，兼顾防御阵地坚韧度与攻坚可行性)
         if node.particles > 0 then
-            local defenseDamp = (node.isDefensive and 0.75 or 1.0)
+            local defenseDamp = (node.isDefensive and 0.7 or 1.0)
             if math.random() <= defenseDamp then
                 node.particles = node.particles - 1
             end

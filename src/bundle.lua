@@ -27,15 +27,15 @@ local BalanceConfig = {
     MATCH_DURATION = 360, -- 6 分钟紧凑快节奏
 
     -- 兵力孕育与生产
-    SPAWN_INTERVAL = 0.5,  -- 基础孕育周期 (秒) - 提速至每秒 2 粒，快节奏爽快感
+    SPAWN_INTERVAL = 0.8,  -- 基础孕育周期 (秒) - 前沿活跃灵穴每秒产 1.25 粒，节奏张弛有度
     MAX_NODE_CAP = 50,     -- 普通灵穴兵力上限
     PLASMA_CAP = 25,       -- 赤阳熔核灵穴兵力硬封顶
     SAFE_GARRISON = 3,     -- 光轨输出时源灵穴保留的最低护卫兵力 (防止基地永久定格在1)
 
     -- 物流与光轨
     PARTICLE_SPEED = 200,  -- 微粒基础航速 (像素/秒)
-    BASE_TRANSPORT_RATE = 3.5, -- 标准输送率 (粒/秒) - 平滑连贯光流
-    BOOST_TRANSPORT_RATE = 8,  -- 疾风加速输送率 (粒/秒)
+    BASE_TRANSPORT_RATE = 3.2, -- 标准输送率 (粒/秒) - 平滑连贯光流
+    BOOST_TRANSPORT_RATE = 6.4, -- 疾风加速输送率 (粒/秒)
 
     -- 占领与共鸣度 (0% ~ 100%)
     CAPTURE_INTERVAL = 0.8, -- 占领共鸣判定步进周期 (秒)
@@ -212,15 +212,15 @@ local ChapterConfig = {
                 }
             },
             nodes = {
-                { id = 0, name = "西风前哨", x = 260, y = 450, radius = 42, faction = "player", particles = 26, control = 100, anomaly = "NORMAL", desc = "我方西风骑士前哨" },
-                { id = 1, name = "清泉北陵", x = 520, y = 580, radius = 36, faction = "neutral", particles = 4, control = 0, anomaly = "NORMAL", desc = "北侧灵泉高地 (低阻力拓展点)" },
-                { id = 2, name = "泉水祭坛", x = 800, y = 620, radius = 38, faction = "neutral", particles = 8, control = 0, anomaly = "NORMAL", desc = "清泉古祭坛" },
-                { id = 3, name = "晨曦峡口", x = 1080, y = 580, radius = 36, faction = "neutral", particles = 4, control = 0, anomaly = "NORMAL", desc = "近酒庄险隘" },
-                { id = 4, name = "清泉主脉", x = 620, y = 450, radius = 38, faction = "neutral", particles = 8, control = 0, anomaly = "NORMAL", desc = "清泉核心灵脉" },
-                { id = 5, name = "奔狼前驿", x = 980, y = 450, radius = 38, faction = "neutral", particles = 8, control = 0, anomaly = "NORMAL", desc = "中路枢纽要道" },
-                { id = 6, name = "清泉南溪", x = 520, y = 320, radius = 36, faction = "neutral", particles = 4, control = 0, anomaly = "NORMAL", desc = "南侧支流草甸 (低阻力拓展点)" },
-                { id = 7, name = "杜拉夫猎场", x = 800, y = 280, radius = 38, faction = "neutral", particles = 8, control = 0, anomaly = "NORMAL", desc = "猎人歇脚营地" },
-                { id = 8, name = "达达乌帕口", x = 1080, y = 320, radius = 36, faction = "neutral", particles = 4, control = 0, anomaly = "NORMAL", desc = "近部落前沿" },
+                { id = 0, name = "西风前哨", x = 260, y = 450, radius = 42, faction = "player", particles = 20, control = 100, anomaly = "NORMAL", desc = "我方西风骑士前哨" },
+                { id = 1, name = "清泉北陵", x = 520, y = 580, radius = 36, faction = "neutral", particles = 7, control = 0, anomaly = "NORMAL", desc = "北侧灵泉高地 (侧翼拓展点)" },
+                { id = 2, name = "泉水祭坛", x = 800, y = 620, radius = 38, faction = "neutral", particles = 10, control = 0, anomaly = "NORMAL", desc = "清泉古祭坛" },
+                { id = 3, name = "晨曦峡口", x = 1080, y = 580, radius = 36, faction = "neutral", particles = 7, control = 0, anomaly = "NORMAL", desc = "近酒庄险隘" },
+                { id = 4, name = "清泉主脉", x = 620, y = 450, radius = 38, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "清泉核心灵脉 (战略枢纽)" },
+                { id = 5, name = "奔狼前驿", x = 980, y = 450, radius = 38, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "中路要冲 (战略枢纽)" },
+                { id = 6, name = "清泉南溪", x = 520, y = 320, radius = 36, faction = "neutral", particles = 7, control = 0, anomaly = "NORMAL", desc = "南侧支流草甸 (侧翼拓展点)" },
+                { id = 7, name = "杜拉夫猎场", x = 800, y = 280, radius = 38, faction = "neutral", particles = 10, control = 0, anomaly = "NORMAL", desc = "猎人歇脚营地" },
+                { id = 8, name = "达达乌帕口", x = 1080, y = 320, radius = 36, faction = "neutral", particles = 7, control = 0, anomaly = "NORMAL", desc = "近部落前沿" },
                 { id = 9, name = "愚人驻地", x = 1340, y = 450, radius = 42, faction = "enemy_red", particles = 20, control = 100, anomaly = "NORMAL", desc = "愚人众前线营地" }
             },
             links = {
@@ -904,50 +904,59 @@ function NodeEntity.Create(def)
     }
 end
 
--- 判定腹地休眠：无对外输出光轨、无入侵敌军且所有邻居均为同阵营领地
-function NodeEntity.CheckInlandDormant(node, allNodes)
+-- 判定是否为腹地节点：所有物理相邻灵穴均为同阵营领地
+function NodeEntity.CheckIsInland(node, allNodes)
     if node.faction == "neutral" then
-        node.isIdle = false
         return false
     end
-
-    -- 若对外有活跃输送光轨，则不休眠
-    if node.routeTo ~= nil then
-        node.isIdle = false
-        return false
-    end
-
-    -- 兵力尚未充实（低于 25 粒）的后方灵穴依然保持孕育，避免腹地守备空虚
-    if node.particles < 25 then
-        node.isIdle = false
-        return false
-    end
-
     local neighbors = StarMap.GetNeighbors(node.id)
-    local allAllies = true
+    if #neighbors == 0 then return false end
     for _, nId in ipairs(neighbors) do
         local n = allNodes[nId + 1]
-        if n and n.faction ~= node.faction then
-            allAllies = false
-            break
+        if not n or n.faction ~= node.faction then
+            return false
         end
     end
+    return true
+end
 
-    node.isIdle = allAllies
-    return allAllies
+-- 判定腹地休眠与状态维护
+function NodeEntity.CheckInlandDormant(node, allNodes)
+    local isInland = NodeEntity.CheckIsInland(node, allNodes)
+    if not isInland then
+        node.isIdle = false
+        return false
+    end
+
+    -- 核心理性机制：若灵穴处于安全腹地且未向外输送，储备达到 15 粒时自动休眠停止造兵
+    if node.routeTo == nil and node.particles >= 15 then
+        node.isIdle = true
+        return true
+    end
+
+    node.isIdle = false
+    return false
 end
 
 -- 帧更新生产逻辑
 function NodeEntity.TickSpawn(node, dt, allNodes, elapsedTime)
     if node.faction == "neutral" then return end
 
-    -- 判定内陆休眠
+    -- 判定内陆休眠 (未外调且储备充足则完全停产)
     if NodeEntity.CheckInlandDormant(node, allNodes) then
         return
     end
 
-    -- 生产周期换算 (富矿产速翻倍，贫瘠产速减半，纯水枢纽产速+50%，共鸣度不足拉长周期)
+    local isInland = NodeEntity.CheckIsInland(node, allNodes)
+
+    -- 生产周期换算
     local baseInterval = BalanceConfig.SPAWN_INTERVAL
+    if isInland then
+        -- 核心理性机制：腹地远离前线战火，地脉平息，产能衰减为前线的 40% (周期延长 2.5 倍)
+        -- 避免后方节点无限造兵串联成超级水泵碾压前线
+        baseInterval = baseInterval * 2.5
+    end
+
     if node.anomaly == "AMBER_MINE" then
         baseInterval = baseInterval * 0.5
     elseif node.anomaly == "MIST_RUINS" then
@@ -970,7 +979,7 @@ function NodeEntity.TickSpawn(node, dt, allNodes, elapsedTime)
     end
 end
 
--- 占领共鸣度步进结算 (0.8s 周期，封顶 5 点/轮防滚雪球)
+-- 占领共鸣度步进结算 (0.8s 周期)
 function NodeEntity.TickCapture(node, elapsedTime, onCaptureCallback, onRevertNeutralCallback)
     if (node.protectedUntil or 0) > (elapsedTime or 0) then
         return -- 受千风庇护免疫侵蚀
@@ -981,12 +990,12 @@ function NodeEntity.TickCapture(node, elapsedTime, onCaptureCallback, onRevertNe
         local baseGrowth = math.min(BalanceConfig.MAX_RESONANCE_GROWTH, math.max(1, math.floor(excess / 5 + 0.5)))
 
         if node.faction == "neutral" then
-            -- 中立节点占领大幅提速：每轮基础 +25 共鸣度，3~4 轮 (约 2.5 秒) 完成掌控
-            node.control = math.min(100, node.control + 25 + baseGrowth * 5)
+            -- 中立节点占领进度平衡：每轮 +14~20 共鸣度，需 5~6 轮 (约 4 秒) 完成掌控
+            node.control = math.min(100, node.control + 14 + baseGrowth * 3)
             if node.control >= 100 then
                 node.faction = node.contenderFaction
-                -- 多余侵蚀微粒直接作为驻留守军 (保底 3 粒，上限 15 粒)，不浪费兵力
-                node.particles = math.max(3, math.min(15, node.contenderParticles))
+                -- 占领后初始守军：侵蚀微粒按 25% 比例转化，保底 2 粒，上限 5 粒 (防止瞬间获得满编大军继续碾压)
+                node.particles = math.min(5, math.max(2, math.floor(node.contenderParticles * 0.25) + 2))
                 node.contenderParticles = 0
                 node.contenderFaction = nil
                 node.isDefensive = true
@@ -995,8 +1004,8 @@ function NodeEntity.TickCapture(node, elapsedTime, onCaptureCallback, onRevertNe
                 end
             end
         elseif node.faction ~= node.contenderFaction then
-            -- 削减原主控方控制度：提速削减，快速瓦解敌方统治
-            node.control = math.max(0, node.control - (15 + baseGrowth * 5))
+            -- 削减原主控方控制度：每轮削减 10 + baseGrowth * 3
+            node.control = math.max(0, node.control - (10 + baseGrowth * 3))
             if node.control <= BalanceConfig.NEUTRAL_THRESHOLD then
                 -- 沦为中立争夺态，控制度清零以便攻占方迅速掌控
                 node.faction = "neutral"
@@ -1158,9 +1167,9 @@ function RouteManager.OnParticleArrive(particle, node, onCombatHitCallback)
             node.particles = node.particles + 1
         end
     else
-        -- 敌对交火与侵蚀 (固守减伤调整为 25%，命中率 75%，兼顾防守优势与进攻可行性)
+        -- 敌对交火与侵蚀 (固守减伤 30%，命中率 70%，兼顾防御阵地坚韧度与攻坚可行性)
         if node.particles > 0 then
-            local defenseDamp = (node.isDefensive and 0.75 or 1.0)
+            local defenseDamp = (node.isDefensive and 0.7 or 1.0)
             if math.random() <= defenseDamp then
                 node.particles = node.particles - 1
             end
@@ -1451,7 +1460,7 @@ local StarMap = require("default_import_file/src/world/starMap") or require("src
 
 local FactionAI = {
     aiTimer = 0,
-    AI_INTERVAL = 2.0 -- 2 秒决策一轮
+    AI_INTERVAL = 1.5 -- 1.5 秒决策一轮，反应敏捷
 }
 
 function FactionAI.Update(dt, nodes, routeManager)
@@ -1465,34 +1474,51 @@ function FactionAI.Update(dt, nodes, routeManager)
     for _, eNode in ipairs(nodes) do
         local fac = eNode.faction
         if fac ~= "player" and fac ~= "neutral" then
-            if eNode.particles > 14 and eNode.routeTo == nil then
-                -- 兵力充足且未外调：寻找邻近非本阵营领地（包括中立、玩家及其他敌对势力）
+            if eNode.particles > 10 and eNode.routeTo == nil then
                 local neighbors = StarMap.GetNeighbors(eNode.id)
-                local targets = {}
-                for _, nId in ipairs(neighbors) do
-                    local n = nodes[nId + 1]
-                    if n and n.faction ~= fac then
-                        table.insert(targets, n)
+
+                -- 1. 战术互援：若相邻同阵营据点陷入危局 (守军不足 8 粒或面临敌情)，且自身兵力充裕 (>12)，架设光轨增援
+                local needAlly = nil
+                if eNode.particles > 12 then
+                    for _, nId in ipairs(neighbors) do
+                        local n = nodes[nId + 1]
+                        if n and n.faction == fac and (n.hasEnemyThreat or n.particles < 8) and n.id ~= eNode.id then
+                            needAlly = n
+                            break
+                        end
                     end
                 end
 
-                if #targets > 0 then
-                    -- 优先级：优先夺取中立薄弱灵穴，其次进攻弱势敌对/玩家据点
-                    table.sort(targets, function(a, b)
-                        if a.faction == "neutral" and b.faction ~= "neutral" then
-                            return true
-                        elseif a.faction ~= "neutral" and b.faction == "neutral" then
-                            return false
-                        else
-                            return a.particles < b.particles
+                if needAlly then
+                    routeManager.SetRoute(eNode.id, needAlly.id, fac, nodes)
+                else
+                    -- 2. 战线拓展与针对性进攻
+                    local targets = {}
+                    for _, nId in ipairs(neighbors) do
+                        local n = nodes[nId + 1]
+                        if n and n.faction ~= fac then
+                            table.insert(targets, n)
                         end
-                    end)
+                    end
 
-                    local chosen = targets[1]
-                    routeManager.SetRoute(eNode.id, chosen.id, fac, nodes)
+                    if #targets > 0 then
+                        -- 优先级：优先夺取中立薄弱灵穴，其次进攻弱势敌对/玩家据点
+                        table.sort(targets, function(a, b)
+                            if a.faction == "neutral" and b.faction ~= "neutral" then
+                                return true
+                            elseif a.faction ~= "neutral" and b.faction == "neutral" then
+                                return false
+                            else
+                                return a.particles < b.particles
+                            end
+                        end)
+
+                        local chosen = targets[1]
+                        routeManager.SetRoute(eNode.id, chosen.id, fac, nodes)
+                    end
                 end
 
-            elseif eNode.particles < 5 and eNode.routeTo ~= nil then
+            elseif eNode.particles < 4 and eNode.routeTo ~= nil then
                 -- 兵力紧缺危急：主动切断光轨收拢力量固守
                 routeManager.RemoveRouteFrom(eNode.id, nodes)
                 eNode.isDefensive = true

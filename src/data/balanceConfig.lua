@@ -6,15 +6,15 @@ local BalanceConfig = {
     MATCH_DURATION = 360, -- 6 分钟紧凑快节奏
 
     -- 兵力孕育与生产
-    SPAWN_INTERVAL = 0.5,  -- 基础孕育周期 (秒) - 提速至每秒 2 粒，快节奏爽快感
+    SPAWN_INTERVAL = 0.8,  -- 基础孕育周期 (秒) - 前沿活跃灵穴每秒产 1.25 粒，节奏张弛有度
     MAX_NODE_CAP = 50,     -- 普通灵穴兵力上限
     PLASMA_CAP = 25,       -- 赤阳熔核灵穴兵力硬封顶
     SAFE_GARRISON = 3,     -- 光轨输出时源灵穴保留的最低护卫兵力 (防止基地永久定格在1)
 
     -- 物流与光轨
     PARTICLE_SPEED = 200,  -- 微粒基础航速 (像素/秒)
-    BASE_TRANSPORT_RATE = 3.5, -- 标准输送率 (粒/秒) - 平滑连贯光流
-    BOOST_TRANSPORT_RATE = 8,  -- 疾风加速输送率 (粒/秒)
+    BASE_TRANSPORT_RATE = 3.2, -- 标准输送率 (粒/秒) - 平滑连贯光流
+    BOOST_TRANSPORT_RATE = 6.4, -- 疾风加速输送率 (粒/秒)
 
     -- 占领与共鸣度 (0% ~ 100%)
     CAPTURE_INTERVAL = 0.8, -- 占领共鸣判定步进周期 (秒)

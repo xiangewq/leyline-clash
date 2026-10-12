@@ -33,50 +33,59 @@ function NodeEntity.Create(def)
     }
 end
 
--- 判定腹地休眠：无对外输出光轨、无入侵敌军且所有邻居均为同阵营领地
-function NodeEntity.CheckInlandDormant(node, allNodes)
+-- 判定是否为腹地节点：所有物理相邻灵穴均为同阵营领地
+function NodeEntity.CheckIsInland(node, allNodes)
     if node.faction == "neutral" then
-        node.isIdle = false
         return false
     end
-
-    -- 若对外有活跃输送光轨，则不休眠
-    if node.routeTo ~= nil then
-        node.isIdle = false
-        return false
-    end
-
-    -- 兵力尚未充实（低于 25 粒）的后方灵穴依然保持孕育，避免腹地守备空虚
-    if node.particles < 25 then
-        node.isIdle = false
-        return false
-    end
-
     local neighbors = StarMap.GetNeighbors(node.id)
-    local allAllies = true
+    if #neighbors == 0 then return false end
     for _, nId in ipairs(neighbors) do
         local n = allNodes[nId + 1]
-        if n and n.faction ~= node.faction then
-            allAllies = false
-            break
+        if not n or n.faction ~= node.faction then
+            return false
         end
     end
+    return true
+end
 
-    node.isIdle = allAllies
-    return allAllies
+-- 判定腹地休眠与状态维护
+function NodeEntity.CheckInlandDormant(node, allNodes)
+    local isInland = NodeEntity.CheckIsInland(node, allNodes)
+    if not isInland then
+        node.isIdle = false
+        return false
+    end
+
+    -- 核心理性机制：若灵穴处于安全腹地且未向外输送，储备达到 15 粒时自动休眠停止造兵
+    if node.routeTo == nil and node.particles >= 15 then
+        node.isIdle = true
+        return true
+    end
+
+    node.isIdle = false
+    return false
 end
 
 -- 帧更新生产逻辑
 function NodeEntity.TickSpawn(node, dt, allNodes, elapsedTime)
     if node.faction == "neutral" then return end
 
-    -- 判定内陆休眠
+    -- 判定内陆休眠 (未外调且储备充足则完全停产)
     if NodeEntity.CheckInlandDormant(node, allNodes) then
         return
     end
 
-    -- 生产周期换算 (富矿产速翻倍，贫瘠产速减半，纯水枢纽产速+50%，共鸣度不足拉长周期)
+    local isInland = NodeEntity.CheckIsInland(node, allNodes)
+
+    -- 生产周期换算
     local baseInterval = BalanceConfig.SPAWN_INTERVAL
+    if isInland then
+        -- 核心理性机制：腹地远离前线战火，地脉平息，产能衰减为前线的 40% (周期延长 2.5 倍)
+        -- 避免后方节点无限造兵串联成超级水泵碾压前线
+        baseInterval = baseInterval * 2.5
+    end
+
     if node.anomaly == "AMBER_MINE" then
         baseInterval = baseInterval * 0.5
     elseif node.anomaly == "MIST_RUINS" then
@@ -99,7 +108,7 @@ function NodeEntity.TickSpawn(node, dt, allNodes, elapsedTime)
     end
 end
 
--- 占领共鸣度步进结算 (0.8s 周期，封顶 5 点/轮防滚雪球)
+-- 占领共鸣度步进结算 (0.8s 周期)
 function NodeEntity.TickCapture(node, elapsedTime, onCaptureCallback, onRevertNeutralCallback)
     if (node.protectedUntil or 0) > (elapsedTime or 0) then
         return -- 受千风庇护免疫侵蚀
@@ -110,12 +119,12 @@ function NodeEntity.TickCapture(node, elapsedTime, onCaptureCallback, onRevertNe
         local baseGrowth = math.min(BalanceConfig.MAX_RESONANCE_GROWTH, math.max(1, math.floor(excess / 5 + 0.5)))
 
         if node.faction == "neutral" then
-            -- 中立节点占领大幅提速：每轮基础 +25 共鸣度，3~4 轮 (约 2.5 秒) 完成掌控
-            node.control = math.min(100, node.control + 25 + baseGrowth * 5)
+            -- 中立节点占领进度平衡：每轮 +14~20 共鸣度，需 5~6 轮 (约 4 秒) 完成掌控
+            node.control = math.min(100, node.control + 14 + baseGrowth * 3)
             if node.control >= 100 then
                 node.faction = node.contenderFaction
-                -- 多余侵蚀微粒直接作为驻留守军 (保底 3 粒，上限 15 粒)，不浪费兵力
-                node.particles = math.max(3, math.min(15, node.contenderParticles))
+                -- 占领后初始守军：侵蚀微粒按 25% 比例转化，保底 2 粒，上限 5 粒 (防止瞬间获得满编大军继续碾压)
+                node.particles = math.min(5, math.max(2, math.floor(node.contenderParticles * 0.25) + 2))
                 node.contenderParticles = 0
                 node.contenderFaction = nil
                 node.isDefensive = true
@@ -124,8 +133,8 @@ function NodeEntity.TickCapture(node, elapsedTime, onCaptureCallback, onRevertNe
                 end
             end
         elseif node.faction ~= node.contenderFaction then
-            -- 削减原主控方控制度：提速削减，快速瓦解敌方统治
-            node.control = math.max(0, node.control - (15 + baseGrowth * 5))
+            -- 削减原主控方控制度：每轮削减 10 + baseGrowth * 3
+            node.control = math.max(0, node.control - (10 + baseGrowth * 3))
             if node.control <= BalanceConfig.NEUTRAL_THRESHOLD then
                 -- 沦为中立争夺态，控制度清零以便攻占方迅速掌控
                 node.faction = "neutral"
