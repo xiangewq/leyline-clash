@@ -40,7 +40,14 @@ function NodeEntity.CheckInlandDormant(node, allNodes)
         return false
     end
 
+    -- 若对外有活跃输送光轨，则不休眠
     if node.routeTo ~= nil then
+        node.isIdle = false
+        return false
+    end
+
+    -- 兵力尚未充实（低于 25 粒）的后方灵穴依然保持孕育，避免腹地守备空虚
+    if node.particles < 25 then
         node.isIdle = false
         return false
     end
@@ -68,16 +75,18 @@ function NodeEntity.TickSpawn(node, dt, allNodes, elapsedTime)
         return
     end
 
-    -- 生产周期换算 (富矿产速翻倍，贫瘠产速减半，共鸣度不足拉长周期)
+    -- 生产周期换算 (富矿产速翻倍，贫瘠产速减半，纯水枢纽产速+50%，共鸣度不足拉长周期)
     local baseInterval = BalanceConfig.SPAWN_INTERVAL
     if node.anomaly == "AMBER_MINE" then
         baseInterval = baseInterval * 0.5
     elseif node.anomaly == "MIST_RUINS" then
-        baseInterval = baseInterval * 1.5
+        baseInterval = baseInterval * 1.25 -- 迷雾轻度减产
+    elseif node.anomaly == "PURE_WATER" then
+        baseInterval = baseInterval * 0.65 -- 纯水激荡：产速提升约 54%
     end
 
-    -- 共鸣度衰减曲线
-    local effRatio = math.max(0.3, node.control / 100)
+    -- 共鸣度衰减曲线（底线提高至 0.6，防止受创灵穴产兵完全停摆）
+    local effRatio = math.max(0.6, node.control / 100)
     local actualInterval = baseInterval / effRatio
 
     node.spawnTimer = node.spawnTimer + dt
@@ -92,7 +101,7 @@ end
 
 -- 占领共鸣度步进结算 (0.8s 周期，封顶 5 点/轮防滚雪球)
 function NodeEntity.TickCapture(node, elapsedTime, onCaptureCallback, onRevertNeutralCallback)
-    if node.protectedUntil > elapsedTime then
+    if (node.protectedUntil or 0) > (elapsedTime or 0) then
         return -- 受千风庇护免疫侵蚀
     end
 
@@ -127,6 +136,11 @@ function NodeEntity.TickCapture(node, elapsedTime, onCaptureCallback, onRevertNe
         end
 
         node.contenderParticles = math.max(0, node.contenderParticles - 1)
+    else
+        -- 核心机制修复：已占领灵穴在无敌军侵蚀且防守稳固时，共鸣度自然逐步回满至 100%
+        if node.faction ~= "neutral" and node.control < 100 then
+            node.control = math.min(100, node.control + 10)
+        end
     end
 end
 

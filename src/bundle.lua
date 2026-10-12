@@ -376,7 +376,7 @@ local ChapterConfig = {
                 }
             },
             nodes = {
-                { id = 0, name = "西风水港", x = 200, y = 450, radius = 36, faction = "player", particles = 24, control = 100, anomaly = "NORMAL", desc = "我方西港母基" },
+                { id = 0, name = "西风水港", x = 200, y = 450, radius = 36, faction = "player", particles = 28, control = 100, anomaly = "NORMAL", desc = "我方西港母基" },
                 { id = 1, name = "枫丹前哨", x = 400, y = 570, radius = 30, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "西北水下前沿" },
                 { id = 2, name = "海露平原", x = 400, y = 330, radius = 30, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "西南海草平原" },
                 { id = 3, name = "伊黎耶港", x = 620, y = 630, radius = 30, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "北侧水闸港湾" },
@@ -437,7 +437,7 @@ local ChapterConfig = {
                 }
             },
             nodes = {
-                { id = 0, name = "西风终焉", x = 190, y = 220, radius = 35, faction = "player", particles = 26, control = 100, anomaly = "NORMAL", desc = "我方西南极境大营" },
+                { id = 0, name = "西风终焉", x = 190, y = 220, radius = 35, faction = "player", particles = 28, control = 100, anomaly = "NORMAL", desc = "我方西南极境大营" },
                 { id = 1, name = "忍冬废墟", x = 370, y = 680, radius = 28, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "西北废墟要冲" },
                 { id = 2, name = "覆雪咽喉", x = 370, y = 450, radius = 30, faction = "neutral", particles = 16, control = 0, anomaly = "DEFENSE_BASTION", desc = "西翼要塞（战损减半）" },
                 { id = 3, name = "眠龙前哨", x = 370, y = 220, radius = 28, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "西南峡谷前哨" },
@@ -911,7 +911,14 @@ function NodeEntity.CheckInlandDormant(node, allNodes)
         return false
     end
 
+    -- 若对外有活跃输送光轨，则不休眠
     if node.routeTo ~= nil then
+        node.isIdle = false
+        return false
+    end
+
+    -- 兵力尚未充实（低于 25 粒）的后方灵穴依然保持孕育，避免腹地守备空虚
+    if node.particles < 25 then
         node.isIdle = false
         return false
     end
@@ -939,16 +946,18 @@ function NodeEntity.TickSpawn(node, dt, allNodes, elapsedTime)
         return
     end
 
-    -- 生产周期换算 (富矿产速翻倍，贫瘠产速减半，共鸣度不足拉长周期)
+    -- 生产周期换算 (富矿产速翻倍，贫瘠产速减半，纯水枢纽产速+50%，共鸣度不足拉长周期)
     local baseInterval = BalanceConfig.SPAWN_INTERVAL
     if node.anomaly == "AMBER_MINE" then
         baseInterval = baseInterval * 0.5
     elseif node.anomaly == "MIST_RUINS" then
-        baseInterval = baseInterval * 1.5
+        baseInterval = baseInterval * 1.25 -- 迷雾轻度减产
+    elseif node.anomaly == "PURE_WATER" then
+        baseInterval = baseInterval * 0.65 -- 纯水激荡：产速提升约 54%
     end
 
-    -- 共鸣度衰减曲线
-    local effRatio = math.max(0.3, node.control / 100)
+    -- 共鸣度衰减曲线（底线提高至 0.6，防止受创灵穴产兵完全停摆）
+    local effRatio = math.max(0.6, node.control / 100)
     local actualInterval = baseInterval / effRatio
 
     node.spawnTimer = node.spawnTimer + dt
@@ -963,7 +972,7 @@ end
 
 -- 占领共鸣度步进结算 (0.8s 周期，封顶 5 点/轮防滚雪球)
 function NodeEntity.TickCapture(node, elapsedTime, onCaptureCallback, onRevertNeutralCallback)
-    if node.protectedUntil > elapsedTime then
+    if (node.protectedUntil or 0) > (elapsedTime or 0) then
         return -- 受千风庇护免疫侵蚀
     end
 
@@ -998,6 +1007,11 @@ function NodeEntity.TickCapture(node, elapsedTime, onCaptureCallback, onRevertNe
         end
 
         node.contenderParticles = math.max(0, node.contenderParticles - 1)
+    else
+        -- 核心机制修复：已占领灵穴在无敌军侵蚀且防守稳固时，共鸣度自然逐步回满至 100%
+        if node.faction ~= "neutral" and node.control < 100 then
+            node.control = math.min(100, node.control + 10)
+        end
     end
 end
 
@@ -1228,6 +1242,13 @@ local AbilitySystem = {
     cooldowns = { 0, 0, 0, 0 }
 }
 
+-- 判定是否为敌对势力据点（支持多阵营敌方 enemy_red / enemy_purple / enemy_green / enemy）
+local function IsEnemyFaction(faction)
+    if not faction then return false end
+    if faction == "player" or faction == "neutral" then return false end
+    return true
+end
+
 function AbilitySystem.InitDeck(cardIdList)
     AbilitySystem.deck = {}
     AbilitySystem.cooldowns = { 0, 0, 0, 0 }
@@ -1287,7 +1308,7 @@ function AbilitySystem.CastAbility(slotIndex, targetNodeId, nodes, routeManager,
 
     elseif card.id == "pyro_blast" then
         -- 轰轰烈焰：轰炸敌方据点
-        if targetNode.faction ~= "enemy" and targetNode.particles <= 0 then
+        if not IsEnemyFaction(targetNode.faction) then
             return false, "【轰轰烈焰】只能轰击敌对势力据点！"
         end
         local eliminated = math.floor(targetNode.particles * 0.8)
@@ -1313,7 +1334,7 @@ function AbilitySystem.CastAbility(slotIndex, targetNodeId, nodes, routeManager,
             AbilitySystem.cooldowns[slotIndex] = card.cd
             BalanceConfig.PlayAudioSafe("UI_CLICK")
             return true, "【摩拉律法】生效！已直接同化掌管中立灵穴！"
-        elseif targetNode.faction == "enemy" then
+        elseif IsEnemyFaction(targetNode.faction) then
             targetNode.control = math.max(0, targetNode.control - 65)
             AbilitySystem.cooldowns[slotIndex] = card.cd
             BalanceConfig.PlayAudioSafe("UI_CLICK")
@@ -1336,7 +1357,7 @@ function AbilitySystem.CastAbility(slotIndex, targetNodeId, nodes, routeManager,
 
     elseif card.id == "pyro_erosion" then
         -- 烈焰侵蚀：重创敌对据点并切断其输出航线
-        if targetNode.faction ~= "enemy" then
+        if not IsEnemyFaction(targetNode.faction) then
             return false, "【烈焰侵蚀】只能施加于敌方灵穴！"
         end
         local cut = math.max(8, math.floor(targetNode.particles * 0.4))
@@ -1388,7 +1409,7 @@ function AbilitySystem.GetSmartTarget(cardId, nodes, routeManager)
         -- 优先选兵力最多的敌方灵穴
         local best = nil
         for _, n in ipairs(nodes) do
-            if n.faction == "enemy" then
+            if IsEnemyFaction(n.faction) then
                 if not best or (n.particles > best.particles) then
                     best = n
                 end
@@ -1402,7 +1423,7 @@ function AbilitySystem.GetSmartTarget(cardId, nodes, routeManager)
             if n.faction == "neutral" then return n.id end
         end
         for _, n in ipairs(nodes) do
-            if n.faction == "enemy" then return n.id end
+            if IsEnemyFaction(n.faction) then return n.id end
         end
         return nil
     end
@@ -1521,6 +1542,7 @@ function VisualRenderer.UpdateRoutes(routeCtrls, routes, nodes, dragLineCtrl, in
 
                 if nA and nB then
                     local col = Layout.GetFactionColor(r.faction)
+                    local thickness = 4
                     -- 处于「疾风流道」(千风隘口) 或施加「千风湍流」符印：激活提瓦特千风翠绿粗流道特效 (10粒/秒高速流)
                     if nA.anomaly == "WIND_FLOW" or r.boostedUntil > elapsedTime then
                         col = Layout.PALETTE.ANEMO
@@ -1699,6 +1721,20 @@ function VisualRenderer.ApplyStageLayout(nodeUIList, nodes, staticLinkCtrls, lin
                 Layout.SetVisible(linkCtrl, false)
             end
         end
+    end
+end
+
+-- 彻底清除并隐藏所有光轨连线与导引线
+function VisualRenderer.HideAllRoutes(routeCtrls, dragLineCtrl)
+    if routeCtrls then
+        for _, ctrl in ipairs(routeCtrls) do
+            if ctrl and ctrl.alive then
+                Layout.SetVisible(ctrl, false)
+            end
+        end
+    end
+    if dragLineCtrl and dragLineCtrl.alive then
+        Layout.SetVisible(dragLineCtrl, false)
     end
 end
 
@@ -2505,6 +2541,8 @@ local function CheckMatchEnd(isTimeout)
         -- 玩家大获全胜！
         gameState.isGameOver = true
         gameState.currentState = STATE_SETTLEMENT
+        VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
+        Runtime.HideAllParticles()
         ChapterSelectView.UnlockNextStage(StarMap.currentStage)
         BalanceConfig.PlayAudioSafe("MATCH_WIN")
         HudView.ShowSettlement(true, gameState.nodes, gameState.elapsedTime, UI.settleModal, UI.settleTitle, UI.settleDesc, UI.settleStats, UI.settleNextBtn)
@@ -2512,12 +2550,16 @@ local function CheckMatchEnd(isTimeout)
         -- 玩家兵力全军覆没
         gameState.isGameOver = true
         gameState.currentState = STATE_SETTLEMENT
+        VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
+        Runtime.HideAllParticles()
         BalanceConfig.PlayAudioSafe("MATCH_LOSE")
         HudView.ShowSettlement(false, gameState.nodes, gameState.elapsedTime, UI.settleModal, UI.settleTitle, UI.settleDesc, UI.settleStats, UI.settleNextBtn)
     elseif isTimeout then
         -- 倒计时归零压哨决胜
         gameState.isGameOver = true
         gameState.currentState = STATE_SETTLEMENT
+        VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
+        Runtime.HideAllParticles()
         local pScore = pNodes * 1000 + pParts * 10
         local isWin = true
         for _, data in pairs(enemyFactionScores) do
@@ -2615,24 +2657,24 @@ local function CacheUIControls()
     -- 光轨条带池与静态连线池
     UI.routeCtrls = {}
     UI.staticLinkCtrls = {}
-    local linksLayer = FindDeepChild(root, "LinksLayer")
-    if linksLayer then
+    UI.linksLayer = FindDeepChild(root, "LinksLayer")
+    if UI.linksLayer then
         for i = 1, 25 do
-            local line = FindDeepChild(linksLayer, "RouteLine_" .. i)
+            local line = FindDeepChild(UI.linksLayer, "RouteLine_" .. i)
             if line then table.insert(UI.routeCtrls, line) end
         end
         for i = 0, 44 do
-            local sLine = FindDeepChild(linksLayer, "StaticLink_" .. i)
+            local sLine = FindDeepChild(UI.linksLayer, "StaticLink_" .. i)
             if sLine then table.insert(UI.staticLinkCtrls, sLine) end
         end
     end
 
     -- 微粒对象池 (120个)
     UI.particleCtrls = {}
-    local pLayer = FindDeepChild(root, "ParticlesLayer")
-    if pLayer then
+    UI.particlesLayer = FindDeepChild(root, "ParticlesLayer")
+    if UI.particlesLayer then
         for i = 1, 120 do
-            local p = FindDeepChild(pLayer, "P_" .. i)
+            local p = FindDeepChild(UI.particlesLayer, "P_" .. i)
             if p then table.insert(UI.particleCtrls, p) end
         end
     end
@@ -2640,10 +2682,10 @@ local function CacheUIControls()
 
     -- 18 座地脉灵穴 UI 组
     UI.nodeUIList = {}
-    local nodesLayer = FindDeepChild(root, "NodesLayer")
-    if nodesLayer then
+    UI.nodesLayer = FindDeepChild(root, "NodesLayer")
+    if UI.nodesLayer then
         for i = 0, 17 do
-            local grp = FindDeepChild(nodesLayer, "NodeGroup_" .. i)
+            local grp = FindDeepChild(UI.nodesLayer, "NodeGroup_" .. i)
             if grp then
                 table.insert(UI.nodeUIList, {
                     group        = grp,
@@ -2660,7 +2702,8 @@ local function CacheUIControls()
     end
 
     -- 顶部 HUD
-    local hud = FindDeepChild(root, "HudLayer")
+    UI.hudLayer = FindDeepChild(root, "HudLayer")
+    local hud = UI.hudLayer
     if hud then
         UI.playerPctText  = FindDeepChild(hud, "HudPlayerPct")
         UI.enemyPctText   = FindDeepChild(hud, "HudEnemyPct")
@@ -2733,6 +2776,14 @@ local function CacheUIControls()
     end
 end
 
+-- 控制战斗核心层（灵穴、光轨、微粒、HUD）的可见性
+local function SetGameplayLayersVisible(visible)
+    Layout.SetVisible(UI.nodesLayer, visible)
+    Layout.SetVisible(UI.linksLayer, visible)
+    Layout.SetVisible(UI.particlesLayer, visible)
+    Layout.SetVisible(UI.hudLayer, visible)
+end
+
 -- 提取光标事件位置助手
 local function GetEventPos(data)
     if not data then return 0, 0 end
@@ -2765,13 +2816,25 @@ local function StartStage(stageId)
     CombatResolver.Init()
     AbilitySystem.cooldowns = { 0, 0, 0, 0 }
 
+    -- 彻底清除旧关卡残留连线、微粒与拖拽线
+    VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
+    Runtime.HideAllParticles()
+    Input.isDragging = false
+    Input.dragSourceId = nil
+    Input.ClearSelectedCard()
+
     gameState.elapsedTime   = 0
     gameState.timeRemaining = chap.duration or BalanceConfig.MATCH_DURATION
     gameState.isGameOver    = false
 
+    -- 呈现战场沙盘层
+    SetGameplayLayersVisible(true)
+
     -- 刷新沙盘节点与静态连线几何布局
     VisualRenderer.ApplyStageLayout(UI.nodeUIList, gameState.nodes, UI.staticLinkCtrls, StarMap.LINKS)
     VisualRenderer.UpdateNodes(UI.nodeUIList, gameState.nodes, 0)
+    VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
+    Runtime.HideAllParticles()
 
     -- 隐藏其他面板，进入战前剧情
     Layout.SetVisible(UI.modeSelectModal, false)
@@ -2880,6 +2943,7 @@ local function SetupEventHandlers()
             print("[Starlink] 玩家选择【剧情模式】，打开战役章节选择面板...")
             Layout.SetVisible(UI.modeSelectModal, false)
             Layout.SetVisible(UI.chapterSelectModal, true)
+            SetGameplayLayersVisible(false)
             gameState.currentState = STATE_CHAPTER_SELECT
             ChapterSelectView.Render(UI.chapterCards, UI.chapDesc, UI.chapStartTxt)
         end)
@@ -2920,6 +2984,7 @@ local function SetupEventHandlers()
             BalanceConfig.PlayAudioSafe("UI_CLICK")
             Layout.SetVisible(UI.chapterSelectModal, false)
             Layout.SetVisible(UI.modeSelectModal, true)
+            SetGameplayLayersVisible(false)
             gameState.currentState = STATE_MODE_SELECT
         end)
     end
@@ -3036,6 +3101,8 @@ local function SetupEventHandlers()
     if UI.settleNextBtn and UI.settleNextBtn.AddCursorEventListener then
         UI.settleNextBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
             BalanceConfig.PlayAudioSafe("UI_CLICK")
+            VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
+            Runtime.HideAllParticles()
             local nextStageId = StarMap.currentStage + 1
             if nextStageId <= 5 then
                 print(string.format("[Starlink] 进军下一关: 第 %d 关...", nextStageId))
@@ -3045,6 +3112,7 @@ local function SetupEventHandlers()
                 HudView.ShowToast("【恭喜】已通关全部 5 大战役章节！")
                 Layout.SetVisible(UI.settleModal, false)
                 Layout.SetVisible(UI.chapterSelectModal, true)
+                SetGameplayLayersVisible(false)
                 gameState.currentState = STATE_CHAPTER_SELECT
                 ChapterSelectView.Render(UI.chapterCards, UI.chapDesc, UI.chapStartTxt)
             end
@@ -3055,6 +3123,8 @@ local function SetupEventHandlers()
     if UI.settleRetryBtn and UI.settleRetryBtn.AddCursorEventListener then
         UI.settleRetryBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
             BalanceConfig.PlayAudioSafe("UI_CLICK")
+            VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
+            Runtime.HideAllParticles()
             print(string.format("[Starlink] 重新演练当前关卡: 第 %d 关...", StarMap.currentStage))
             StartStage(StarMap.currentStage)
         end)
@@ -3064,8 +3134,11 @@ local function SetupEventHandlers()
     if UI.settleChapBtn and UI.settleChapBtn.AddCursorEventListener then
         UI.settleChapBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
             BalanceConfig.PlayAudioSafe("UI_CLICK")
+            VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
+            Runtime.HideAllParticles()
             Layout.SetVisible(UI.settleModal, false)
             Layout.SetVisible(UI.chapterSelectModal, true)
+            SetGameplayLayersVisible(false)
             gameState.currentState = STATE_CHAPTER_SELECT
             ChapterSelectView.Render(UI.chapterCards, UI.chapDesc, UI.chapStartTxt)
         end)
@@ -3104,6 +3177,9 @@ function OnStart()
         script:EnableUpdate(true)
     end
     gameState.currentState = STATE_MODE_SELECT
+    SetGameplayLayersVisible(false)
+    VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
+    Runtime.HideAllParticles()
     Layout.SetVisible(UI.modeSelectModal, true)
     Layout.SetVisible(UI.chapterSelectModal, false)
     Layout.SetVisible(UI.dialogueModal, false)

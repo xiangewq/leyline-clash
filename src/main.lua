@@ -159,6 +159,8 @@ local function CheckMatchEnd(isTimeout)
         -- 玩家大获全胜！
         gameState.isGameOver = true
         gameState.currentState = STATE_SETTLEMENT
+        VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
+        Runtime.HideAllParticles()
         ChapterSelectView.UnlockNextStage(StarMap.currentStage)
         BalanceConfig.PlayAudioSafe("MATCH_WIN")
         HudView.ShowSettlement(true, gameState.nodes, gameState.elapsedTime, UI.settleModal, UI.settleTitle, UI.settleDesc, UI.settleStats, UI.settleNextBtn)
@@ -166,12 +168,16 @@ local function CheckMatchEnd(isTimeout)
         -- 玩家兵力全军覆没
         gameState.isGameOver = true
         gameState.currentState = STATE_SETTLEMENT
+        VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
+        Runtime.HideAllParticles()
         BalanceConfig.PlayAudioSafe("MATCH_LOSE")
         HudView.ShowSettlement(false, gameState.nodes, gameState.elapsedTime, UI.settleModal, UI.settleTitle, UI.settleDesc, UI.settleStats, UI.settleNextBtn)
     elseif isTimeout then
         -- 倒计时归零压哨决胜
         gameState.isGameOver = true
         gameState.currentState = STATE_SETTLEMENT
+        VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
+        Runtime.HideAllParticles()
         local pScore = pNodes * 1000 + pParts * 10
         local isWin = true
         for _, data in pairs(enemyFactionScores) do
@@ -269,24 +275,24 @@ local function CacheUIControls()
     -- 光轨条带池与静态连线池
     UI.routeCtrls = {}
     UI.staticLinkCtrls = {}
-    local linksLayer = FindDeepChild(root, "LinksLayer")
-    if linksLayer then
+    UI.linksLayer = FindDeepChild(root, "LinksLayer")
+    if UI.linksLayer then
         for i = 1, 25 do
-            local line = FindDeepChild(linksLayer, "RouteLine_" .. i)
+            local line = FindDeepChild(UI.linksLayer, "RouteLine_" .. i)
             if line then table.insert(UI.routeCtrls, line) end
         end
         for i = 0, 44 do
-            local sLine = FindDeepChild(linksLayer, "StaticLink_" .. i)
+            local sLine = FindDeepChild(UI.linksLayer, "StaticLink_" .. i)
             if sLine then table.insert(UI.staticLinkCtrls, sLine) end
         end
     end
 
     -- 微粒对象池 (120个)
     UI.particleCtrls = {}
-    local pLayer = FindDeepChild(root, "ParticlesLayer")
-    if pLayer then
+    UI.particlesLayer = FindDeepChild(root, "ParticlesLayer")
+    if UI.particlesLayer then
         for i = 1, 120 do
-            local p = FindDeepChild(pLayer, "P_" .. i)
+            local p = FindDeepChild(UI.particlesLayer, "P_" .. i)
             if p then table.insert(UI.particleCtrls, p) end
         end
     end
@@ -294,10 +300,10 @@ local function CacheUIControls()
 
     -- 18 座地脉灵穴 UI 组
     UI.nodeUIList = {}
-    local nodesLayer = FindDeepChild(root, "NodesLayer")
-    if nodesLayer then
+    UI.nodesLayer = FindDeepChild(root, "NodesLayer")
+    if UI.nodesLayer then
         for i = 0, 17 do
-            local grp = FindDeepChild(nodesLayer, "NodeGroup_" .. i)
+            local grp = FindDeepChild(UI.nodesLayer, "NodeGroup_" .. i)
             if grp then
                 table.insert(UI.nodeUIList, {
                     group        = grp,
@@ -314,7 +320,8 @@ local function CacheUIControls()
     end
 
     -- 顶部 HUD
-    local hud = FindDeepChild(root, "HudLayer")
+    UI.hudLayer = FindDeepChild(root, "HudLayer")
+    local hud = UI.hudLayer
     if hud then
         UI.playerPctText  = FindDeepChild(hud, "HudPlayerPct")
         UI.enemyPctText   = FindDeepChild(hud, "HudEnemyPct")
@@ -387,6 +394,14 @@ local function CacheUIControls()
     end
 end
 
+-- 控制战斗核心层（灵穴、光轨、微粒、HUD）的可见性
+local function SetGameplayLayersVisible(visible)
+    Layout.SetVisible(UI.nodesLayer, visible)
+    Layout.SetVisible(UI.linksLayer, visible)
+    Layout.SetVisible(UI.particlesLayer, visible)
+    Layout.SetVisible(UI.hudLayer, visible)
+end
+
 -- 提取光标事件位置助手
 local function GetEventPos(data)
     if not data then return 0, 0 end
@@ -419,13 +434,25 @@ local function StartStage(stageId)
     CombatResolver.Init()
     AbilitySystem.cooldowns = { 0, 0, 0, 0 }
 
+    -- 彻底清除旧关卡残留连线、微粒与拖拽线
+    VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
+    Runtime.HideAllParticles()
+    Input.isDragging = false
+    Input.dragSourceId = nil
+    Input.ClearSelectedCard()
+
     gameState.elapsedTime   = 0
     gameState.timeRemaining = chap.duration or BalanceConfig.MATCH_DURATION
     gameState.isGameOver    = false
 
+    -- 呈现战场沙盘层
+    SetGameplayLayersVisible(true)
+
     -- 刷新沙盘节点与静态连线几何布局
     VisualRenderer.ApplyStageLayout(UI.nodeUIList, gameState.nodes, UI.staticLinkCtrls, StarMap.LINKS)
     VisualRenderer.UpdateNodes(UI.nodeUIList, gameState.nodes, 0)
+    VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
+    Runtime.HideAllParticles()
 
     -- 隐藏其他面板，进入战前剧情
     Layout.SetVisible(UI.modeSelectModal, false)
@@ -534,6 +561,7 @@ local function SetupEventHandlers()
             print("[Starlink] 玩家选择【剧情模式】，打开战役章节选择面板...")
             Layout.SetVisible(UI.modeSelectModal, false)
             Layout.SetVisible(UI.chapterSelectModal, true)
+            SetGameplayLayersVisible(false)
             gameState.currentState = STATE_CHAPTER_SELECT
             ChapterSelectView.Render(UI.chapterCards, UI.chapDesc, UI.chapStartTxt)
         end)
@@ -574,6 +602,7 @@ local function SetupEventHandlers()
             BalanceConfig.PlayAudioSafe("UI_CLICK")
             Layout.SetVisible(UI.chapterSelectModal, false)
             Layout.SetVisible(UI.modeSelectModal, true)
+            SetGameplayLayersVisible(false)
             gameState.currentState = STATE_MODE_SELECT
         end)
     end
@@ -690,6 +719,8 @@ local function SetupEventHandlers()
     if UI.settleNextBtn and UI.settleNextBtn.AddCursorEventListener then
         UI.settleNextBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
             BalanceConfig.PlayAudioSafe("UI_CLICK")
+            VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
+            Runtime.HideAllParticles()
             local nextStageId = StarMap.currentStage + 1
             if nextStageId <= 5 then
                 print(string.format("[Starlink] 进军下一关: 第 %d 关...", nextStageId))
@@ -699,6 +730,7 @@ local function SetupEventHandlers()
                 HudView.ShowToast("【恭喜】已通关全部 5 大战役章节！")
                 Layout.SetVisible(UI.settleModal, false)
                 Layout.SetVisible(UI.chapterSelectModal, true)
+                SetGameplayLayersVisible(false)
                 gameState.currentState = STATE_CHAPTER_SELECT
                 ChapterSelectView.Render(UI.chapterCards, UI.chapDesc, UI.chapStartTxt)
             end
@@ -709,6 +741,8 @@ local function SetupEventHandlers()
     if UI.settleRetryBtn and UI.settleRetryBtn.AddCursorEventListener then
         UI.settleRetryBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
             BalanceConfig.PlayAudioSafe("UI_CLICK")
+            VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
+            Runtime.HideAllParticles()
             print(string.format("[Starlink] 重新演练当前关卡: 第 %d 关...", StarMap.currentStage))
             StartStage(StarMap.currentStage)
         end)
@@ -718,8 +752,11 @@ local function SetupEventHandlers()
     if UI.settleChapBtn and UI.settleChapBtn.AddCursorEventListener then
         UI.settleChapBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
             BalanceConfig.PlayAudioSafe("UI_CLICK")
+            VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
+            Runtime.HideAllParticles()
             Layout.SetVisible(UI.settleModal, false)
             Layout.SetVisible(UI.chapterSelectModal, true)
+            SetGameplayLayersVisible(false)
             gameState.currentState = STATE_CHAPTER_SELECT
             ChapterSelectView.Render(UI.chapterCards, UI.chapDesc, UI.chapStartTxt)
         end)
@@ -758,6 +795,9 @@ function OnStart()
         script:EnableUpdate(true)
     end
     gameState.currentState = STATE_MODE_SELECT
+    SetGameplayLayersVisible(false)
+    VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
+    Runtime.HideAllParticles()
     Layout.SetVisible(UI.modeSelectModal, true)
     Layout.SetVisible(UI.chapterSelectModal, false)
     Layout.SetVisible(UI.dialogueModal, false)

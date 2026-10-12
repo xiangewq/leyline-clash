@@ -9,6 +9,13 @@ local AbilitySystem = {
     cooldowns = { 0, 0, 0, 0 }
 }
 
+-- 判定是否为敌对势力据点（支持多阵营敌方 enemy_red / enemy_purple / enemy_green / enemy）
+local function IsEnemyFaction(faction)
+    if not faction then return false end
+    if faction == "player" or faction == "neutral" then return false end
+    return true
+end
+
 function AbilitySystem.InitDeck(cardIdList)
     AbilitySystem.deck = {}
     AbilitySystem.cooldowns = { 0, 0, 0, 0 }
@@ -68,7 +75,7 @@ function AbilitySystem.CastAbility(slotIndex, targetNodeId, nodes, routeManager,
 
     elseif card.id == "pyro_blast" then
         -- 轰轰烈焰：轰炸敌方据点
-        if targetNode.faction ~= "enemy" and targetNode.particles <= 0 then
+        if not IsEnemyFaction(targetNode.faction) then
             return false, "【轰轰烈焰】只能轰击敌对势力据点！"
         end
         local eliminated = math.floor(targetNode.particles * 0.8)
@@ -94,7 +101,7 @@ function AbilitySystem.CastAbility(slotIndex, targetNodeId, nodes, routeManager,
             AbilitySystem.cooldowns[slotIndex] = card.cd
             BalanceConfig.PlayAudioSafe("UI_CLICK")
             return true, "【摩拉律法】生效！已直接同化掌管中立灵穴！"
-        elseif targetNode.faction == "enemy" then
+        elseif IsEnemyFaction(targetNode.faction) then
             targetNode.control = math.max(0, targetNode.control - 65)
             AbilitySystem.cooldowns[slotIndex] = card.cd
             BalanceConfig.PlayAudioSafe("UI_CLICK")
@@ -117,7 +124,7 @@ function AbilitySystem.CastAbility(slotIndex, targetNodeId, nodes, routeManager,
 
     elseif card.id == "pyro_erosion" then
         -- 烈焰侵蚀：重创敌对据点并切断其输出航线
-        if targetNode.faction ~= "enemy" then
+        if not IsEnemyFaction(targetNode.faction) then
             return false, "【烈焰侵蚀】只能施加于敌方灵穴！"
         end
         local cut = math.max(8, math.floor(targetNode.particles * 0.4))
@@ -169,7 +176,7 @@ function AbilitySystem.GetSmartTarget(cardId, nodes, routeManager)
         -- 优先选兵力最多的敌方灵穴
         local best = nil
         for _, n in ipairs(nodes) do
-            if n.faction == "enemy" then
+            if IsEnemyFaction(n.faction) then
                 if not best or (n.particles > best.particles) then
                     best = n
                 end
@@ -183,7 +190,7 @@ function AbilitySystem.GetSmartTarget(cardId, nodes, routeManager)
             if n.faction == "neutral" then return n.id end
         end
         for _, n in ipairs(nodes) do
-            if n.faction == "enemy" then return n.id end
+            if IsEnemyFaction(n.faction) then return n.id end
         end
         return nil
     end

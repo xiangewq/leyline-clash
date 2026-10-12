@@ -198,7 +198,7 @@ local ChapterConfig = {
                 }
             },
             nodes = {
-                { id = 0, name = "西风水港", x = 200, y = 450, radius = 36, faction = "player", particles = 24, control = 100, anomaly = "NORMAL", desc = "我方西港母基" },
+                { id = 0, name = "西风水港", x = 200, y = 450, radius = 36, faction = "player", particles = 28, control = 100, anomaly = "NORMAL", desc = "我方西港母基" },
                 { id = 1, name = "枫丹前哨", x = 400, y = 570, radius = 30, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "西北水下前沿" },
                 { id = 2, name = "海露平原", x = 400, y = 330, radius = 30, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "西南海草平原" },
                 { id = 3, name = "伊黎耶港", x = 620, y = 630, radius = 30, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "北侧水闸港湾" },
@@ -259,7 +259,7 @@ local ChapterConfig = {
                 }
             },
             nodes = {
-                { id = 0, name = "西风终焉", x = 190, y = 220, radius = 35, faction = "player", particles = 26, control = 100, anomaly = "NORMAL", desc = "我方西南极境大营" },
+                { id = 0, name = "西风终焉", x = 190, y = 220, radius = 35, faction = "player", particles = 28, control = 100, anomaly = "NORMAL", desc = "我方西南极境大营" },
                 { id = 1, name = "忍冬废墟", x = 370, y = 680, radius = 28, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "西北废墟要冲" },
                 { id = 2, name = "覆雪咽喉", x = 370, y = 450, radius = 30, faction = "neutral", particles = 16, control = 0, anomaly = "DEFENSE_BASTION", desc = "西翼要塞（战损减半）" },
                 { id = 3, name = "眠龙前哨", x = 370, y = 220, radius = 28, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "西南峡谷前哨" },
