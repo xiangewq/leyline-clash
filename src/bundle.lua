@@ -1062,9 +1062,10 @@ function RouteManager.SetRoute(fromId, toId, faction, nodes)
     -- 单节点同一时间仅允许存在 1 条对外输出光轨
     RouteManager.RemoveRouteFrom(fromId, nodes)
 
-    -- 核心死循环防御：禁止两灵穴间双向对冲输送 (若目标灵穴正向源灵穴输送，切断反向光轨)
+    -- 仅限【同阵营内部调兵】防止死锁回环：若同阵营目标据点已在向源据点输送，切断原同向光轨
+    -- 敌对阵营之间完全允许互相进攻交火，绝不打断敌方的进攻光轨！
     local revRoute = RouteManager.GetRouteFrom(toId)
-    if revRoute and revRoute.toId == fromId then
+    if revRoute and revRoute.toId == fromId and revRoute.faction == faction then
         RouteManager.RemoveRouteFrom(toId, nodes)
     end
 
