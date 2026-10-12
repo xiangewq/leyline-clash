@@ -27,14 +27,15 @@ local BalanceConfig = {
     MATCH_DURATION = 360, -- 6 分钟紧凑快节奏
 
     -- 兵力孕育与生产
-    SPAWN_INTERVAL = 0.75, -- 基础孕育周期 (秒)
+    SPAWN_INTERVAL = 0.5,  -- 基础孕育周期 (秒) - 提速至每秒 2 粒，快节奏爽快感
     MAX_NODE_CAP = 50,     -- 普通灵穴兵力上限
     PLASMA_CAP = 25,       -- 赤阳熔核灵穴兵力硬封顶
+    SAFE_GARRISON = 3,     -- 光轨输出时源灵穴保留的最低护卫兵力 (防止基地永久定格在1)
 
     -- 物流与光轨
     PARTICLE_SPEED = 200,  -- 微粒基础航速 (像素/秒)
-    BASE_TRANSPORT_RATE = 5, -- 标准输送率 (粒/秒)
-    BOOST_TRANSPORT_RATE = 10, -- 疾风加速输送率 (粒/秒)
+    BASE_TRANSPORT_RATE = 3.5, -- 标准输送率 (粒/秒) - 平滑连贯光流
+    BOOST_TRANSPORT_RATE = 8,  -- 疾风加速输送率 (粒/秒)
 
     -- 占领与共鸣度 (0% ~ 100%)
     CAPTURE_INTERVAL = 0.8, -- 占领共鸣判定步进周期 (秒)
@@ -211,16 +212,16 @@ local ChapterConfig = {
                 }
             },
             nodes = {
-                { id = 0, name = "西风前哨", x = 260, y = 450, radius = 42, faction = "player", particles = 22, control = 100, anomaly = "NORMAL", desc = "我方西风骑士前哨" },
-                { id = 1, name = "清泉北陵", x = 520, y = 580, radius = 36, faction = "neutral", particles = 10, control = 0, anomaly = "NORMAL", desc = "北侧灵泉高地" },
-                { id = 2, name = "泉水祭坛", x = 800, y = 620, radius = 38, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "清泉古祭坛" },
-                { id = 3, name = "晨曦峡口", x = 1080, y = 580, radius = 36, faction = "neutral", particles = 10, control = 0, anomaly = "NORMAL", desc = "近酒庄险隘" },
-                { id = 4, name = "清泉主脉", x = 620, y = 450, radius = 38, faction = "neutral", particles = 14, control = 0, anomaly = "NORMAL", desc = "清泉核心灵脉" },
-                { id = 5, name = "奔狼前驿", x = 980, y = 450, radius = 38, faction = "neutral", particles = 14, control = 0, anomaly = "NORMAL", desc = "中路枢纽要道" },
-                { id = 6, name = "清泉南溪", x = 520, y = 320, radius = 36, faction = "neutral", particles = 10, control = 0, anomaly = "NORMAL", desc = "南侧支流草甸" },
-                { id = 7, name = "杜拉夫猎场", x = 800, y = 280, radius = 38, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "猎人歇脚营地" },
-                { id = 8, name = "达达乌帕口", x = 1080, y = 320, radius = 36, faction = "neutral", particles = 10, control = 0, anomaly = "NORMAL", desc = "近部落前沿" },
-                { id = 9, name = "愚人驻地", x = 1340, y = 450, radius = 42, faction = "enemy_red", particles = 22, control = 100, anomaly = "NORMAL", desc = "愚人众前线营地" }
+                { id = 0, name = "西风前哨", x = 260, y = 450, radius = 42, faction = "player", particles = 26, control = 100, anomaly = "NORMAL", desc = "我方西风骑士前哨" },
+                { id = 1, name = "清泉北陵", x = 520, y = 580, radius = 36, faction = "neutral", particles = 4, control = 0, anomaly = "NORMAL", desc = "北侧灵泉高地 (低阻力拓展点)" },
+                { id = 2, name = "泉水祭坛", x = 800, y = 620, radius = 38, faction = "neutral", particles = 8, control = 0, anomaly = "NORMAL", desc = "清泉古祭坛" },
+                { id = 3, name = "晨曦峡口", x = 1080, y = 580, radius = 36, faction = "neutral", particles = 4, control = 0, anomaly = "NORMAL", desc = "近酒庄险隘" },
+                { id = 4, name = "清泉主脉", x = 620, y = 450, radius = 38, faction = "neutral", particles = 8, control = 0, anomaly = "NORMAL", desc = "清泉核心灵脉" },
+                { id = 5, name = "奔狼前驿", x = 980, y = 450, radius = 38, faction = "neutral", particles = 8, control = 0, anomaly = "NORMAL", desc = "中路枢纽要道" },
+                { id = 6, name = "清泉南溪", x = 520, y = 320, radius = 36, faction = "neutral", particles = 4, control = 0, anomaly = "NORMAL", desc = "南侧支流草甸 (低阻力拓展点)" },
+                { id = 7, name = "杜拉夫猎场", x = 800, y = 280, radius = 38, faction = "neutral", particles = 8, control = 0, anomaly = "NORMAL", desc = "猎人歇脚营地" },
+                { id = 8, name = "达达乌帕口", x = 1080, y = 320, radius = 36, faction = "neutral", particles = 4, control = 0, anomaly = "NORMAL", desc = "近部落前沿" },
+                { id = 9, name = "愚人驻地", x = 1340, y = 450, radius = 42, faction = "enemy_red", particles = 20, control = 100, anomaly = "NORMAL", desc = "愚人众前线营地" }
             },
             links = {
                 { 0, 1 }, { 0, 4 }, { 0, 6 },
@@ -980,10 +981,12 @@ function NodeEntity.TickCapture(node, elapsedTime, onCaptureCallback, onRevertNe
         local baseGrowth = math.min(BalanceConfig.MAX_RESONANCE_GROWTH, math.max(1, math.floor(excess / 5 + 0.5)))
 
         if node.faction == "neutral" then
-            node.control = math.min(100, node.control + baseGrowth * 6)
+            -- 中立节点占领大幅提速：每轮基础 +25 共鸣度，3~4 轮 (约 2.5 秒) 完成掌控
+            node.control = math.min(100, node.control + 25 + baseGrowth * 5)
             if node.control >= 100 then
                 node.faction = node.contenderFaction
-                node.particles = 5
+                -- 多余侵蚀微粒直接作为驻留守军 (保底 3 粒，上限 15 粒)，不浪费兵力
+                node.particles = math.max(3, math.min(15, node.contenderParticles))
                 node.contenderParticles = 0
                 node.contenderFaction = nil
                 node.isDefensive = true
@@ -992,11 +995,12 @@ function NodeEntity.TickCapture(node, elapsedTime, onCaptureCallback, onRevertNe
                 end
             end
         elseif node.faction ~= node.contenderFaction then
-            -- 削减原主控方控制度
-            node.control = math.max(0, node.control - baseGrowth * 4)
+            -- 削减原主控方控制度：提速削减，快速瓦解敌方统治
+            node.control = math.max(0, node.control - (15 + baseGrowth * 5))
             if node.control <= BalanceConfig.NEUTRAL_THRESHOLD then
-                -- 沦为中立争夺态
+                -- 沦为中立争夺态，控制度清零以便攻占方迅速掌控
                 node.faction = "neutral"
+                node.control = 0
                 node.routeTo = nil
                 node.isDefensive = false
                 if onRevertNeutralCallback then
@@ -1104,8 +1108,9 @@ function RouteManager.Update(dt, nodes, elapsedTime, onCombatHitCallback)
             local interval = 1.0 / rate
             if route.sendTimer >= interval then
                 route.sendTimer = 0
-                -- 节点保留至少 1 粒驻扎微粒
-                if fromNode.particles > 1 then
+                -- 节点保留基础守备兵力 (默认 3 粒，防止基地永久定格在 1 且防守空虚)
+                local safeFloor = BalanceConfig.SAFE_GARRISON or 3
+                if fromNode.particles > safeFloor then
                     fromNode.particles = fromNode.particles - 1
                     local dx = toNode.x - fromNode.x
                     local dy = toNode.y - fromNode.y
@@ -1153,9 +1158,9 @@ function RouteManager.OnParticleArrive(particle, node, onCombatHitCallback)
             node.particles = node.particles + 1
         end
     else
-        -- 敌对交火与侵蚀
+        -- 敌对交火与侵蚀 (固守减伤调整为 25%，命中率 75%，兼顾防守优势与进攻可行性)
         if node.particles > 0 then
-            local defenseDamp = (node.isDefensive and 0.5 or 1.0)
+            local defenseDamp = (node.isDefensive and 0.75 or 1.0)
             if math.random() <= defenseDamp then
                 node.particles = node.particles - 1
             end
@@ -1460,7 +1465,7 @@ function FactionAI.Update(dt, nodes, routeManager)
     for _, eNode in ipairs(nodes) do
         local fac = eNode.faction
         if fac ~= "player" and fac ~= "neutral" then
-            if eNode.particles > 12 and eNode.routeTo == nil then
+            if eNode.particles > 14 and eNode.routeTo == nil then
                 -- 兵力充足且未外调：寻找邻近非本阵营领地（包括中立、玩家及其他敌对势力）
                 local neighbors = StarMap.GetNeighbors(eNode.id)
                 local targets = {}

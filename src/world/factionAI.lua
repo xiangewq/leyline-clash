@@ -19,7 +19,7 @@ function FactionAI.Update(dt, nodes, routeManager)
     for _, eNode in ipairs(nodes) do
         local fac = eNode.faction
         if fac ~= "player" and fac ~= "neutral" then
-            if eNode.particles > 12 and eNode.routeTo == nil then
+            if eNode.particles > 14 and eNode.routeTo == nil then
                 -- 兵力充足且未外调：寻找邻近非本阵营领地（包括中立、玩家及其他敌对势力）
                 local neighbors = StarMap.GetNeighbors(eNode.id)
                 local targets = {}

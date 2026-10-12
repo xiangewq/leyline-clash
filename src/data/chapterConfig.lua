@@ -34,16 +34,16 @@ local ChapterConfig = {
                 }
             },
             nodes = {
-                { id = 0, name = "西风前哨", x = 260, y = 450, radius = 42, faction = "player", particles = 22, control = 100, anomaly = "NORMAL", desc = "我方西风骑士前哨" },
-                { id = 1, name = "清泉北陵", x = 520, y = 580, radius = 36, faction = "neutral", particles = 10, control = 0, anomaly = "NORMAL", desc = "北侧灵泉高地" },
-                { id = 2, name = "泉水祭坛", x = 800, y = 620, radius = 38, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "清泉古祭坛" },
-                { id = 3, name = "晨曦峡口", x = 1080, y = 580, radius = 36, faction = "neutral", particles = 10, control = 0, anomaly = "NORMAL", desc = "近酒庄险隘" },
-                { id = 4, name = "清泉主脉", x = 620, y = 450, radius = 38, faction = "neutral", particles = 14, control = 0, anomaly = "NORMAL", desc = "清泉核心灵脉" },
-                { id = 5, name = "奔狼前驿", x = 980, y = 450, radius = 38, faction = "neutral", particles = 14, control = 0, anomaly = "NORMAL", desc = "中路枢纽要道" },
-                { id = 6, name = "清泉南溪", x = 520, y = 320, radius = 36, faction = "neutral", particles = 10, control = 0, anomaly = "NORMAL", desc = "南侧支流草甸" },
-                { id = 7, name = "杜拉夫猎场", x = 800, y = 280, radius = 38, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "猎人歇脚营地" },
-                { id = 8, name = "达达乌帕口", x = 1080, y = 320, radius = 36, faction = "neutral", particles = 10, control = 0, anomaly = "NORMAL", desc = "近部落前沿" },
-                { id = 9, name = "愚人驻地", x = 1340, y = 450, radius = 42, faction = "enemy_red", particles = 22, control = 100, anomaly = "NORMAL", desc = "愚人众前线营地" }
+                { id = 0, name = "西风前哨", x = 260, y = 450, radius = 42, faction = "player", particles = 26, control = 100, anomaly = "NORMAL", desc = "我方西风骑士前哨" },
+                { id = 1, name = "清泉北陵", x = 520, y = 580, radius = 36, faction = "neutral", particles = 4, control = 0, anomaly = "NORMAL", desc = "北侧灵泉高地 (低阻力拓展点)" },
+                { id = 2, name = "泉水祭坛", x = 800, y = 620, radius = 38, faction = "neutral", particles = 8, control = 0, anomaly = "NORMAL", desc = "清泉古祭坛" },
+                { id = 3, name = "晨曦峡口", x = 1080, y = 580, radius = 36, faction = "neutral", particles = 4, control = 0, anomaly = "NORMAL", desc = "近酒庄险隘" },
+                { id = 4, name = "清泉主脉", x = 620, y = 450, radius = 38, faction = "neutral", particles = 8, control = 0, anomaly = "NORMAL", desc = "清泉核心灵脉" },
+                { id = 5, name = "奔狼前驿", x = 980, y = 450, radius = 38, faction = "neutral", particles = 8, control = 0, anomaly = "NORMAL", desc = "中路枢纽要道" },
+                { id = 6, name = "清泉南溪", x = 520, y = 320, radius = 36, faction = "neutral", particles = 4, control = 0, anomaly = "NORMAL", desc = "南侧支流草甸 (低阻力拓展点)" },
+                { id = 7, name = "杜拉夫猎场", x = 800, y = 280, radius = 38, faction = "neutral", particles = 8, control = 0, anomaly = "NORMAL", desc = "猎人歇脚营地" },
+                { id = 8, name = "达达乌帕口", x = 1080, y = 320, radius = 36, faction = "neutral", particles = 4, control = 0, anomaly = "NORMAL", desc = "近部落前沿" },
+                { id = 9, name = "愚人驻地", x = 1340, y = 450, radius = 42, faction = "enemy_red", particles = 20, control = 100, anomaly = "NORMAL", desc = "愚人众前线营地" }
             },
             links = {
                 { 0, 1 }, { 0, 4 }, { 0, 6 },

@@ -110,10 +110,12 @@ function NodeEntity.TickCapture(node, elapsedTime, onCaptureCallback, onRevertNe
         local baseGrowth = math.min(BalanceConfig.MAX_RESONANCE_GROWTH, math.max(1, math.floor(excess / 5 + 0.5)))
 
         if node.faction == "neutral" then
-            node.control = math.min(100, node.control + baseGrowth * 6)
+            -- 中立节点占领大幅提速：每轮基础 +25 共鸣度，3~4 轮 (约 2.5 秒) 完成掌控
+            node.control = math.min(100, node.control + 25 + baseGrowth * 5)
             if node.control >= 100 then
                 node.faction = node.contenderFaction
-                node.particles = 5
+                -- 多余侵蚀微粒直接作为驻留守军 (保底 3 粒，上限 15 粒)，不浪费兵力
+                node.particles = math.max(3, math.min(15, node.contenderParticles))
                 node.contenderParticles = 0
                 node.contenderFaction = nil
                 node.isDefensive = true
@@ -122,11 +124,12 @@ function NodeEntity.TickCapture(node, elapsedTime, onCaptureCallback, onRevertNe
                 end
             end
         elseif node.faction ~= node.contenderFaction then
-            -- 削减原主控方控制度
-            node.control = math.max(0, node.control - baseGrowth * 4)
+            -- 削减原主控方控制度：提速削减，快速瓦解敌方统治
+            node.control = math.max(0, node.control - (15 + baseGrowth * 5))
             if node.control <= BalanceConfig.NEUTRAL_THRESHOLD then
-                -- 沦为中立争夺态
+                -- 沦为中立争夺态，控制度清零以便攻占方迅速掌控
                 node.faction = "neutral"
+                node.control = 0
                 node.routeTo = nil
                 node.isDefensive = false
                 if onRevertNeutralCallback then

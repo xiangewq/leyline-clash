@@ -82,8 +82,9 @@ function RouteManager.Update(dt, nodes, elapsedTime, onCombatHitCallback)
             local interval = 1.0 / rate
             if route.sendTimer >= interval then
                 route.sendTimer = 0
-                -- 节点保留至少 1 粒驻扎微粒
-                if fromNode.particles > 1 then
+                -- 节点保留基础守备兵力 (默认 3 粒，防止基地永久定格在 1 且防守空虚)
+                local safeFloor = BalanceConfig.SAFE_GARRISON or 3
+                if fromNode.particles > safeFloor then
                     fromNode.particles = fromNode.particles - 1
                     local dx = toNode.x - fromNode.x
                     local dy = toNode.y - fromNode.y
@@ -131,9 +132,9 @@ function RouteManager.OnParticleArrive(particle, node, onCombatHitCallback)
             node.particles = node.particles + 1
         end
     else
-        -- 敌对交火与侵蚀
+        -- 敌对交火与侵蚀 (固守减伤调整为 25%，命中率 75%，兼顾防守优势与进攻可行性)
         if node.particles > 0 then
-            local defenseDamp = (node.isDefensive and 0.5 or 1.0)
+            local defenseDamp = (node.isDefensive and 0.75 or 1.0)
             if math.random() <= defenseDamp then
                 node.particles = node.particles - 1
             end
