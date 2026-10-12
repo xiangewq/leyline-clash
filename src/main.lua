@@ -1,8 +1,10 @@
 -- src/main.lua
 -- 《星轨交错：地脉争锋》千星奇域 2D 俯视角即时战略游戏主控脚本
+-- 支持模式选择（剧情模式/挑战模式）、5大关卡章节推衍、2~4方大乱斗与动态权能预算阶梯
 
 local BalanceConfig   = require("default_import_file/src/data/balanceConfig") or require("src/data/balanceConfig")
 local CardRegistry    = require("default_import_file/src/data/cardRegistry") or require("src/data/cardRegistry")
+local ChapterConfig   = require("default_import_file/src/data/chapterConfig") or require("src/data/chapterConfig")
 local Layout          = require("default_import_file/src/core/layout") or require("src/core/layout")
 local Runtime         = require("default_import_file/src/core/runtime") or require("src/core/runtime")
 local Input           = require("default_import_file/src/core/input") or require("src/core/input")
@@ -19,15 +21,19 @@ local DialoguePlayer  = require("default_import_file/src/ui/dialoguePlayer") or 
 local PrepareView     = require("default_import_file/src/ui/prepareView") or require("src/ui/prepareView")
 local HudView         = require("default_import_file/src/ui/hudView") or require("src/ui/hudView")
 local CardBar         = require("default_import_file/src/ui/cardBar") or require("src/ui/cardBar")
+local ModeSelectView  = require("default_import_file/src/ui/modeSelectView") or require("src/ui/modeSelectView")
+local ChapterSelectView = require("default_import_file/src/ui/chapterSelectView") or require("src/ui/chapterSelectView")
 
 -- 全局游戏状态机枚举
-local STATE_DIALOGUE   = "STATE_DIALOGUE"
-local STATE_PREPARE    = "STATE_PREPARE"
-local STATE_PLAYING    = "STATE_PLAYING"
-local STATE_SETTLEMENT = "STATE_SETTLEMENT"
+local STATE_MODE_SELECT    = "STATE_MODE_SELECT"
+local STATE_CHAPTER_SELECT = "STATE_CHAPTER_SELECT"
+local STATE_DIALOGUE       = "STATE_DIALOGUE"
+local STATE_PREPARE        = "STATE_PREPARE"
+local STATE_PLAYING        = "STATE_PLAYING"
+local STATE_SETTLEMENT     = "STATE_SETTLEMENT"
 
 local gameState = {
-    currentState   = STATE_DIALOGUE,
+    currentState   = STATE_MODE_SELECT,
     elapsedTime    = 0,
     timeRemaining  = BalanceConfig.MATCH_DURATION,
     captureTimer   = 0,
@@ -41,9 +47,24 @@ local UI = {
     cursorArea     = nil,
     dragLine       = nil,
     routeCtrls     = {},
+    staticLinkCtrls= {},
     particleCtrls  = {},
     nodeUIList     = {},
     cardSlots      = {},
+
+    -- 模式选择弹窗
+    modeSelectModal  = nil,
+    modeStoryBtn     = nil,
+    modeChallengeBtn = nil,
+
+    -- 章节选择弹窗
+    chapterSelectModal = nil,
+    chapterCards       = {},
+    chapDesc           = nil,
+    chapTitle          = nil,
+    chapStartBtn       = nil,
+    chapStartTxt       = nil,
+    chapBackBtn        = nil,
 
     -- 顶部 HUD
     playerPctText  = nil,
@@ -64,17 +85,22 @@ local UI = {
     -- 战前构筑弹窗
     prepareModal   = nil,
     prepBudgetText = nil,
+    prepHint       = nil,
+    prepTitle      = nil,
     prepStartBtn   = nil,
+    prepCards      = {},
 
     -- 结算弹窗
     settleModal    = nil,
     settleTitle    = nil,
     settleDesc     = nil,
     settleStats    = nil,
-    settleRetryBtn = nil
+    settleNextBtn  = nil,
+    settleRetryBtn = nil,
+    settleChapBtn  = nil
 }
 
--- 初始化沙盘所有灵穴
+-- 初始化沙盘所有灵穴实体
 local function InitNodes()
     gameState.nodes = {}
     for _, def in ipairs(StarMap.NODES_DEF) do
@@ -82,47 +108,86 @@ local function InitNodes()
     end
 end
 
--- 胜负判定
+-- 胜负判定 (支持 2~4 方多阵营混战)
 local function CheckMatchEnd(isTimeout)
     if gameState.isGameOver then return end
 
-    local pNodes, eNodes = 0, 0
-    local pParts, eParts = 0, 0
+    local pNodes, pParts = 0, 0
+    local enemyFactionScores = {}
+
     for _, n in ipairs(gameState.nodes) do
         if n.faction == "player" then
             pNodes = pNodes + 1
             pParts = pParts + n.particles
-        elseif n.faction == "enemy" then
-            eNodes = eNodes + 1
-            eParts = eParts + n.particles
+        elseif n.faction ~= "neutral" then
+            local fac = n.faction
+            if not enemyFactionScores[fac] then
+                enemyFactionScores[fac] = { nodes = 0, parts = 0 }
+            end
+            enemyFactionScores[fac].nodes = enemyFactionScores[fac].nodes + 1
+            enemyFactionScores[fac].parts = enemyFactionScores[fac].parts + n.particles
         end
     end
 
     local inFlightPlayer = 0
-    local inFlightEnemy = 0
+    local inFlightEnemy = {}
     for _, p in ipairs(RouteManager.movingParticles) do
-        if p.faction == "player" then inFlightPlayer = inFlightPlayer + 1
-        elseif p.faction == "enemy" then inFlightEnemy = inFlightEnemy + 1 end
+        if p.faction == "player" then
+            inFlightPlayer = inFlightPlayer + 1
+        elseif p.faction ~= "neutral" then
+            inFlightEnemy[p.faction] = (inFlightEnemy[p.faction] or 0) + 1
+        end
     end
 
-    if eNodes == 0 and inFlightEnemy == 0 then
-        -- 玩家胜利
+    -- 判定所有敌对势力是否已全部被歼灭
+    local allEnemiesDefeated = true
+    for fac, data in pairs(enemyFactionScores) do
+        local flying = inFlightEnemy[fac] or 0
+        if data.nodes > 0 or flying > 0 then
+            allEnemiesDefeated = false
+            break
+        end
+    end
+    for fac, cnt in pairs(inFlightEnemy) do
+        if cnt > 0 then
+            allEnemiesDefeated = false
+            break
+        end
+    end
+
+    if allEnemiesDefeated then
+        -- 玩家大获全胜！
         gameState.isGameOver = true
         gameState.currentState = STATE_SETTLEMENT
+        ChapterSelectView.UnlockNextStage(StarMap.currentStage)
         BalanceConfig.PlayAudioSafe("MATCH_WIN")
-        HudView.ShowSettlement(true, gameState.nodes, gameState.elapsedTime, UI.settleModal, UI.settleTitle, UI.settleDesc, UI.settleStats)
+        HudView.ShowSettlement(true, gameState.nodes, gameState.elapsedTime, UI.settleModal, UI.settleTitle, UI.settleDesc, UI.settleStats, UI.settleNextBtn)
     elseif pNodes == 0 and inFlightPlayer == 0 then
-        -- 玩家失败
+        -- 玩家兵力全军覆没
         gameState.isGameOver = true
         gameState.currentState = STATE_SETTLEMENT
         BalanceConfig.PlayAudioSafe("MATCH_LOSE")
-        HudView.ShowSettlement(false, gameState.nodes, gameState.elapsedTime, UI.settleModal, UI.settleTitle, UI.settleDesc, UI.settleStats)
+        HudView.ShowSettlement(false, gameState.nodes, gameState.elapsedTime, UI.settleModal, UI.settleTitle, UI.settleDesc, UI.settleStats, UI.settleNextBtn)
     elseif isTimeout then
-        -- 6 分钟压哨结算
+        -- 倒计时归零压哨决胜
         gameState.isGameOver = true
         gameState.currentState = STATE_SETTLEMENT
-        local isWin = (pNodes * 1000 + pParts * 10) >= (eNodes * 1000 + eParts * 10)
-        HudView.ShowSettlement(isWin, gameState.nodes, gameState.elapsedTime, UI.settleModal, UI.settleTitle, UI.settleDesc, UI.settleStats)
+        local pScore = pNodes * 1000 + pParts * 10
+        local isWin = true
+        for _, data in pairs(enemyFactionScores) do
+            local eScore = data.nodes * 1000 + data.parts * 10
+            if eScore >= pScore then
+                isWin = false
+                break
+            end
+        end
+        if isWin then
+            ChapterSelectView.UnlockNextStage(StarMap.currentStage)
+            BalanceConfig.PlayAudioSafe("MATCH_WIN")
+        else
+            BalanceConfig.PlayAudioSafe("MATCH_LOSE")
+        end
+        HudView.ShowSettlement(isWin, gameState.nodes, gameState.elapsedTime, UI.settleModal, UI.settleTitle, UI.settleDesc, UI.settleStats, UI.settleNextBtn)
     end
 end
 
@@ -144,22 +209,18 @@ end
 -- 缓存控件树引用
 local function CacheUIControls()
     local root = nil
-    -- 1. 优先尝试脚本变量绑定（如在编辑器中配置了客户端控件ID变量）
     if script and script.GetParam then
         local pId = script:GetParam("RootCanvasID")
         if pId and type(pId) == "number" and game and game.GetClientUIControl then
             root = game.GetClientUIControl(pId)
         end
     end
-    -- 2. 其次获取挂载宿主对象
     if not root and script and script.object then
         root = script.object
     end
-    -- 3. 再次通过名称查找全局根
     if not root and game and game.FindClientUIRoot then
         root = game.FindClientUIRoot("StarlinkCanvas") or game.FindClientUIRoot("GameRoot")
     end
-    -- 4. 兜底获取当前活跃的第一个根容器
     if not root and game and game.GetClientUIRoots then
         local roots = game.GetClientUIRoots()
         if roots and #roots > 0 then root = roots[1] end
@@ -170,32 +231,72 @@ local function CacheUIControls()
     UI.cursorArea = FindDeepChild(root, "GlobalCursorArea")
     UI.dragLine   = FindDeepChild(root, "DragLine")
 
-    -- 光轨条带池
-    UI.routeCtrls = {}
-    local linksLayer = FindDeepChild(root, "LinksLayer")
-    if linksLayer then
-        for i = 1, 10 do
-            local line = FindDeepChild(linksLayer, "RouteLine_" .. i)
-            if line then table.insert(UI.routeCtrls, line) end
+    -- 模式选择弹窗
+    UI.modeSelectModal  = FindDeepChild(root, "ModeSelectModal")
+    if UI.modeSelectModal then
+        UI.modeStoryBtn     = FindDeepChild(UI.modeSelectModal, "ModeStoryBtn")
+        UI.modeChallengeBtn = FindDeepChild(UI.modeSelectModal, "ModeChallengeBtn")
+    end
+
+    -- 关卡章节选择弹窗
+    UI.chapterSelectModal = FindDeepChild(root, "ChapterSelectModal")
+    UI.chapterCards = {}
+    if UI.chapterSelectModal then
+        UI.chapDesc     = FindDeepChild(UI.chapterSelectModal, "ChapterDesc")
+        UI.chapTitle    = FindDeepChild(UI.chapterSelectModal, "ChapterTitle")
+        UI.chapStartBtn = FindDeepChild(UI.chapterSelectModal, "ChapterStartBtn")
+        if UI.chapStartBtn then
+            UI.chapStartTxt = FindDeepChild(UI.chapStartBtn, "Text")
+        end
+        UI.chapBackBtn  = FindDeepChild(UI.chapterSelectModal, "ChapterBackBtn")
+
+        for idx = 1, 5 do
+            local cardBtn = FindDeepChild(UI.chapterSelectModal, "ChapterCard_" .. idx)
+            if cardBtn then
+                table.insert(UI.chapterCards, {
+                    button     = cardBtn,
+                    tagCtrl    = FindDeepChild(cardBtn, "TagText"),
+                    infoCtrl   = FindDeepChild(cardBtn, "InfoText"),
+                    budgetCtrl = FindDeepChild(cardBtn, "BudgetText"),
+                    titleCtrl  = FindDeepChild(cardBtn, "TitleText"),
+                    bgCtrl     = FindDeepChild(cardBtn, "CardBg"),
+                    borderCtrl = FindDeepChild(cardBtn, "CardBorder")
+                })
+            end
         end
     end
 
-    -- 微粒对象池
+    -- 光轨条带池与静态连线池
+    UI.routeCtrls = {}
+    UI.staticLinkCtrls = {}
+    local linksLayer = FindDeepChild(root, "LinksLayer")
+    if linksLayer then
+        for i = 1, 25 do
+            local line = FindDeepChild(linksLayer, "RouteLine_" .. i)
+            if line then table.insert(UI.routeCtrls, line) end
+        end
+        for i = 0, 44 do
+            local sLine = FindDeepChild(linksLayer, "StaticLink_" .. i)
+            if sLine then table.insert(UI.staticLinkCtrls, sLine) end
+        end
+    end
+
+    -- 微粒对象池 (120个)
     UI.particleCtrls = {}
     local pLayer = FindDeepChild(root, "ParticlesLayer")
     if pLayer then
-        for i = 1, 80 do
+        for i = 1, 120 do
             local p = FindDeepChild(pLayer, "P_" .. i)
             if p then table.insert(UI.particleCtrls, p) end
         end
     end
     Runtime.InitParticlePool(UI.particleCtrls)
 
-    -- 5 座地脉灵穴 UI 组
+    -- 18 座地脉灵穴 UI 组
     UI.nodeUIList = {}
     local nodesLayer = FindDeepChild(root, "NodesLayer")
     if nodesLayer then
-        for i = 0, 4 do
+        for i = 0, 17 do
             local grp = FindDeepChild(nodesLayer, "NodeGroup_" .. i)
             if grp then
                 table.insert(UI.nodeUIList, {
@@ -225,7 +326,6 @@ local function CacheUIControls()
             UI.toastText  = FindDeepChild(UI.toastContainer, "ToastText")
         end
 
-        -- 4 战术符印槽
         UI.cardSlots = {}
         for j = 1, 4 do
             local slotGrp = FindDeepChild(hud, "CardSlot_" .. j)
@@ -281,7 +381,9 @@ local function CacheUIControls()
         UI.settleTitle    = FindDeepChild(UI.settleModal, "SettleTitle")
         UI.settleDesc     = FindDeepChild(UI.settleModal, "SettleDesc")
         UI.settleStats    = FindDeepChild(UI.settleModal, "SettleStats")
+        UI.settleNextBtn  = FindDeepChild(UI.settleModal, "SettleNextBtn")
         UI.settleRetryBtn = FindDeepChild(UI.settleModal, "SettleRetryBtn")
+        UI.settleChapBtn  = FindDeepChild(UI.settleModal, "SettleChapterBtn")
     end
 end
 
@@ -307,7 +409,53 @@ local function GetEventPos(data)
     return 0, 0
 end
 
--- 注册所有交互监听
+-- 载入并启动指定章节
+local function StartStage(stageId)
+    local chap = StarMap.LoadStage(stageId)
+    print(string.format("[Starlink] 加载章节: 第 %d 关【%s】(节点数: %d, 权能预算: %d, 时限: %ds)", chap.id, chap.title, #chap.nodes, chap.budget, chap.duration))
+
+    InitNodes()
+    RouteManager.Init()
+    CombatResolver.Init()
+    AbilitySystem.cooldowns = { 0, 0, 0, 0 }
+
+    gameState.elapsedTime   = 0
+    gameState.timeRemaining = chap.duration or BalanceConfig.MATCH_DURATION
+    gameState.isGameOver    = false
+
+    -- 刷新沙盘节点与静态连线几何布局
+    VisualRenderer.ApplyStageLayout(UI.nodeUIList, gameState.nodes, UI.staticLinkCtrls, StarMap.LINKS)
+    VisualRenderer.UpdateNodes(UI.nodeUIList, gameState.nodes, 0)
+
+    -- 隐藏其他面板，进入战前剧情
+    Layout.SetVisible(UI.modeSelectModal, false)
+    Layout.SetVisible(UI.chapterSelectModal, false)
+    Layout.SetVisible(UI.settleModal, false)
+    Layout.SetVisible(UI.prepareModal, false)
+
+    -- 1. 剧情演播
+    DialoguePlayer.Init(chap.dialogues, function()
+        print("[Starlink] 章节剧情完毕，进入战前符印调配...")
+        Layout.SetVisible(UI.dialogueModal, false)
+        Layout.SetVisible(UI.prepareModal, true)
+        gameState.currentState = STATE_PREPARE
+
+        -- 2. 调配面板初始化 (动态预算)
+        PrepareView.Init(chap.budget, function(selectedDeck)
+            print("[Starlink] 战前符印装配完成，启阵出征！")
+            AbilitySystem.InitDeck(selectedDeck)
+            Layout.SetVisible(UI.prepareModal, false)
+            gameState.currentState = STATE_PLAYING
+            HudView.ShowToast(string.format("【%s】战局开启！铺设光轨，争夺灵穴！", chap.title))
+        end)
+        PrepareView.Render(UI.prepCards, UI.prepBudgetText, UI.prepHint)
+    end)
+
+    gameState.currentState = STATE_DIALOGUE
+    Layout.SetVisible(UI.dialogueModal, true)
+end
+
+-- 注册全屏与各面板交互监听
 local function SetupEventHandlers()
     -- 1. 全屏光标事件 (连线与轻点)
     if UI.cursorArea and UI.cursorArea.AddCursorEventListener then
@@ -379,7 +527,58 @@ local function SetupEventHandlers()
         CardBar.Update(UI.cardSlots, AbilitySystem.deck, AbilitySystem.cooldowns, nil)
     end
 
-    -- 3. 剧情按钮监听
+    -- 3. 模式选择按钮监听
+    if UI.modeStoryBtn and UI.modeStoryBtn.AddCursorEventListener then
+        UI.modeStoryBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
+            BalanceConfig.PlayAudioSafe("UI_CLICK")
+            print("[Starlink] 玩家选择【剧情模式】，打开战役章节选择面板...")
+            Layout.SetVisible(UI.modeSelectModal, false)
+            Layout.SetVisible(UI.chapterSelectModal, true)
+            gameState.currentState = STATE_CHAPTER_SELECT
+            ChapterSelectView.Render(UI.chapterCards, UI.chapDesc, UI.chapStartTxt)
+        end)
+    end
+
+    if UI.modeChallengeBtn and UI.modeChallengeBtn.AddCursorEventListener then
+        UI.modeChallengeBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
+            BalanceConfig.PlayAudioSafe("UI_CLICK")
+            print("[Starlink] 玩家点击【挑战模式】（筹备中提示）...")
+            HudView.ShowToast("【挑战模式】正在筹备中，敬请期待！")
+        end)
+    end
+
+    -- 4. 章节选择按钮监听
+    for idx, cardUI in ipairs(UI.chapterCards) do
+        if cardUI.button and cardUI.button.AddCursorEventListener then
+            cardUI.button:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
+                BalanceConfig.PlayAudioSafe("UI_CLICK")
+                local ok, err = ChapterSelectView.SelectStage(idx)
+                if not ok then
+                    HudView.ShowToast(err or "该关卡尚未解锁！")
+                else
+                    ChapterSelectView.Render(UI.chapterCards, UI.chapDesc, UI.chapStartTxt)
+                end
+            end)
+        end
+    end
+
+    if UI.chapStartBtn and UI.chapStartBtn.AddCursorEventListener then
+        UI.chapStartBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
+            BalanceConfig.PlayAudioSafe("UI_CLICK")
+            StartStage(ChapterSelectView.selectedStage)
+        end)
+    end
+
+    if UI.chapBackBtn and UI.chapBackBtn.AddCursorEventListener then
+        UI.chapBackBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
+            BalanceConfig.PlayAudioSafe("UI_CLICK")
+            Layout.SetVisible(UI.chapterSelectModal, false)
+            Layout.SetVisible(UI.modeSelectModal, true)
+            gameState.currentState = STATE_MODE_SELECT
+        end)
+    end
+
+    -- 5. 剧情按钮监听
     if UI.dlgNextBtn and UI.dlgNextBtn.AddCursorEventListener then
         UI.dlgNextBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
             DialoguePlayer.Next()
@@ -391,7 +590,7 @@ local function SetupEventHandlers()
         end)
     end
 
-    -- 4. 战前调配卡牌点击选择与差分渲染
+    -- 6. 战前调配卡牌点击选择
     for idx, cardUI in ipairs(UI.prepCards) do
         if cardUI.button and cardUI.button.AddCursorEventListener then
             local cardKey = PrepareView.POOL_ORDER[idx]
@@ -405,9 +604,9 @@ local function SetupEventHandlers()
                     local used = PrepareView.GetUsedBudget()
                     local count = #PrepareView.selectedIds
                     if action == "equipped" then
-                        HudView.ShowToast(string.format("【已装配】%s (耗能%d) | 预算 %d/12，已选 %d/4 张", card and card.name or "符印", card and card.cost or 0, used, count))
+                        HudView.ShowToast(string.format("【已装配】%s (耗能%d) | 预算 %d/%d，已选 %d/4 张", card and card.name or "符印", card and card.cost or 0, used, PrepareView.maxBudget, count))
                     elseif action == "unequipped" then
-                        HudView.ShowToast(string.format("【已卸下】%s (归还%d) | 预算 %d/12，已选 %d/4 张", card and card.name or "符印", card and card.cost or 0, used, count))
+                        HudView.ShowToast(string.format("【已卸下】%s (归还%d) | 预算 %d/%d，已选 %d/4 张", card and card.name or "符印", card and card.cost or 0, used, PrepareView.maxBudget, count))
                     end
                 end
                 PrepareView.Render(UI.prepCards, UI.prepBudgetText, UI.prepHint)
@@ -424,7 +623,7 @@ local function SetupEventHandlers()
         end)
     end
 
-    -- 5. 符印槽位点击选择 (冷却中拦截，支持点击选定目标施法与再次点击智能自动施法)
+    -- 7. 符印槽位点击选择
     for idx, slot in ipairs(UI.cardSlots) do
         if slot.container and slot.container.AddCursorEventListener then
             slot.container:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
@@ -432,14 +631,12 @@ local function SetupEventHandlers()
                     local card = AbilitySystem.deck[idx]
                     if not card then return end
 
-                    -- 1. 冷却中拦截
                     if AbilitySystem.cooldowns[idx] and AbilitySystem.cooldowns[idx] > 0 then
                         BalanceConfig.PlayAudioSafe("UI_CLICK")
                         HudView.ShowToast(string.format("【%s】仍在冷却中（还剩 %d 秒）", card.name, math.ceil(AbilitySystem.cooldowns[idx])))
                         return
                     end
 
-                    -- 2. 若再次点击同一张已选中的卡牌：触发快捷智能施法！
                     if Input.GetSelectedCard() == idx then
                         local smartTargetId = AbilitySystem.GetSmartTarget(card.id, gameState.nodes, RouteManager)
                         if smartTargetId ~= nil then
@@ -469,7 +666,6 @@ local function SetupEventHandlers()
                         end
                     end
 
-                    -- 3. 首次点击卡牌：进入选定施法态
                     Input.SetSelectedCard(idx)
                     BalanceConfig.PlayAudioSafe("UI_CLICK")
                     local targetHint = ""
@@ -489,33 +685,43 @@ local function SetupEventHandlers()
         end
     end
 
-    -- 6. 重试按钮 (重开时重置并返回符印调配环节)
+    -- 8. 结算弹窗按钮
+    -- 进军下一关
+    if UI.settleNextBtn and UI.settleNextBtn.AddCursorEventListener then
+        UI.settleNextBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
+            BalanceConfig.PlayAudioSafe("UI_CLICK")
+            local nextStageId = StarMap.currentStage + 1
+            if nextStageId <= 5 then
+                print(string.format("[Starlink] 进军下一关: 第 %d 关...", nextStageId))
+                ChapterSelectView.selectedStage = nextStageId
+                StartStage(nextStageId)
+            else
+                HudView.ShowToast("【恭喜】已通关全部 5 大战役章节！")
+                Layout.SetVisible(UI.settleModal, false)
+                Layout.SetVisible(UI.chapterSelectModal, true)
+                gameState.currentState = STATE_CHAPTER_SELECT
+                ChapterSelectView.Render(UI.chapterCards, UI.chapDesc, UI.chapStartTxt)
+            end
+        end)
+    end
+
+    -- 重新演练
     if UI.settleRetryBtn and UI.settleRetryBtn.AddCursorEventListener then
         UI.settleRetryBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
-            print("[Starlink] 玩家选择重新演练，重置战场并返回战前调配环节...")
-            InitNodes()
-            RouteManager.Init()
-            CombatResolver.Init()
-            gameState.elapsedTime = 0
-            gameState.timeRemaining = BalanceConfig.MATCH_DURATION
-            gameState.isGameOver = false
-            AbilitySystem.cooldowns = { 0, 0, 0, 0 }
+            BalanceConfig.PlayAudioSafe("UI_CLICK")
+            print(string.format("[Starlink] 重新演练当前关卡: 第 %d 关...", StarMap.currentStage))
+            StartStage(StarMap.currentStage)
+        end)
+    end
 
-            -- 隐藏结算弹窗，打开战前调配弹窗
+    -- 返回章节选择
+    if UI.settleChapBtn and UI.settleChapBtn.AddCursorEventListener then
+        UI.settleChapBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
+            BalanceConfig.PlayAudioSafe("UI_CLICK")
             Layout.SetVisible(UI.settleModal, false)
-            Layout.SetVisible(UI.prepareModal, true)
-            gameState.currentState = STATE_PREPARE
-
-            -- 重新初始化调配界面并刷新差分呈现
-            PrepareView.Init(function(selectedDeck)
-                print("[Starlink] 战前构筑完成，开启动态推演！")
-                AbilitySystem.InitDeck(selectedDeck)
-                Layout.SetVisible(UI.prepareModal, false)
-                gameState.currentState = STATE_PLAYING
-                HudView.ShowToast("【推衍开启】铺设光轨，争夺中立灵穴！")
-            end)
-            PrepareView.Render(UI.prepCards, UI.prepBudgetText, UI.prepHint)
-            HudView.ShowToast("【重新演练】请调配本局战术符印！")
+            Layout.SetVisible(UI.chapterSelectModal, true)
+            gameState.currentState = STATE_CHAPTER_SELECT
+            ChapterSelectView.Render(UI.chapterCards, UI.chapDesc, UI.chapStartTxt)
         end)
     end
 end
@@ -525,66 +731,53 @@ end
 --------------------------------------------------------------------------------
 
 function OnInit()
-    print("[Starlink] OnInit: 开始装配 2D 纯代码推衍沙盘...")
+    print("[Starlink] OnInit: 装配 2D 纯代码关卡模式沙盘...")
     if script and script.EnableUpdate then
         script:EnableUpdate(true)
     end
     CacheUIControls()
+    StarMap.LoadStage(1)
     InitNodes()
     RouteManager.Init()
     CombatResolver.Init()
-
-    -- 初始化剧情回调 (演播完毕后进入符印调配并初始化差分样式)
-    DialoguePlayer.Init(function()
-        print("[Starlink] 剧情演播完毕，进入战前符印调配...")
-        Layout.SetVisible(UI.dialogueModal, false)
-        Layout.SetVisible(UI.prepareModal, true)
-        gameState.currentState = STATE_PREPARE
-        PrepareView.Render(UI.prepCards, UI.prepBudgetText, UI.prepHint)
-    end)
-
-    -- 初始化战前构筑回调
-    PrepareView.Init(function(selectedDeck)
-        print("[Starlink] 战前构筑完成，开启动态推演！")
-        AbilitySystem.InitDeck(selectedDeck)
-        Layout.SetVisible(UI.prepareModal, false)
-        gameState.currentState = STATE_PLAYING
-        HudView.ShowToast("【推衍开启】铺设光轨，争夺中立灵穴！")
-    end)
-
-    -- 初始化 HUD
     HudView.Init()
 
-    -- 首次初始画面渲染填充 (确保文字与状态在开局立即呈现)
+    -- 初始应用第 1 关布局
+    VisualRenderer.ApplyStageLayout(UI.nodeUIList, gameState.nodes, UI.staticLinkCtrls, StarMap.LINKS)
     VisualRenderer.UpdateNodes(UI.nodeUIList, gameState.nodes, 0)
     CardBar.Update(UI.cardSlots, AbilitySystem.deck, AbilitySystem.cooldowns, nil)
     HudView.UpdateTopBar(gameState.timeRemaining, gameState.nodes, UI.playerPctText, UI.enemyPctText, UI.timerText, UI.barPlayer, UI.barEnemy)
 
-    -- 注册输入
     SetupEventHandlers()
-    print("[Starlink] OnInit: 装配完成！")
+    print("[Starlink] OnInit: 装配完成！准备就绪。")
 end
 
 function OnStart()
-    print("[Starlink] OnStart: 启动剧情状态...")
+    print("[Starlink] OnStart: 启动模式选择主界面...")
     if script and script.EnableUpdate then
         script:EnableUpdate(true)
     end
-    gameState.currentState = STATE_DIALOGUE
-    Layout.SetVisible(UI.dialogueModal, true)
+    gameState.currentState = STATE_MODE_SELECT
+    Layout.SetVisible(UI.modeSelectModal, true)
+    Layout.SetVisible(UI.chapterSelectModal, false)
+    Layout.SetVisible(UI.dialogueModal, false)
     Layout.SetVisible(UI.prepareModal, false)
     Layout.SetVisible(UI.settleModal, false)
 end
 
 function OnUpdate(dt)
-    if gameState.currentState == STATE_DIALOGUE then
+    if gameState.currentState == STATE_MODE_SELECT then
+        HudView.UpdateToast(dt, UI.toastContainer, UI.toastText)
+
+    elseif gameState.currentState == STATE_CHAPTER_SELECT then
+        HudView.UpdateToast(dt, UI.toastContainer, UI.toastText)
+
+    elseif gameState.currentState == STATE_DIALOGUE then
         DialoguePlayer.Update(dt, UI.dlgSpeaker, UI.dlgContent)
+        HudView.UpdateToast(dt, UI.toastContainer, UI.toastText)
 
     elseif gameState.currentState == STATE_PREPARE then
-        if not gameState._prepRendered then
-            gameState._prepRendered = true
-            PrepareView.Render(UI.prepCards, UI.prepBudgetText, UI.prepHint)
-        end
+        HudView.UpdateToast(dt, UI.toastContainer, UI.toastText)
 
     elseif gameState.currentState == STATE_PLAYING then
         gameState.elapsedTime = gameState.elapsedTime + dt
@@ -593,11 +786,9 @@ function OnUpdate(dt)
         if not gameState._lastHeartbeat or (gameState.elapsedTime - gameState._lastHeartbeat >= 2.0) then
             gameState._lastHeartbeat = gameState.elapsedTime
             local p0 = gameState.nodes[1]
-            local n2 = gameState.nodes[3]
-            local e4 = gameState.nodes[5]
-            print(string.format("[Starlink Battle] t=%.1fs, routes=%d, flying=%d | 枢纽0:%d, 隘口2:%d(ctrl:%d), 敌垒4:%d",
-                gameState.elapsedTime, #RouteManager.routes, #RouteManager.movingParticles,
-                p0 and p0.particles or 0, n2 and n2.particles or 0, n2 and n2.control or 0, e4 and e4.particles or 0
+            print(string.format("[Starlink Battle] Stage %d, t=%.1fs, routes=%d, flying=%d | p0 particles=%d",
+                StarMap.currentStage, gameState.elapsedTime, #RouteManager.routes, #RouteManager.movingParticles,
+                p0 and p0.particles or 0
             ))
         end
 
@@ -615,11 +806,12 @@ function OnUpdate(dt)
                     n,
                     gameState.elapsedTime,
                     function(capturedNode)
-                        HudView.ShowToast("【" .. capturedNode.name .. "】已被 " .. (capturedNode.faction == "player" and "我方" or "敌方") .. " 完全掌控！")
+                        local facName = Layout.GetFactionName(capturedNode.faction)
+                        HudView.ShowToast(string.format("【%s】已被【%s】完全掌控！", capturedNode.name, facName))
                         CheckMatchEnd()
                     end,
                     function(lostNode)
-                        HudView.ShowToast("【" .. lostNode.name .. "】原统治动摇，已沦为中立争夺！")
+                        HudView.ShowToast(string.format("【%s】统治动摇，已沦为中立争夺！", lostNode.name))
                     end
                 )
             end
@@ -633,7 +825,7 @@ function OnUpdate(dt)
         -- 4. 战火与威胁判定
         CombatResolver.Update(dt, gameState.nodes, RouteManager.movingParticles)
 
-        -- 5. 敌方 AI 推进
+        -- 5. 敌方 AI 推进 (多阵营全员大乱斗)
         FactionAI.Update(dt, gameState.nodes, RouteManager)
 
         -- 6. 符印冷却计时
@@ -655,7 +847,6 @@ function OnUpdate(dt)
         end
 
     elseif gameState.currentState == STATE_SETTLEMENT then
-        -- 结算停顿时仅维持 Toast 与动效衰减
         HudView.UpdateToast(dt, UI.toastContainer, UI.toastText)
     end
 end

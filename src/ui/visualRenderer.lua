@@ -138,6 +138,18 @@ function VisualRenderer.UpdateNodes(nodeUIList, nodes, elapsedTime)
                     ui.anomalyText.text = "【迷雾荒墟】"
                     ui.anomalyText.fontColor = Layout.PALETTE.TEXT_MUTED
                     Layout.SetVisible(ui.anomalyText, true)
+                elseif node.anomaly == "DEFENSE_BASTION" then
+                    ui.anomalyText.text = "【雷暴要塞】"
+                    ui.anomalyText.fontColor = Layout.PALETTE.GOLD
+                    Layout.SetVisible(ui.anomalyText, true)
+                elseif node.anomaly == "PURE_WATER" then
+                    ui.anomalyText.text = "【纯水枢纽】"
+                    ui.anomalyText.fontColor = Layout.PALETTE.PLAYER
+                    Layout.SetVisible(ui.anomalyText, true)
+                elseif node.anomaly == "PLASMA" then
+                    ui.anomalyText.text = "【赤阳熔核】"
+                    ui.anomalyText.fontColor = Layout.PALETTE.ENEMY
+                    Layout.SetVisible(ui.anomalyText, true)
                 else
                     Layout.SetVisible(ui.anomalyText, false)
                 end
@@ -146,15 +158,15 @@ function VisualRenderer.UpdateNodes(nodeUIList, nodes, elapsedTime)
             -- 5. 占领进度与状态标签 (占领中/动摇中/输送中/固守中/休眠中)
             if ui.statusText and ui.statusText.alive then
                 if node.faction == "neutral" and (node.control > 0 or (node.contenderParticles and node.contenderParticles > 0)) then
-                    local fName = (node.contenderFaction == "player") and "我方" or (node.contenderFaction == "enemy" and "敌方" or "")
-                    local col = (node.contenderFaction == "player") and Layout.PALETTE.PLAYER or Layout.PALETTE.ENEMY
+                    local fName = Layout.GetFactionName(node.contenderFaction)
+                    local col = Layout.GetFactionColor(node.contenderFaction)
                     ui.statusText.text = string.format("[%s占领中 %d%%]", fName, math.floor(node.control))
                     ui.statusText.fontColor = col
                     Layout.SetVisible(ui.statusText, true)
                 elseif node.faction ~= "neutral" and node.control < 100 then
-                    local statusDesc = (node.faction == "player") and "敌袭动摇" or "我方攻克"
-                    local col = (node.faction == "player") and Layout.PALETTE.ENEMY or Layout.PALETTE.PLAYER
-                    ui.statusText.text = string.format("[%s %d%%]", statusDesc, math.floor(node.control))
+                    local fName = Layout.GetFactionName(node.faction)
+                    local col = Layout.GetFactionColor(node.faction)
+                    ui.statusText.text = string.format("[%s动摇 %d%%]", fName, math.floor(node.control))
                     ui.statusText.fontColor = col
                     Layout.SetVisible(ui.statusText, true)
                 elseif node.isIdle then
@@ -172,6 +184,39 @@ function VisualRenderer.UpdateNodes(nodeUIList, nodes, elapsedTime)
                 else
                     Layout.SetVisible(ui.statusText, false)
                 end
+            end
+        end
+    end
+end
+
+-- 关卡拓扑几何重布局 (按当前章节的节点坐标与连线刷新沙盘)
+function VisualRenderer.ApplyStageLayout(nodeUIList, nodes, staticLinkCtrls, links)
+    -- 1. 更新节点位置与可见性
+    for i, ui in ipairs(nodeUIList) do
+        local node = nodes[i]
+        if node and ui.group and ui.group.alive then
+            ui.group.anchoredPositionX = node.x
+            ui.group.anchoredPositionY = node.y
+            Layout.SetVisible(ui.group, true)
+        elseif ui.group and ui.group.alive then
+            Layout.SetVisible(ui.group, false)
+        end
+    end
+
+    -- 2. 更新静态底轨连线
+    if staticLinkCtrls and links then
+        for i, linkCtrl in ipairs(staticLinkCtrls) do
+            local link = links[i]
+            if link and linkCtrl and linkCtrl.alive then
+                local nA = nodes[link[1] + 1]
+                local nB = nodes[link[2] + 1]
+                if nA and nB then
+                    VisualRenderer.SetLineTransform(linkCtrl, nA.x, nA.y, nB.x, nB.y, 2, Layout.PALETTE.LINK_INACTIVE)
+                else
+                    Layout.SetVisible(linkCtrl, false)
+                end
+            elseif linkCtrl and linkCtrl.alive then
+                Layout.SetVisible(linkCtrl, false)
             end
         end
     end

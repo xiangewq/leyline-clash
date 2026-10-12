@@ -33,16 +33,23 @@ local DialoguePlayer = {
     onFinished = nil
 }
 
-function DialoguePlayer.Init(onFinishedCallback)
+function DialoguePlayer.Init(dialoguesOrCb, onFinishedCallback)
+    if type(dialoguesOrCb) == "table" then
+        DialoguePlayer.currentList = dialoguesOrCb
+        DialoguePlayer.onFinished = onFinishedCallback
+    else
+        DialoguePlayer.currentList = DialoguePlayer.DIALOGUES
+        DialoguePlayer.onFinished = dialoguesOrCb
+    end
     DialoguePlayer.currentIndex = 1
     DialoguePlayer.charIndex = 0
     DialoguePlayer.charTimer = 0
     DialoguePlayer.isComplete = false
-    DialoguePlayer.onFinished = onFinishedCallback
 end
 
 function DialoguePlayer.GetCurrentLine()
-    return DialoguePlayer.DIALOGUES[DialoguePlayer.currentIndex]
+    local list = DialoguePlayer.currentList or DialoguePlayer.DIALOGUES
+    return list[DialoguePlayer.currentIndex]
 end
 
 function DialoguePlayer.Update(dt, speakerTextCtrl, contentTextCtrl)
@@ -56,10 +63,18 @@ function DialoguePlayer.Update(dt, speakerTextCtrl, contentTextCtrl)
 
     if speakerTextCtrl and speakerTextCtrl.alive then
         speakerTextCtrl.text = "【" .. line.speaker .. "】"
-        if line.color then
-            local col = type(line.color) == "number" and line.color or (Layout and Layout.ToColorInt and Layout.ToColorInt(line.color) or Layout.PALETTE.GOLD)
-            pcall(function() speakerTextCtrl.fontColor = col end)
+        local col = line.color
+        if not col then
+            if line.speaker == "阿贝多" then
+                col = Layout.PALETTE.PLAYER
+            elseif line.speaker == "派蒙" then
+                col = Layout.PALETTE.GOLD
+            else
+                col = Layout.PALETTE.TEXT_LIGHT
+            end
         end
+        local colInt = type(col) == "number" and col or (Layout and Layout.ToColorInt and Layout.ToColorInt(col) or Layout.PALETTE.GOLD)
+        pcall(function() speakerTextCtrl.fontColor = colInt end)
     end
 
 

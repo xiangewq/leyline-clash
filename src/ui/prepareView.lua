@@ -21,14 +21,38 @@ local PrepareView = {
     }
 }
 
-function PrepareView.Init(onStartMatchCallback)
-    if not PrepareView.selectedIds or #PrepareView.selectedIds == 0 then
-        PrepareView.selectedIds = { "anemo_shield", "anemo_turb", "pyro_blast" }
+function PrepareView.Init(budgetOrCb, onStartMatchCallback)
+    local budget = 12
+    local cb = nil
+    if type(budgetOrCb) == "number" then
+        budget = budgetOrCb
+        cb = onStartMatchCallback
+    else
+        cb = budgetOrCb
+        budget = BalanceConfig.MAX_BUDGET or 12
     end
-    PrepareView.maxBudget = BalanceConfig.MAX_BUDGET or 12
+    PrepareView.maxBudget = budget
     PrepareView.maxCards = 4
-    if onStartMatchCallback then
-        PrepareView.onStartMatch = onStartMatchCallback
+    if cb then
+        PrepareView.onStartMatch = cb
+    end
+
+    if not PrepareView.selectedIds or #PrepareView.selectedIds == 0 then
+        PrepareView.selectedIds = { "anemo_shield" }
+    end
+
+    -- 自动校验修剪超限符印
+    while #PrepareView.selectedIds > 0 and PrepareView.GetUsedBudget() > PrepareView.maxBudget do
+        table.remove(PrepareView.selectedIds)
+    end
+    if #PrepareView.selectedIds == 0 then
+        for _, cKey in ipairs(PrepareView.POOL_ORDER) do
+            local c = CardRegistry.GetCardById(cKey)
+            if c and c.cost <= PrepareView.maxBudget then
+                table.insert(PrepareView.selectedIds, cKey)
+                break
+            end
+        end
     end
 end
 

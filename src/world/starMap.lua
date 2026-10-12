@@ -1,82 +1,24 @@
 -- src/world/starMap.lua
--- 提瓦特五灵穴沙盘拓扑、连通性矩阵与几何规格
+-- 提瓦特多章节沙盘拓扑、连通性矩阵、邻居查询与动态关卡加载器
+
+local ChapterConfig = require("default_import_file/src/data/chapterConfig") or require("src/data/chapterConfig")
 
 local StarMap = {
-    -- 基础 5 节点规格
-    NODES_DEF = {
-        {
-            id = 0,
-            name = "西风枢纽",
-            x = 320,
-            y = 450,
-            radius = 54,
-            faction = "player",
-            particles = 25,
-            control = 100,
-            anomaly = "NORMAL",
-            desc = "蒙德前哨枢纽"
-        },
-        {
-            id = 1,
-            name = "石珀晶矿",
-            x = 650,
-            y = 280,
-            radius = 46,
-            faction = "neutral",
-            particles = 10,
-            control = 0,
-            anomaly = "AMBER_MINE",
-            desc = "石珀富矿（产能翻倍）"
-        },
-        {
-            id = 2,
-            name = "千风隘口",
-            x = 800,
-            y = 520,
-            radius = 48,
-            faction = "neutral",
-            particles = 15,
-            control = 0,
-            anomaly = "WIND_FLOW",
-            desc = "千风汇聚（输送翻倍）"
-        },
-        {
-            id = 3,
-            name = "迷雾荒墟",
-            x = 950,
-            y = 300,
-            radius = 44,
-            faction = "neutral",
-            particles = 8,
-            control = 0,
-            anomaly = "MIST_RUINS",
-            desc = "迷雾缓冲（产能减半）"
-        },
-        {
-            id = 4,
-            name = "愚人坚垒",
-            x = 1280,
-            y = 450,
-            radius = 54,
-            faction = "enemy",
-            particles = 25,
-            control = 100,
-            anomaly = "NORMAL",
-            desc = "敌对推衍要塞"
-        }
-    },
-
-    -- 拓扑连线 (无交叉网络)
-    LINKS = {
-        { 0, 1 },
-        { 0, 2 },
-        { 1, 2 },
-        { 1, 3 },
-        { 2, 3 },
-        { 2, 4 },
-        { 3, 4 }
-    }
+    currentStage = 1,
+    currentChapterDef = nil,
+    NODES_DEF = {},
+    LINKS = {}
 }
+
+-- 动态加载关卡数据
+function StarMap.LoadStage(stageIndex)
+    local chap = ChapterConfig.GetChapter(stageIndex)
+    StarMap.currentStage = chap.id
+    StarMap.currentChapterDef = chap
+    StarMap.NODES_DEF = chap.nodes
+    StarMap.LINKS = chap.links
+    return chap
+end
 
 -- 判定两节点间是否存在地脉直通流道
 function StarMap.AreNodesLinked(idA, idB)
@@ -100,5 +42,8 @@ function StarMap.GetNeighbors(nodeId)
     end
     return list
 end
+
+-- 初始默认载入第 1 关
+StarMap.LoadStage(1)
 
 return StarMap

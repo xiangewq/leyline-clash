@@ -1,5 +1,6 @@
 // scripts/build_save.mjs
 // 构建《星轨交错：地脉争锋》全量 UI 控件树与工程存档 starlink.save.json
+// 支持全 5 大战役章节、18 灵穴拓扑池、45 静态拓扑连线、25 动态航线、120 微粒池与模式/章节选择面板
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -41,19 +42,6 @@ function parseColor(str, alpha = 1.0) {
   return 0xffffffff;
 }
 
-// 5 节点拓扑
-const NODES_DEF = [
-  { id: 0, name: '西风枢纽', x: 320, y: 450, r: 54, faction: 'player', parts: 25, ctrl: 100, anom: 'NORMAL' },
-  { id: 1, name: '石珀晶矿', x: 650, y: 280, r: 46, faction: 'neutral', parts: 10, ctrl: 0, anom: 'AMBER_MINE' },
-  { id: 2, name: '千风隘口', x: 800, y: 520, r: 48, faction: 'neutral', parts: 15, ctrl: 0, anom: 'WIND_FLOW' },
-  { id: 3, name: '迷雾荒墟', x: 950, y: 300, r: 44, faction: 'neutral', parts: 8, ctrl: 0, anom: 'MIST_RUINS' },
-  { id: 4, name: '愚人坚垒', x: 1280, y: 450, r: 54, faction: 'enemy', parts: 25, ctrl: 100, anom: 'NORMAL' },
-];
-
-const LINKS_DEF = [
-  [0, 1], [0, 2], [1, 2], [1, 3], [2, 3], [2, 4], [3, 4]
-];
-
 // 6 备选战术卡 (对齐 CardRegistry 17种战术符印体系)
 const POOL_CARDS = [
   { id: 1, key: 'anemo_shield', name: '千风庇护', cost: 2, desc: '加持免伤结界' },
@@ -70,7 +58,6 @@ const POOL_CARDS = [
 // 最后一个子节点处于最底层 (Back / Underneath)
 // ==========================================
 
-// 安全创建文本框 (保证 minimumFontSize <= fontSize，关闭模糊描边与背景冲突)
 function createTextbox(opts) {
   return createNode('textbox', {
     ...opts,
@@ -80,46 +67,329 @@ function createTextbox(opts) {
   });
 }
 
-// 1. 终局结算弹窗 SettleModal (最顶层)
-const settleModal = createNode('container', {
-  id: 'settle_modal',
-  name: 'SettleModal',
-  visible: false,
+// 0. 模式选择主界面 ModeSelectModal (最顶层)
+const modeSelectModal = createNode('container', {
+  id: 'mode_select_modal',
+  name: 'ModeSelectModal',
+  visible: true,
   transformByPlatform: makeTransform({ layout: 'stretch' }),
   children: [
-    // 弹窗对话框实体
     createNode('container', {
-      id: 'settle_box',
-      name: 'SettleBox',
+      id: 'mode_box',
+      name: 'ModeBox',
       transformByPlatform: makeTransform({
         offset: [0, 0],
-        size: [640, 380],
+        size: [840, 520],
         pivot: [0.5, 0.5]
       }),
       children: [
+        // 模式 1: 剧情模式按钮
         createNode('button', {
-          id: 'settle_retry_btn',
-          name: 'SettleRetryBtn',
+          id: 'mode_story_btn',
+          name: 'ModeStoryBtn',
           raycastTarget: true,
           interactable: true,
           transformByPlatform: makeTransform({
-            offset: [0, -115],
-            size: [170, 44],
+            offset: [-190, -45],
+            size: [320, 240],
             pivot: [0.5, 0.5]
           }),
           children: [
             createTextbox({
-              id: 'settle_retry_txt',
-              name: 'Text',
-              text: '【重新演练】',
-              fontSize: 15,
+              id: 'mode_story_desc',
+              name: 'DescText',
+              text: '体验提瓦特古代沙盘推衍\n5大递进章节 · 权能逐步觉醒\n2~4方全域大乱斗争霸',
+              fontSize: 13,
+              fontColor: parseColor('#94a3b8'),
+              horizontalAlignment: 'Middle',
+              verticalAlignment: 'Middle',
+              transformByPlatform: makeTransform({ offset: [0, -50], size: [280, 70], pivot: [0.5, 0.5] })
+            }),
+            createTextbox({
+              id: 'mode_story_sub',
+              name: 'SubText',
+              text: '【5 章节战役推衍】',
+              fontSize: 14,
+              fontColor: parseColor('#38bdf8'),
+              horizontalAlignment: 'Middle',
+              verticalAlignment: 'Middle',
+              transformByPlatform: makeTransform({ offset: [0, 18], size: [280, 28], pivot: [0.5, 0.5] })
+            }),
+            createTextbox({
+              id: 'mode_story_title',
+              name: 'TitleText',
+              text: '【 剧情模式 】',
+              fontSize: 24,
               fontColor: parseColor('#f8fafc'),
               horizontalAlignment: 'Middle',
               verticalAlignment: 'Middle',
-              transformByPlatform: makeTransform({ offset: [0, 0], size: [170, 44], pivot: [0.5, 0.5] })
+              transformByPlatform: makeTransform({ offset: [0, 65], size: [280, 42], pivot: [0.5, 0.5] })
             }),
             createNode('image', {
-              id: 'settle_retry_bg',
+              id: 'mode_story_bg',
+              name: 'BtnBg',
+              imageId: 100001,
+              imageColor: parseColor('#1e3a5f'),
+              transformByPlatform: makeTransform({ offset: [0, 0], size: [312, 232], pivot: [0.5, 0.5] })
+            }),
+            createNode('image', {
+              id: 'mode_story_border',
+              name: 'BtnBorder',
+              imageId: 100001,
+              imageColor: parseColor('#38bdf8'),
+              transformByPlatform: makeTransform({ layout: 'stretch' })
+            })
+          ]
+        }),
+
+        // 模式 2: 挑战模式按钮 (待完成)
+        createNode('button', {
+          id: 'mode_challenge_btn',
+          name: 'ModeChallengeBtn',
+          raycastTarget: true,
+          interactable: true,
+          transformByPlatform: makeTransform({
+            offset: [190, -45],
+            size: [320, 240],
+            pivot: [0.5, 0.5]
+          }),
+          children: [
+            createTextbox({
+              id: 'mode_challenge_desc',
+              name: 'DescText',
+              text: '全域混沌异象随机轮换\n极高难度深渊AI演练\n（待完成 · 敬请期待）',
+              fontSize: 13,
+              fontColor: parseColor('#64748b'),
+              horizontalAlignment: 'Middle',
+              verticalAlignment: 'Middle',
+              transformByPlatform: makeTransform({ offset: [0, -50], size: [280, 70], pivot: [0.5, 0.5] })
+            }),
+            createTextbox({
+              id: 'mode_challenge_sub',
+              name: 'SubText',
+              text: '【全域无尽深渊】',
+              fontSize: 14,
+              fontColor: parseColor('#a855f7'),
+              horizontalAlignment: 'Middle',
+              verticalAlignment: 'Middle',
+              transformByPlatform: makeTransform({ offset: [0, 18], size: [280, 28], pivot: [0.5, 0.5] })
+            }),
+            createTextbox({
+              id: 'mode_challenge_title',
+              name: 'TitleText',
+              text: '【 挑战模式 】',
+              fontSize: 24,
+              fontColor: parseColor('#94a3b8'),
+              horizontalAlignment: 'Middle',
+              verticalAlignment: 'Middle',
+              transformByPlatform: makeTransform({ offset: [0, 65], size: [280, 42], pivot: [0.5, 0.5] })
+            }),
+            createNode('image', {
+              id: 'mode_challenge_bg',
+              name: 'BtnBg',
+              imageId: 100001,
+              imageColor: parseColor('#181e2b'),
+              transformByPlatform: makeTransform({ offset: [0, 0], size: [312, 232], pivot: [0.5, 0.5] })
+            }),
+            createNode('image', {
+              id: 'mode_challenge_border',
+              name: 'BtnBorder',
+              imageId: 100001,
+              imageColor: parseColor('#475569'),
+              transformByPlatform: makeTransform({ layout: 'stretch' })
+            })
+          ]
+        }),
+
+        createTextbox({
+          id: 'mode_subtitle',
+          name: 'ModeSubtitle',
+          text: '坎瑞亚古代战争推衍棋盘 · 提瓦特元素法则战争模拟',
+          fontSize: 14,
+          fontColor: parseColor('#94a3b8'),
+          horizontalAlignment: 'Middle',
+          verticalAlignment: 'Middle',
+          transformByPlatform: makeTransform({ offset: [0, 160], size: [600, 30], pivot: [0.5, 0.5] })
+        }),
+        createTextbox({
+          id: 'mode_title',
+          name: 'ModeTitle',
+          text: '《星轨交错：地脉争锋》',
+          fontSize: 30,
+          fontColor: parseColor('#fbbf24'),
+          horizontalAlignment: 'Middle',
+          verticalAlignment: 'Middle',
+          transformByPlatform: makeTransform({ offset: [0, 210], size: [600, 50], pivot: [0.5, 0.5] })
+        }),
+        createNode('image', {
+          id: 'mode_inner_bg',
+          name: 'ModeInnerBg',
+          imageId: 100001,
+          imageColor: parseColor('#0f172a'),
+          transformByPlatform: makeTransform({ offset: [0, 0], size: [832, 512], pivot: [0.5, 0.5] })
+        }),
+        createNode('image', {
+          id: 'mode_border',
+          name: 'ModeBorder',
+          imageId: 100001,
+          imageColor: parseColor('#fbbf24'),
+          transformByPlatform: makeTransform({ layout: 'stretch' })
+        })
+      ]
+    }),
+    createNode('image', {
+      id: 'mode_mask',
+      name: 'ModeMask',
+      imageId: 100001,
+      imageColor: parseColor('#000000', 0.85),
+      transformByPlatform: makeTransform({ layout: 'stretch' })
+    })
+  ]
+});
+
+// 1. 关卡章节选择面板 ChapterSelectModal
+const chapterCardNodes = [1, 2, 3, 4, 5].map(idx => {
+  const posX = -380 + (idx - 1) * 190;
+  return createNode('button', {
+    id: `chapter_card_${idx}`,
+    name: `ChapterCard_${idx}`,
+    raycastTarget: true,
+    interactable: true,
+    transformByPlatform: makeTransform({
+      offset: [posX, 35],
+      size: [175, 230],
+      pivot: [0.5, 0.5]
+    }),
+    children: [
+      createTextbox({
+        id: `chap_tag_${idx}`,
+        name: 'TagText',
+        text: idx === 1 ? '【★ 当前选择】' : '【锁定中】',
+        fontSize: 11,
+        fontColor: parseColor(idx === 1 ? '#fbbf24' : '#64748b'),
+        horizontalAlignment: 'Middle',
+        verticalAlignment: 'Middle',
+        transformByPlatform: makeTransform({ offset: [0, -85], size: [160, 24], pivot: [0.5, 0.5] })
+      }),
+      createTextbox({
+        id: `chap_info_${idx}`,
+        name: 'InfoText',
+        text: `${Math.min(4, Math.floor((idx + 2) / 1.5))}方混战 | ${8 + idx * 2}灵穴`,
+        fontSize: 12,
+        fontColor: parseColor('#fbbf24'),
+        horizontalAlignment: 'Middle',
+        verticalAlignment: 'Middle',
+        transformByPlatform: makeTransform({ offset: [0, -35], size: [160, 24], pivot: [0.5, 0.5] })
+      }),
+      createTextbox({
+        id: `chap_budget_${idx}`,
+        name: 'BudgetText',
+        text: `权能预算: ${2 + idx * 2} 点`,
+        fontSize: 12,
+        fontColor: parseColor('#38bdf8'),
+        horizontalAlignment: 'Middle',
+        verticalAlignment: 'Middle',
+        transformByPlatform: makeTransform({ offset: [0, 5], size: [160, 24], pivot: [0.5, 0.5] })
+      }),
+      createTextbox({
+        id: `chap_title_${idx}`,
+        name: 'TitleText',
+        text: `第 ${idx} 关`,
+        fontSize: 17,
+        fontColor: parseColor(idx === 1 ? '#f8fafc' : '#94a3b8'),
+        horizontalAlignment: 'Middle',
+        verticalAlignment: 'Middle',
+        transformByPlatform: makeTransform({ offset: [0, 65], size: [160, 32], pivot: [0.5, 0.5] })
+      }),
+      createNode('image', {
+        id: `chap_bg_${idx}`,
+        name: 'CardBg',
+        imageId: 100001,
+        imageColor: parseColor(idx === 1 ? '#1e3a5f' : '#0f172a'),
+        transformByPlatform: makeTransform({ offset: [0, 0], size: [169, 224], pivot: [0.5, 0.5] })
+      }),
+      createNode('image', {
+        id: `chap_bdr_${idx}`,
+        name: 'CardBorder',
+        imageId: 100001,
+        imageColor: parseColor(idx === 1 ? '#fbbf24' : '#334155'),
+        transformByPlatform: makeTransform({ layout: 'stretch' })
+      })
+    ]
+  });
+});
+
+const chapterSelectModal = createNode('container', {
+  id: 'chapter_select_modal',
+  name: 'ChapterSelectModal',
+  visible: false,
+  transformByPlatform: makeTransform({ layout: 'stretch' }),
+  children: [
+    createNode('container', {
+      id: 'chap_box',
+      name: 'ChapBox',
+      transformByPlatform: makeTransform({
+        offset: [0, 0],
+        size: [1020, 560],
+        pivot: [0.5, 0.5]
+      }),
+      children: [
+        // 底部返回按钮
+        createNode('button', {
+          id: 'chap_back_btn',
+          name: 'ChapterBackBtn',
+          raycastTarget: true,
+          interactable: true,
+          transformByPlatform: makeTransform({
+            offset: [-180, -215],
+            size: [180, 44],
+            pivot: [0.5, 0.5]
+          }),
+          children: [
+            createTextbox({
+              id: 'chap_back_txt',
+              name: 'Text',
+              text: '【返回模式选择】',
+              fontSize: 14,
+              fontColor: parseColor('#94a3b8'),
+              horizontalAlignment: 'Middle',
+              verticalAlignment: 'Middle',
+              transformByPlatform: makeTransform({ offset: [0, 0], size: [180, 44], pivot: [0.5, 0.5] })
+            }),
+            createNode('image', {
+              id: 'chap_back_bg',
+              name: 'BtnBg',
+              imageId: 100001,
+              imageColor: parseColor('#1e293b'),
+              transformByPlatform: makeTransform({ layout: 'stretch' })
+            })
+          ]
+        }),
+
+        // 底部出征按钮
+        createNode('button', {
+          id: 'chap_start_btn',
+          name: 'ChapterStartBtn',
+          raycastTarget: true,
+          interactable: true,
+          transformByPlatform: makeTransform({
+            offset: [140, -215],
+            size: [240, 44],
+            pivot: [0.5, 0.5]
+          }),
+          children: [
+            createTextbox({
+              id: 'chap_start_txt',
+              name: 'Text',
+              text: '【启程出征 · 第 1 关】',
+              fontSize: 16,
+              fontColor: parseColor('#f8fafc'),
+              horizontalAlignment: 'Middle',
+              verticalAlignment: 'Middle',
+              transformByPlatform: makeTransform({ offset: [0, 0], size: [240, 44], pivot: [0.5, 0.5] })
+            }),
+            createNode('image', {
+              id: 'chap_start_bg',
               name: 'BtnBg',
               imageId: 100001,
               imageColor: parseColor('#0284c7'),
@@ -127,6 +397,169 @@ const settleModal = createNode('container', {
             })
           ]
         }),
+
+        // 选中章节描述详情
+        createTextbox({
+          id: 'chap_desc',
+          name: 'ChapterDesc',
+          text: '【第 1 关·启蒙·清泉流响】\n单线对冲 · 基础地脉流动新手演练\n清泉镇下汇聚着温和的地脉微粒。在此熟悉光轨铺设与驻阵固守，击溃愚人众前哨。',
+          fontSize: 13,
+          fontColor: parseColor('#e2e8f0'),
+          horizontalAlignment: 'Middle',
+          verticalAlignment: 'Middle',
+          transformByPlatform: makeTransform({ offset: [0, -130], size: [880, 60], pivot: [0.5, 0.5] })
+        }),
+
+        ...chapterCardNodes,
+
+        createTextbox({
+          id: 'chap_title',
+          name: 'ChapterTitle',
+          text: '【战役推衍 · 章节选择】',
+          fontSize: 22,
+          fontColor: parseColor('#fbbf24'),
+          horizontalAlignment: 'Middle',
+          verticalAlignment: 'Middle',
+          transformByPlatform: makeTransform({ offset: [0, 220], size: [500, 40], pivot: [0.5, 0.5] })
+        }),
+        createNode('image', {
+          id: 'chap_inner_bg',
+          name: 'ChapInnerBg',
+          imageId: 100001,
+          imageColor: parseColor('#0f172a'),
+          transformByPlatform: makeTransform({ offset: [0, 0], size: [1012, 552], pivot: [0.5, 0.5] })
+        }),
+        createNode('image', {
+          id: 'chap_border',
+          name: 'ChapBorder',
+          imageId: 100001,
+          imageColor: parseColor('#38bdf8'),
+          transformByPlatform: makeTransform({ layout: 'stretch' })
+        })
+      ]
+    }),
+    createNode('image', {
+      id: 'chap_mask',
+      name: 'ChapMask',
+      imageId: 100001,
+      imageColor: parseColor('#000000', 0.80),
+      transformByPlatform: makeTransform({ layout: 'stretch' })
+    })
+  ]
+});
+
+// 2. 终局结算弹窗 SettleModal
+const settleModal = createNode('container', {
+  id: 'settle_modal',
+  name: 'SettleModal',
+  visible: false,
+  transformByPlatform: makeTransform({ layout: 'stretch' }),
+  children: [
+    createNode('container', {
+      id: 'settle_box',
+      name: 'SettleBox',
+      transformByPlatform: makeTransform({
+        offset: [0, 0],
+        size: [680, 400],
+        pivot: [0.5, 0.5]
+      }),
+      children: [
+        // 进军下一关按钮 (胜利时呈现)
+        createNode('button', {
+          id: 'settle_next_btn',
+          name: 'SettleNextBtn',
+          raycastTarget: true,
+          interactable: true,
+          transformByPlatform: makeTransform({
+            offset: [-190, -125],
+            size: [160, 44],
+            pivot: [0.5, 0.5]
+          }),
+          children: [
+            createTextbox({
+              id: 'settle_next_txt',
+              name: 'Text',
+              text: '【进军下一关】',
+              fontSize: 14,
+              fontColor: parseColor('#f8fafc'),
+              horizontalAlignment: 'Middle',
+              verticalAlignment: 'Middle',
+              transformByPlatform: makeTransform({ offset: [0, 0], size: [160, 44], pivot: [0.5, 0.5] })
+            }),
+            createNode('image', {
+              id: 'settle_next_bg',
+              name: 'BtnBg',
+              imageId: 100001,
+              imageColor: parseColor('#0284c7'),
+              transformByPlatform: makeTransform({ layout: 'stretch' })
+            })
+          ]
+        }),
+
+        // 重新演练按钮
+        createNode('button', {
+          id: 'settle_retry_btn',
+          name: 'SettleRetryBtn',
+          raycastTarget: true,
+          interactable: true,
+          transformByPlatform: makeTransform({
+            offset: [0, -125],
+            size: [160, 44],
+            pivot: [0.5, 0.5]
+          }),
+          children: [
+            createTextbox({
+              id: 'settle_retry_txt',
+              name: 'Text',
+              text: '【重新演练】',
+              fontSize: 14,
+              fontColor: parseColor('#f8fafc'),
+              horizontalAlignment: 'Middle',
+              verticalAlignment: 'Middle',
+              transformByPlatform: makeTransform({ offset: [0, 0], size: [160, 44], pivot: [0.5, 0.5] })
+            }),
+            createNode('image', {
+              id: 'settle_retry_bg',
+              name: 'BtnBg',
+              imageId: 100001,
+              imageColor: parseColor('#1e3a5f'),
+              transformByPlatform: makeTransform({ layout: 'stretch' })
+            })
+          ]
+        }),
+
+        // 返回章节选择按钮
+        createNode('button', {
+          id: 'settle_chap_btn',
+          name: 'SettleChapterBtn',
+          raycastTarget: true,
+          interactable: true,
+          transformByPlatform: makeTransform({
+            offset: [190, -125],
+            size: [160, 44],
+            pivot: [0.5, 0.5]
+          }),
+          children: [
+            createTextbox({
+              id: 'settle_chap_txt',
+              name: 'Text',
+              text: '【章节选择】',
+              fontSize: 14,
+              fontColor: parseColor('#94a3b8'),
+              horizontalAlignment: 'Middle',
+              verticalAlignment: 'Middle',
+              transformByPlatform: makeTransform({ offset: [0, 0], size: [160, 44], pivot: [0.5, 0.5] })
+            }),
+            createNode('image', {
+              id: 'settle_chap_bg',
+              name: 'BtnBg',
+              imageId: 100001,
+              imageColor: parseColor('#334155'),
+              transformByPlatform: makeTransform({ layout: 'stretch' })
+            })
+          ]
+        }),
+
         createTextbox({
           id: 'settle_stats',
           name: 'SettleStats',
@@ -135,50 +568,34 @@ const settleModal = createNode('container', {
           fontColor: parseColor('#fbbf24'),
           horizontalAlignment: 'Middle',
           verticalAlignment: 'Middle',
-          transformByPlatform: makeTransform({
-            offset: [0, -30],
-            size: [520, 36],
-            pivot: [0.5, 0.5]
-          })
+          transformByPlatform: makeTransform({ offset: [0, -40], size: [560, 36], pivot: [0.5, 0.5] })
         }),
         createTextbox({
           id: 'settle_desc',
           name: 'SettleDesc',
-          text: '星盘之理尽在掌控，地脉灵流归于统御。',
+          text: '星盘之理尽在掌控，地脉灵流归于统御。全域敌对势力已被彻底肃清！',
           fontSize: 14,
           fontColor: parseColor('#e2e8f0'),
           horizontalAlignment: 'Middle',
           verticalAlignment: 'Middle',
-          transformByPlatform: makeTransform({
-            offset: [0, 50],
-            size: [520, 50],
-            pivot: [0.5, 0.5]
-          })
+          transformByPlatform: makeTransform({ offset: [0, 35], size: [560, 50], pivot: [0.5, 0.5] })
         }),
         createTextbox({
           id: 'settle_title',
           name: 'SettleTitle',
           text: '【推衍大捷·全域共鸣】',
-          fontSize: 22,
+          fontSize: 24,
           fontColor: parseColor('#38bdf8'),
           horizontalAlignment: 'Middle',
           verticalAlignment: 'Middle',
-          transformByPlatform: makeTransform({
-            offset: [0, 120],
-            size: [500, 44],
-            pivot: [0.5, 0.5]
-          })
+          transformByPlatform: makeTransform({ offset: [0, 125], size: [520, 44], pivot: [0.5, 0.5] })
         }),
         createNode('image', {
           id: 'settle_inner_bg',
           name: 'SettleInnerBg',
           imageId: 100001,
           imageColor: parseColor('#0f172a'),
-          transformByPlatform: makeTransform({
-            offset: [0, 0],
-            size: [634, 374],
-            pivot: [0.5, 0.5]
-          })
+          transformByPlatform: makeTransform({ offset: [0, 0], size: [672, 392], pivot: [0.5, 0.5] })
         }),
         createNode('image', {
           id: 'settle_border',
@@ -189,7 +606,6 @@ const settleModal = createNode('container', {
         })
       ]
     }),
-    // 半透明背景遮罩
     createNode('image', {
       id: 'settle_mask',
       name: 'SettleMask',
@@ -200,7 +616,7 @@ const settleModal = createNode('container', {
   ]
 });
 
-// 2. 战前调配弹窗 PrepareModal
+// 3. 战前调配弹窗 PrepareModal
 const prepCardNodes = POOL_CARDS.map((card, idx) => {
   const col = idx % 3;
   const row = Math.floor(idx / 3);
@@ -221,16 +637,12 @@ const prepCardNodes = POOL_CARDS.map((card, idx) => {
       createTextbox({
         id: `prep_check_${card.id}`,
         name: 'CheckTag',
-        text: idx < 3 ? '【✓ 已装配】' : '【点击装配】',
+        text: idx < 2 ? '【✓ 已装配】' : '【点击装配】',
         fontSize: 11,
-        fontColor: parseColor(idx < 3 ? '#fbbf24' : '#64748b'),
+        fontColor: parseColor(idx < 2 ? '#fbbf24' : '#64748b'),
         horizontalAlignment: 'Right',
         verticalAlignment: 'Middle',
-        transformByPlatform: makeTransform({
-          offset: [45, 24],
-          size: [90, 24],
-          pivot: [0.5, 0.5]
-        })
+        transformByPlatform: makeTransform({ offset: [45, 24], size: [90, 24], pivot: [0.5, 0.5] })
       }),
       createTextbox({
         id: `prep_cost_${card.id}`,
@@ -240,11 +652,7 @@ const prepCardNodes = POOL_CARDS.map((card, idx) => {
         fontColor: parseColor('#fbbf24'),
         horizontalAlignment: 'Middle',
         verticalAlignment: 'Middle',
-        transformByPlatform: makeTransform({
-          offset: [0, -28],
-          size: [180, 24],
-          pivot: [0.5, 0.5]
-        })
+        transformByPlatform: makeTransform({ offset: [0, -28], size: [180, 24], pivot: [0.5, 0.5] })
       }),
       createTextbox({
         id: `prep_desc_${card.id}`,
@@ -254,47 +662,31 @@ const prepCardNodes = POOL_CARDS.map((card, idx) => {
         fontColor: parseColor('#94a3b8'),
         horizontalAlignment: 'Middle',
         verticalAlignment: 'Middle',
-        transformByPlatform: makeTransform({
-          offset: [0, -4],
-          size: [180, 28],
-          pivot: [0.5, 0.5]
-        })
+        transformByPlatform: makeTransform({ offset: [0, -4], size: [180, 28], pivot: [0.5, 0.5] })
       }),
       createTextbox({
         id: `prep_name_${card.id}`,
         name: 'NameText',
         text: card.name,
         fontSize: 14,
-        fontColor: parseColor(idx < 3 ? '#f8fafc' : '#94a3b8'),
+        fontColor: parseColor(idx < 2 ? '#f8fafc' : '#94a3b8'),
         horizontalAlignment: 'Left',
         verticalAlignment: 'Middle',
-        transformByPlatform: makeTransform({
-          offset: [-30, 24],
-          size: [110, 28],
-          pivot: [0.5, 0.5]
-        })
+        transformByPlatform: makeTransform({ offset: [-30, 24], size: [110, 28], pivot: [0.5, 0.5] })
       }),
       createNode('image', {
         id: `prep_cbg_${card.id}`,
         name: 'CardBg',
         imageId: 100001,
-        imageColor: parseColor(idx < 3 ? '#1e3a5f' : '#0f172a'),
-        transformByPlatform: makeTransform({
-          offset: [0, 0],
-          size: [194, 90],
-          pivot: [0.5, 0.5]
-        })
+        imageColor: parseColor(idx < 2 ? '#1e3a5f' : '#0f172a'),
+        transformByPlatform: makeTransform({ offset: [0, 0], size: [194, 90], pivot: [0.5, 0.5] })
       }),
       createNode('image', {
         id: `prep_cbdr_${card.id}`,
         name: 'CardBorder',
         imageId: 100001,
-        imageColor: parseColor(idx < 3 ? '#fbbf24' : '#475569'),
-        transformByPlatform: makeTransform({
-          offset: [0, 0],
-          size: [200, 96],
-          pivot: [0.5, 0.5]
-        })
+        imageColor: parseColor(idx < 2 ? '#fbbf24' : '#475569'),
+        transformByPlatform: makeTransform({ offset: [0, 0], size: [200, 96], pivot: [0.5, 0.5] })
       })
     ]
   });
@@ -334,11 +726,7 @@ const prepareModal = createNode('container', {
               fontColor: parseColor('#f8fafc'),
               horizontalAlignment: 'Middle',
               verticalAlignment: 'Middle',
-              transformByPlatform: makeTransform({
-                offset: [0, 0],
-                size: [220, 46],
-                pivot: [0.5, 0.5]
-              })
+              transformByPlatform: makeTransform({ offset: [0, 0], size: [220, 46], pivot: [0.5, 0.5] })
             }),
             createNode('image', {
               id: 'prep_start_bg',
@@ -353,30 +741,22 @@ const prepareModal = createNode('container', {
         createTextbox({
           id: 'prep_hint',
           name: 'PrepHint',
-          text: '已预装核心卡组：千风庇护(2点) + 千风湍流(3点) + 轰轰烈焰(4点)',
+          text: '已选符印：千风庇护(2点)',
           fontSize: 13,
           fontColor: parseColor('#94a3b8'),
           horizontalAlignment: 'Middle',
           verticalAlignment: 'Middle',
-          transformByPlatform: makeTransform({
-            offset: [0, 95],
-            size: [600, 28],
-            pivot: [0.5, 0.5]
-          })
+          transformByPlatform: makeTransform({ offset: [0, 95], size: [600, 28], pivot: [0.5, 0.5] })
         }),
         createTextbox({
           id: 'prep_budget_txt',
           name: 'PrepBudgetText',
-          text: '当前调配权能预算：9 / 12 点',
+          text: '当前调配权能预算：2 / 4 点',
           fontSize: 15,
           fontColor: parseColor('#38bdf8'),
           horizontalAlignment: 'Middle',
           verticalAlignment: 'Middle',
-          transformByPlatform: makeTransform({
-            offset: [0, 130],
-            size: [400, 32],
-            pivot: [0.5, 0.5]
-          })
+          transformByPlatform: makeTransform({ offset: [0, 130], size: [400, 32], pivot: [0.5, 0.5] })
         }),
         createTextbox({
           id: 'prep_title',
@@ -386,22 +766,14 @@ const prepareModal = createNode('container', {
           fontColor: parseColor('#fbbf24'),
           horizontalAlignment: 'Middle',
           verticalAlignment: 'Middle',
-          transformByPlatform: makeTransform({
-            offset: [0, 175],
-            size: [400, 40],
-            pivot: [0.5, 0.5]
-          })
+          transformByPlatform: makeTransform({ offset: [0, 175], size: [400, 40], pivot: [0.5, 0.5] })
         }),
         createNode('image', {
           id: 'prep_inner_bg',
           name: 'PrepInnerBg',
           imageId: 100001,
           imageColor: parseColor('#0f172a'),
-          transformByPlatform: makeTransform({
-            offset: [0, 0],
-            size: [754, 454],
-            pivot: [0.5, 0.5]
-          })
+          transformByPlatform: makeTransform({ offset: [0, 0], size: [754, 454], pivot: [0.5, 0.5] })
         }),
         createNode('image', {
           id: 'prep_border',
@@ -422,11 +794,11 @@ const prepareModal = createNode('container', {
   ]
 });
 
-// 3. 剧情弹窗 DialogueModal (开局处于激活呈现状态)
+// 4. 剧情弹窗 DialogueModal
 const dialogueModal = createNode('container', {
   id: 'dialogue_modal',
   name: 'DialogueModal',
-  visible: true,
+  visible: false,
   transformByPlatform: makeTransform({ layout: 'stretch' }),
   children: [
     createNode('container', {
@@ -457,11 +829,7 @@ const dialogueModal = createNode('container', {
               fontColor: parseColor('#94a3b8'),
               horizontalAlignment: 'Middle',
               verticalAlignment: 'Middle',
-              transformByPlatform: makeTransform({
-                offset: [0, 0],
-                size: [88, 34],
-                pivot: [0.5, 0.5]
-              })
+              transformByPlatform: makeTransform({ offset: [0, 0], size: [88, 34], pivot: [0.5, 0.5] })
             }),
             createNode('image', {
               id: 'dlg_skip_bg',
@@ -491,11 +859,7 @@ const dialogueModal = createNode('container', {
               fontColor: parseColor('#38bdf8'),
               horizontalAlignment: 'Middle',
               verticalAlignment: 'Middle',
-              transformByPlatform: makeTransform({
-                offset: [0, 0],
-                size: [88, 34],
-                pivot: [0.5, 0.5]
-              })
+              transformByPlatform: makeTransform({ offset: [0, 0], size: [88, 34], pivot: [0.5, 0.5] })
             }),
             createNode('image', {
               id: 'dlg_next_bg',
@@ -509,16 +873,12 @@ const dialogueModal = createNode('container', {
         createTextbox({
           id: 'dlg_content',
           name: 'DlgContent',
-          text: '哇！阿贝多，这个泛着蓝光的大圆盘是什么呀？\\n上面亮晶晶的小圆点，看起来好像……会发光的甜甜花糖豆！',
+          text: '哇！阿贝多，这个泛着蓝光的大圆盘是什么呀？\n上面亮晶晶的小圆点，看起来好像……会发光的甜甜花糖豆！',
           fontSize: 15,
           fontColor: parseColor('#f8fafc'),
           horizontalAlignment: 'Left',
           verticalAlignment: 'Top',
-          transformByPlatform: makeTransform({
-            offset: [0, -6],
-            size: [820, 72],
-            pivot: [0.5, 0.5]
-          })
+          transformByPlatform: makeTransform({ offset: [0, -6], size: [820, 72], pivot: [0.5, 0.5] })
         }),
         createTextbox({
           id: 'dlg_speaker',
@@ -528,22 +888,14 @@ const dialogueModal = createNode('container', {
           fontColor: parseColor('#fbbf24'),
           horizontalAlignment: 'Left',
           verticalAlignment: 'Middle',
-          transformByPlatform: makeTransform({
-            offset: [-300, 48],
-            size: [220, 36],
-            pivot: [0.5, 0.5]
-          })
+          transformByPlatform: makeTransform({ offset: [-300, 48], size: [220, 36], pivot: [0.5, 0.5] })
         }),
         createNode('image', {
           id: 'dlg_inner_bg',
           name: 'DlgInnerBg',
           imageId: 100001,
           imageColor: parseColor('#0f172a'),
-          transformByPlatform: makeTransform({
-            offset: [0, 0],
-            size: [874, 164],
-            pivot: [0.5, 0.5]
-          })
+          transformByPlatform: makeTransform({ offset: [0, 0], size: [874, 164], pivot: [0.5, 0.5] })
         }),
         createNode('image', {
           id: 'dlg_border',
@@ -564,7 +916,7 @@ const dialogueModal = createNode('container', {
   ]
 });
 
-// 4. 顶部 HUD 与底部符印栏 HudLayer
+// 5. 顶部 HUD 与底部符印栏 HudLayer
 const cardSlots = [1, 2, 3, 4].map(idx => {
   const offsetX = -210 + (idx - 1) * 140;
   return createNode('button', {
@@ -587,11 +939,7 @@ const cardSlots = [1, 2, 3, 4].map(idx => {
         fontColor: parseColor('#f8fafc'),
         horizontalAlignment: 'Middle',
         verticalAlignment: 'Middle',
-        transformByPlatform: makeTransform({
-          offset: [0, 0],
-          size: [120, 76],
-          pivot: [0.5, 0.5]
-        })
+        transformByPlatform: makeTransform({ offset: [0, 0], size: [120, 76], pivot: [0.5, 0.5] })
       }),
       createNode('image', {
         id: `card_cd_mask_${idx}`,
@@ -599,11 +947,7 @@ const cardSlots = [1, 2, 3, 4].map(idx => {
         visible: false,
         imageId: 100001,
         imageColor: parseColor('#000000', 0.75),
-        transformByPlatform: makeTransform({
-          offset: [0, 0],
-          size: [120, 76],
-          pivot: [0.5, 0.5]
-        })
+        transformByPlatform: makeTransform({ offset: [0, 0], size: [120, 76], pivot: [0.5, 0.5] })
       }),
       createTextbox({
         id: `card_cost_${idx}`,
@@ -613,11 +957,7 @@ const cardSlots = [1, 2, 3, 4].map(idx => {
         fontColor: parseColor('#fbbf24'),
         horizontalAlignment: 'Middle',
         verticalAlignment: 'Middle',
-        transformByPlatform: makeTransform({
-          offset: [0, -16],
-          size: [120, 24],
-          pivot: [0.5, 0.5]
-        })
+        transformByPlatform: makeTransform({ offset: [0, -16], size: [120, 24], pivot: [0.5, 0.5] })
       }),
       createTextbox({
         id: `card_name_${idx}`,
@@ -627,22 +967,14 @@ const cardSlots = [1, 2, 3, 4].map(idx => {
         fontColor: parseColor('#f8fafc'),
         horizontalAlignment: 'Middle',
         verticalAlignment: 'Middle',
-        transformByPlatform: makeTransform({
-          offset: [0, 14],
-          size: [120, 28],
-          pivot: [0.5, 0.5]
-        })
+        transformByPlatform: makeTransform({ offset: [0, 14], size: [120, 28], pivot: [0.5, 0.5] })
       }),
       createNode('image', {
         id: `card_inner_bg_${idx}`,
         name: 'Bg',
         imageId: 100001,
         imageColor: parseColor('#1e293b'),
-        transformByPlatform: makeTransform({
-          offset: [0, 0],
-          size: [120, 76],
-          pivot: [0.5, 0.5]
-        })
+        transformByPlatform: makeTransform({ offset: [0, 0], size: [120, 76], pivot: [0.5, 0.5] })
       }),
       createNode('image', {
         id: `card_border_${idx}`,
@@ -660,7 +992,6 @@ const hudLayer = createNode('container', {
   name: 'HudLayer',
   transformByPlatform: makeTransform({ layout: 'stretch' }),
   children: [
-    // Toast 浮动提示
     createNode('container', {
       id: 'toast_container',
       name: 'ToastContainer',
@@ -679,22 +1010,14 @@ const hudLayer = createNode('container', {
           fontColor: parseColor('#fbbf24'),
           horizontalAlignment: 'Middle',
           verticalAlignment: 'Middle',
-          transformByPlatform: makeTransform({
-            offset: [0, 0],
-            size: [516, 32],
-            pivot: [0.5, 0.5]
-          })
+          transformByPlatform: makeTransform({ offset: [0, 0], size: [516, 32], pivot: [0.5, 0.5] })
         }),
         createNode('image', {
           id: 'toast_inner_bg',
           name: 'ToastBg',
           imageId: 100001,
           imageColor: parseColor('#0f172a'),
-          transformByPlatform: makeTransform({
-            offset: [0, 0],
-            size: [516, 32],
-            pivot: [0.5, 0.5]
-          })
+          transformByPlatform: makeTransform({ offset: [0, 0], size: [516, 32], pivot: [0.5, 0.5] })
         }),
         createNode('image', {
           id: 'toast_border',
@@ -705,7 +1028,6 @@ const hudLayer = createNode('container', {
         })
       ]
     }),
-    // 底部符印栏
     createNode('container', {
       id: 'card_bar',
       name: 'CardBar',
@@ -716,7 +1038,6 @@ const hudLayer = createNode('container', {
       }),
       children: cardSlots
     }),
-    // 顶部优势条与倒计时
     createNode('container', {
       id: 'hud_top_bar',
       name: 'HudTopBar',
@@ -734,25 +1055,17 @@ const hudLayer = createNode('container', {
           fontColor: parseColor('#38bdf8'),
           horizontalAlignment: 'Left',
           verticalAlignment: 'Middle',
-          transformByPlatform: makeTransform({
-            offset: [-200, 6],
-            size: [200, 28],
-            pivot: [0.5, 0.5]
-          })
+          transformByPlatform: makeTransform({ offset: [-200, 6], size: [200, 28], pivot: [0.5, 0.5] })
         }),
         createTextbox({
           id: 'hud_timer',
           name: 'HudTimer',
-          text: '06:00',
+          text: '03:00',
           fontSize: 18,
           fontColor: parseColor('#f8fafc'),
           horizontalAlignment: 'Middle',
           verticalAlignment: 'Middle',
-          transformByPlatform: makeTransform({
-            offset: [0, 6],
-            size: [140, 30],
-            pivot: [0.5, 0.5]
-          })
+          transformByPlatform: makeTransform({ offset: [0, 6], size: [140, 30], pivot: [0.5, 0.5] })
         }),
         createTextbox({
           id: 'hud_enemy_pct',
@@ -762,55 +1075,35 @@ const hudLayer = createNode('container', {
           fontColor: parseColor('#f43f5e'),
           horizontalAlignment: 'Right',
           verticalAlignment: 'Middle',
-          transformByPlatform: makeTransform({
-            offset: [200, 6],
-            size: [200, 28],
-            pivot: [0.5, 0.5]
-          })
+          transformByPlatform: makeTransform({ offset: [200, 6], size: [200, 28], pivot: [0.5, 0.5] })
         }),
         createNode('image', {
           id: 'bar_player',
           name: 'BarPlayer',
           imageId: 100001,
           imageColor: parseColor('#38bdf8'),
-          transformByPlatform: makeTransform({
-            offset: [-310, -18],
-            size: [160, 6],
-            pivot: [0, 0.5]
-          })
+          transformByPlatform: makeTransform({ offset: [-310, -18], size: [160, 6], pivot: [0, 0.5] })
         }),
         createNode('image', {
           id: 'bar_enemy',
           name: 'BarEnemy',
           imageId: 100001,
           imageColor: parseColor('#f43f5e'),
-          transformByPlatform: makeTransform({
-            offset: [310, -18],
-            size: [160, 6],
-            pivot: [1, 0.5]
-          })
+          transformByPlatform: makeTransform({ offset: [310, -18], size: [160, 6], pivot: [1, 0.5] })
         }),
         createNode('image', {
           id: 'bar_track',
           name: 'BarTrack',
           imageId: 100001,
           imageColor: parseColor('#334155'),
-          transformByPlatform: makeTransform({
-            offset: [0, -18],
-            size: [620, 6],
-            pivot: [0.5, 0.5]
-          })
+          transformByPlatform: makeTransform({ offset: [0, -18], size: [620, 6], pivot: [0.5, 0.5] })
         }),
         createNode('image', {
           id: 'hud_inner_bg',
           name: 'HudBg',
           imageId: 100001,
           imageColor: parseColor('#0f172a'),
-          transformByPlatform: makeTransform({
-            offset: [0, 0],
-            size: [636, 42],
-            pivot: [0.5, 0.5]
-          })
+          transformByPlatform: makeTransform({ offset: [0, 0], size: [636, 42], pivot: [0.5, 0.5] })
         }),
         createNode('image', {
           id: 'hud_border',
@@ -824,7 +1117,7 @@ const hudLayer = createNode('container', {
   ]
 });
 
-// 5. 全屏光标输入检测层 GlobalCursorArea
+// 6. 全屏光标输入检测层 GlobalCursorArea
 const globalCursorArea = createNode('cursor', {
   id: 'global_cursor_area',
   name: 'GlobalCursorArea',
@@ -832,7 +1125,7 @@ const globalCursorArea = createNode('cursor', {
   transformByPlatform: makeTransform({ layout: 'stretch' })
 });
 
-// 6. 拖拽引导虚线 DragLine (使用 anchor: [0, 0])
+// 7. 拖拽引导虚线 DragLine
 const dragLine = createNode('image', {
   id: 'drag_line',
   name: 'DragLine',
@@ -847,23 +1140,22 @@ const dragLine = createNode('image', {
   })
 });
 
-// 7. 地脉灵穴层 NodesLayer (5 个地脉节点，使用 anchor: [0, 0])
-const nodeGroups = NODES_DEF.map(n => {
-  const factionColor = n.faction === 'player' ? '#38bdf8' : (n.faction === 'enemy' ? '#f43f5e' : '#94a3b8');
-  const anomText = n.anom === 'AMBER_MINE' ? '【石珀晶矿】' : (n.anom === 'WIND_FLOW' ? '【疾风流道】' : (n.anom === 'MIST_RUINS' ? '【迷雾荒墟】' : ''));
-
-  return createNode('container', {
-    id: `node_grp_${n.id}`,
-    name: `NodeGroup_${n.id}`,
+// 8. 地脉灵穴层 NodesLayer (18 个全量对象池 NodeGroup_0 ~ NodeGroup_17)
+const nodeGroups = [];
+for (let i = 0; i < 18; i++) {
+  nodeGroups.push(createNode('container', {
+    id: `node_grp_${i}`,
+    name: `NodeGroup_${i}`,
+    visible: i < 10, // 初始第1关10个可见
     transformByPlatform: makeTransform({
       anchor: [0, 0],
-      offset: [n.x, n.y],
-      size: [n.r * 2, n.r * 2],
+      offset: [200 + i * 60, 450],
+      size: [76, 76],
       pivot: [0.5, 0.5]
     }),
     children: [
       createTextbox({
-        id: `status_txt_${n.id}`,
+        id: `status_txt_${i}`,
         name: 'StatusText',
         text: '[驻阵固守]',
         visible: false,
@@ -871,98 +1163,67 @@ const nodeGroups = NODES_DEF.map(n => {
         fontColor: parseColor('#fbbf24'),
         horizontalAlignment: 'Middle',
         verticalAlignment: 'Middle',
-        transformByPlatform: makeTransform({
-          offset: [0, -(n.r + 14)],
-          size: [150, 26],
-          pivot: [0.5, 0.5]
-        })
+        transformByPlatform: makeTransform({ offset: [0, -50], size: [150, 26], pivot: [0.5, 0.5] })
       }),
       createTextbox({
-        id: `anom_txt_${n.id}`,
+        id: `anom_txt_${i}`,
         name: 'AnomalyText',
-        text: anomText,
-        visible: Boolean(anomText),
+        text: '',
+        visible: false,
         fontSize: 12,
         fontColor: parseColor('#fbbf24'),
         horizontalAlignment: 'Middle',
         verticalAlignment: 'Middle',
-        transformByPlatform: makeTransform({
-          offset: [0, n.r + 14],
-          size: [130, 24],
-          pivot: [0.5, 0.5]
-        })
+        transformByPlatform: makeTransform({ offset: [0, 50], size: [130, 24], pivot: [0.5, 0.5] })
       }),
       createTextbox({
-        id: `part_txt_${n.id}`,
+        id: `part_txt_${i}`,
         name: 'ParticleText',
-        text: `兵力: ${n.parts}`,
-        fontSize: 15,
-        fontColor: parseColor('#f8fafc'),
-        horizontalAlignment: 'Middle',
-        verticalAlignment: 'Middle',
-        transformByPlatform: makeTransform({
-          offset: [0, -10],
-          size: [140, 32],
-          pivot: [0.5, 0.5]
-        })
-      }),
-      createTextbox({
-        id: `title_txt_${n.id}`,
-        name: 'TitleText',
-        text: `${n.name} (${n.parts})`,
+        text: '兵力: 0',
         fontSize: 14,
         fontColor: parseColor('#f8fafc'),
         horizontalAlignment: 'Middle',
         verticalAlignment: 'Middle',
-        transformByPlatform: makeTransform({
-          offset: [0, 14],
-          size: [140, 28],
-          pivot: [0.5, 0.5]
-        })
+        transformByPlatform: makeTransform({ offset: [0, -10], size: [140, 30], pivot: [0.5, 0.5] })
       }),
-      // 固守/免伤金环 (使用 ring 图元 100006)
+      createTextbox({
+        id: `title_txt_${i}`,
+        name: 'TitleText',
+        text: `灵穴 ${i}`,
+        fontSize: 13,
+        fontColor: parseColor('#f8fafc'),
+        horizontalAlignment: 'Middle',
+        verticalAlignment: 'Middle',
+        transformByPlatform: makeTransform({ offset: [0, 14], size: [140, 28], pivot: [0.5, 0.5] })
+      }),
       createNode('image', {
-        id: `defense_ring_${n.id}`,
+        id: `defense_ring_${i}`,
         name: 'DefenseRing',
         visible: false,
         imageId: 100006,
         imageColor: parseColor('#fbbf24'),
-        transformByPlatform: makeTransform({
-          offset: [0, 0],
-          size: [n.r * 2 + 12, n.r * 2 + 12],
-          pivot: [0.5, 0.5]
-        })
+        transformByPlatform: makeTransform({ offset: [0, 0], size: [88, 88], pivot: [0.5, 0.5] })
       }),
-      // 共鸣外环 (使用 circle 100002 + Radial360 填充)
       createNode('image', {
-        id: `res_ring_${n.id}`,
+        id: `res_ring_${i}`,
         name: 'ResonanceRing',
         imageId: 100002,
-        imageColor: parseColor(factionColor),
+        imageColor: parseColor('#38bdf8'),
         enableFill: true,
         fillType: 'Radial360',
-        fillAmount: n.ctrl / 100,
-        transformByPlatform: makeTransform({
-          offset: [0, 0],
-          size: [n.r * 2, n.r * 2],
-          pivot: [0.5, 0.5]
-        })
+        fillAmount: 1.0,
+        transformByPlatform: makeTransform({ offset: [0, 0], size: [76, 76], pivot: [0.5, 0.5] })
       }),
-      // 灵穴底盘 (使用 circle 100002)
       createNode('image', {
-        id: `base_disc_${n.id}`,
+        id: `base_disc_${i}`,
         name: 'BaseDisc',
         imageId: 100002,
         imageColor: parseColor('#0f172a'),
-        transformByPlatform: makeTransform({
-          offset: [0, 0],
-          size: [n.r * 2, n.r * 2],
-          pivot: [0.5, 0.5]
-        })
+        transformByPlatform: makeTransform({ offset: [0, 0], size: [76, 76], pivot: [0.5, 0.5] })
       })
     ]
-  });
-});
+  }));
+}
 
 const nodesLayer = createNode('container', {
   id: 'nodes_layer',
@@ -971,9 +1232,9 @@ const nodesLayer = createNode('container', {
   children: nodeGroups
 });
 
-// 8. 微粒精灵池 ParticlesLayer (80 个微粒，使用 circle 100002 与 anchor: [0, 0])
+// 9. 微粒精灵池 ParticlesLayer (120 个微粒对象池 P_1 ~ P_120)
 const particleChildren = [];
-for (let i = 1; i <= 80; i++) {
+for (let i = 1; i <= 120; i++) {
   particleChildren.push(createNode('image', {
     id: `p_${i}`,
     name: `P_${i}`,
@@ -996,10 +1257,9 @@ const particlesLayer = createNode('container', {
   children: particleChildren
 });
 
-// 9. 光轨拓扑层 LinksLayer (动态航线与静态连线，使用 rect 100001 与 anchor: [0, 0])
+// 10. 光轨拓扑层 LinksLayer (25 条动态流道 + 45 条静态底轨)
 const linkChildren = [];
-// 10 条动态流动光轨
-for (let i = 1; i <= 10; i++) {
+for (let i = 1; i <= 25; i++) {
   linkChildren.push(createNode('image', {
     id: `route_line_${i}`,
     name: `RouteLine_${i}`,
@@ -1014,29 +1274,21 @@ for (let i = 1; i <= 10; i++) {
     })
   }));
 }
-// 7 条静态拓扑底轨
-LINKS_DEF.forEach(([fromId, toId], idx) => {
-  const nA = NODES_DEF[fromId];
-  const nB = NODES_DEF[toId];
-  const dx = nB.x - nA.x;
-  const dy = nB.y - nA.y;
-  const dist = Math.hypot(dx, dy);
-  const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-
+for (let i = 0; i < 45; i++) {
   linkChildren.push(createNode('image', {
-    id: `static_link_${idx}`,
-    name: `StaticLink_${idx}`,
+    id: `static_link_${i}`,
+    name: `StaticLink_${i}`,
+    visible: false,
     imageId: 100001,
     imageColor: parseColor('#334155'),
     transformByPlatform: makeTransform({
       anchor: [0, 0],
-      offset: [nA.x, nA.y],
-      size: [dist, 2],
-      pivot: [0, 0.5],
-      rotationZ: angle
+      offset: [0, 0],
+      size: [100, 2],
+      pivot: [0, 0.5]
     })
   }));
-});
+}
 
 const linksLayer = createNode('container', {
   id: 'links_layer',
@@ -1045,7 +1297,7 @@ const linksLayer = createNode('container', {
   children: linkChildren
 });
 
-// 10. 宇宙星盘底图 BgImage (最底层)
+// 11. 宇宙星盘底图 BgImage (最底层)
 const bgImage = createNode('image', {
   id: 'bg_image',
   name: 'BgImage',
@@ -1056,6 +1308,8 @@ const bgImage = createNode('image', {
 
 // 组装 GameRoot (同级子节点从前到后排序：顶层在前，底层在后)
 const gameRootChildren = [
+  modeSelectModal,
+  chapterSelectModal,
   settleModal,
   prepareModal,
   dialogueModal,

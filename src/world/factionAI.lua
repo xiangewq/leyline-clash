@@ -1,5 +1,5 @@
 -- src/world/factionAI.lua
--- 坎瑞亚遗迹推衍机（智能敌对 AI 调度逻辑）
+-- 坎瑞亚遗迹推衍机（多阵营全员大乱斗 AI 智能调度与争端决策）
 
 local StarMap = require("default_import_file/src/world/starMap") or require("src/world/starMap")
 
@@ -15,22 +15,23 @@ function FactionAI.Update(dt, nodes, routeManager)
     end
     FactionAI.aiTimer = 0
 
-    -- 遍历所有敌方节点
+    -- 遍历所有非玩家、非中立的敌对势力节点 (enemy_red / enemy_purple / enemy_green / enemy)
     for _, eNode in ipairs(nodes) do
-        if eNode.faction == "enemy" then
+        local fac = eNode.faction
+        if fac ~= "player" and fac ~= "neutral" then
             if eNode.particles > 12 and eNode.routeTo == nil then
-                -- 兵力充足且未外调：寻找邻近中立或玩家灵穴推进
+                -- 兵力充足且未外调：寻找邻近非本阵营领地（包括中立、玩家及其他敌对势力）
                 local neighbors = StarMap.GetNeighbors(eNode.id)
                 local targets = {}
                 for _, nId in ipairs(neighbors) do
                     local n = nodes[nId + 1]
-                    if n and n.faction ~= "enemy" then
+                    if n and n.faction ~= fac then
                         table.insert(targets, n)
                     end
                 end
 
                 if #targets > 0 then
-                    -- 优先夺取中立灵穴，其次进攻弱势玩家据点
+                    -- 优先级：优先夺取中立薄弱灵穴，其次进攻弱势敌对/玩家据点
                     table.sort(targets, function(a, b)
                         if a.faction == "neutral" and b.faction ~= "neutral" then
                             return true
@@ -42,7 +43,7 @@ function FactionAI.Update(dt, nodes, routeManager)
                     end)
 
                     local chosen = targets[1]
-                    routeManager.SetRoute(eNode.id, chosen.id, "enemy", nodes)
+                    routeManager.SetRoute(eNode.id, chosen.id, fac, nodes)
                 end
 
             elseif eNode.particles < 5 and eNode.routeTo ~= nil then

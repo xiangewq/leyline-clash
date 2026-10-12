@@ -43,7 +43,7 @@ function HudView.UpdateTopBar(timeRemaining, nodes, playerPctCtrl, enemyPctCtrl,
         if n.faction == "player" then
             pNodes = pNodes + 1
             pParticles = pParticles + n.particles
-        elseif n.faction == "enemy" then
+        elseif n.faction ~= "neutral" then
             eNodes = eNodes + 1
             eParticles = eParticles + n.particles
         end
@@ -80,9 +80,13 @@ function HudView.UpdateTopBar(timeRemaining, nodes, playerPctCtrl, enemyPctCtrl,
 end
 
 -- 显示终局结算
-function HudView.ShowSettlement(isWin, nodes, elapsedTime, modalCtrl, titleCtrl, descCtrl, statsCtrl)
+function HudView.ShowSettlement(isWin, nodes, elapsedTime, modalCtrl, titleCtrl, descCtrl, statsCtrl, nextBtnCtrl)
     HudView.isSettled = true
     Layout.SetVisible(modalCtrl, true)
+
+    if nextBtnCtrl and nextBtnCtrl.alive then
+        Layout.SetVisible(nextBtnCtrl, isWin)
+    end
 
     local pCount = 0
     local pParts = 0

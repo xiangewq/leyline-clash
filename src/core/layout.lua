@@ -71,8 +71,12 @@ Layout.PALETTE = {
     PANEL_BG     = Layout.MakeColor(15, 23, 42, 235),
     PLAYER       = Layout.MakeColor(56, 189, 248, 255),   -- 提瓦特天青蓝 #38bdf8
     PLAYER_GLOW  = Layout.MakeColor(56, 189, 248, 102),
-    ENEMY        = Layout.MakeColor(244, 63, 94, 255),    -- 侵蚀猩红 #f43f5e
+    ENEMY        = Layout.MakeColor(244, 63, 94, 255),    -- 侵蚀猩红 #f43f5e (敌方1/愚人众)
     ENEMY_GLOW   = Layout.MakeColor(244, 63, 94, 102),
+    ENEMY_PURPLE = Layout.MakeColor(168, 85, 247, 255),   -- 深渊暗紫 #a855f7 (敌方2/盗宝团)
+    ENEMY_PURPLE_GLOW = Layout.MakeColor(168, 85, 247, 102),
+    ENEMY_GREEN  = Layout.MakeColor(16, 185, 129, 255),   -- 苍翠机体 #10b981 (敌方3/遗迹机关)
+    ENEMY_GREEN_GLOW  = Layout.MakeColor(16, 185, 129, 102),
     NEUTRAL      = Layout.MakeColor(148, 163, 184, 255),  -- 远古银岩灰 #94a3b8
     GOLD         = Layout.MakeColor(251, 191, 36, 255),   -- 固守金岩 #fbbf24
     GOLD_ALPHA   = Layout.MakeColor(251, 191, 36, 191),
@@ -86,10 +90,28 @@ Layout.PALETTE = {
 function Layout.GetFactionColor(faction)
     if faction == "player" then
         return Layout.PALETTE.PLAYER
-    elseif faction == "enemy" then
+    elseif faction == "enemy" or faction == "enemy_red" then
         return Layout.PALETTE.ENEMY
+    elseif faction == "enemy_purple" then
+        return Layout.PALETTE.ENEMY_PURPLE
+    elseif faction == "enemy_green" then
+        return Layout.PALETTE.ENEMY_GREEN
     else
         return Layout.PALETTE.NEUTRAL
+    end
+end
+
+function Layout.GetFactionName(faction)
+    if faction == "player" then
+        return "西风骑士"
+    elseif faction == "enemy" or faction == "enemy_red" then
+        return "愚人众"
+    elseif faction == "enemy_purple" then
+        return "盗宝团"
+    elseif faction == "enemy_green" then
+        return "遗迹机关"
+    else
+        return "中立"
     end
 end
 

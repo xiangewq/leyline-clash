@@ -9,6 +9,7 @@ const OUT_FILE = '/opt/starlink/src/bundle.lua';
 const modules = [
   'data/balanceConfig',
   'data/cardRegistry',
+  'data/chapterConfig',
   'core/layout',
   'core/runtime',
   'core/input',
@@ -23,6 +24,8 @@ const modules = [
   'ui/prepareView',
   'ui/hudView',
   'ui/cardBar',
+  'ui/modeSelectView',
+  'ui/chapterSelectView',
 ];
 
 let bundle = `-- src/bundle.lua: Consolidated standalone bundle for Miliastra UGC
