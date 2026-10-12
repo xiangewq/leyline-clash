@@ -42,14 +42,14 @@ function parseColor(str, alpha = 1.0) {
   return 0xffffffff;
 }
 
-// 6 备选战术卡 (对齐 CardRegistry 17种战术符印体系)
+// 6 备选战术卡 (按消耗权能升序排列：2点 -> 2点 -> 3点 -> 4点 -> 4点 -> 5点)
 const POOL_CARDS = [
-  { id: 1, key: 'anemo_shield', name: '千风庇护', cost: 2, desc: '加持免伤结界' },
-  { id: 2, key: 'anemo_turb', name: '千风湍流', cost: 3, desc: '流道速度翻倍' },
-  { id: 3, key: 'pyro_blast', name: '轰轰烈焰', cost: 4, desc: '消灭80%敌方微粒' },
-  { id: 4, key: 'hydro_bribe', name: '摩拉律法', cost: 5, desc: '秒占中立灵穴' },
-  { id: 5, key: 'geo_wall', name: '坚岩重嶂', cost: 4, desc: '战损减半反震' },
-  { id: 6, key: 'pyro_erosion', name: '烈焰侵蚀', cost: 2, desc: '削减40%敌方微粒' },
+  { id: 1, key: 'anemo_shield', name: '千风庇护', cost: 2, cd: 30, desc: '加持免伤结界' },
+  { id: 2, key: 'pyro_erosion', name: '烈焰侵蚀', cost: 2, cd: 30, desc: '削减40%敌方微粒' },
+  { id: 3, key: 'anemo_turb', name: '千风湍流', cost: 3, cd: 20, desc: '流道速度翻倍' },
+  { id: 4, key: 'pyro_blast', name: '轰轰烈焰', cost: 4, cd: 25, desc: '消灭80%敌方微粒' },
+  { id: 5, key: 'geo_wall', name: '坚岩重嶂', cost: 4, cd: 30, desc: '战损减半反震' },
+  { id: 6, key: 'hydro_bribe', name: '摩拉律法', cost: 5, cd: 35, desc: '秒占中立灵穴' },
 ];
 
 // ==========================================
@@ -647,7 +647,7 @@ const prepCardNodes = POOL_CARDS.map((card, idx) => {
       createTextbox({
         id: `prep_cost_${card.id}`,
         name: 'CostText',
-        text: `消耗: ${card.cost} 权能`,
+        text: `消耗: ${card.cost} 权能  |  CD: ${card.cd}秒`,
         fontSize: 12,
         fontColor: parseColor('#fbbf24'),
         horizontalAlignment: 'Middle',
@@ -952,8 +952,8 @@ const cardSlots = [1, 2, 3, 4].map(idx => {
       createTextbox({
         id: `card_cost_${idx}`,
         name: 'CostText',
-        text: '2点',
-        fontSize: 12,
+        text: '2点 · CD 30s',
+        fontSize: 11,
         fontColor: parseColor('#fbbf24'),
         horizontalAlignment: 'Middle',
         verticalAlignment: 'Middle',
@@ -987,47 +987,49 @@ const cardSlots = [1, 2, 3, 4].map(idx => {
   });
 });
 
+// 全局浮动播报条 ToastContainer (置于 GameRoot 最顶层第 0 节点，绝不被任何弹窗/遮罩层遮挡)
+const toastContainer = createNode('container', {
+  id: 'toast_container',
+  name: 'ToastContainer',
+  visible: false,
+  transformByPlatform: makeTransform({
+    offset: [0, 335],
+    size: [600, 42],
+    pivot: [0.5, 0.5]
+  }),
+  children: [
+    createTextbox({
+      id: 'toast_text',
+      name: 'ToastText',
+      text: '',
+      fontSize: 14,
+      fontColor: parseColor('#fbbf24'),
+      horizontalAlignment: 'Middle',
+      verticalAlignment: 'Middle',
+      transformByPlatform: makeTransform({ offset: [0, 0], size: [592, 38], pivot: [0.5, 0.5] })
+    }),
+    createNode('image', {
+      id: 'toast_inner_bg',
+      name: 'ToastBg',
+      imageId: 100001,
+      imageColor: parseColor('#090d16', 0.95),
+      transformByPlatform: makeTransform({ offset: [0, 0], size: [594, 40], pivot: [0.5, 0.5] })
+    }),
+    createNode('image', {
+      id: 'toast_border',
+      name: 'ToastBorder',
+      imageId: 100001,
+      imageColor: parseColor('#fbbf24'),
+      transformByPlatform: makeTransform({ layout: 'stretch' })
+    })
+  ]
+});
+
 const hudLayer = createNode('container', {
   id: 'hud_layer',
   name: 'HudLayer',
   transformByPlatform: makeTransform({ layout: 'stretch' }),
   children: [
-    createNode('container', {
-      id: 'toast_container',
-      name: 'ToastContainer',
-      visible: false,
-      transformByPlatform: makeTransform({
-        offset: [0, 335],
-        size: [520, 36],
-        pivot: [0.5, 0.5]
-      }),
-      children: [
-        createTextbox({
-          id: 'toast_text',
-          name: 'ToastText',
-          text: '',
-          fontSize: 13,
-          fontColor: parseColor('#fbbf24'),
-          horizontalAlignment: 'Middle',
-          verticalAlignment: 'Middle',
-          transformByPlatform: makeTransform({ offset: [0, 0], size: [516, 32], pivot: [0.5, 0.5] })
-        }),
-        createNode('image', {
-          id: 'toast_inner_bg',
-          name: 'ToastBg',
-          imageId: 100001,
-          imageColor: parseColor('#0f172a'),
-          transformByPlatform: makeTransform({ offset: [0, 0], size: [516, 32], pivot: [0.5, 0.5] })
-        }),
-        createNode('image', {
-          id: 'toast_border',
-          name: 'ToastBorder',
-          imageId: 100001,
-          imageColor: parseColor('#fbbf24'),
-          transformByPlatform: makeTransform({ layout: 'stretch' })
-        })
-      ]
-    }),
     createNode('container', {
       id: 'card_bar',
       name: 'CardBar',
@@ -1306,8 +1308,9 @@ const bgImage = createNode('image', {
   transformByPlatform: makeTransform({ layout: 'stretch' })
 });
 
-// 组装 GameRoot (同级子节点从前到后排序：顶层在前，底层在后)
+// 组装 GameRoot (同级子节点从前到后排序：第 0 项在最顶层，最后一项在最底层)
 const gameRootChildren = [
+  toastContainer,       // <--- 最顶层 (Index 0): 全局浮动播报条，绝不被任何弹窗/遮罩层遮挡！
   modeSelectModal,
   chapterSelectModal,
   settleModal,

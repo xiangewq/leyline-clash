@@ -17,6 +17,17 @@ local CardRegistry = {
             badgeColor = Layout.MakeColor(52, 211, 153, 255)
         },
         {
+            id = "pyro_erosion",
+            name = "烈焰侵蚀",
+            element = "pyro",
+            cost = 2,
+            cd = 30,
+            duration = 20,
+            targetType = "enemy_node",
+            desc = "炽火灼烧敌脉，瞬间消灭目标敌方灵穴上 40% 的驻留微粒并切断输出！",
+            badgeColor = Layout.MakeColor(244, 63, 94, 255)
+        },
+        {
             id = "anemo_turb",
             name = "千风湍流",
             element = "anemo",
@@ -39,17 +50,6 @@ local CardRegistry = {
             badgeColor = Layout.MakeColor(244, 63, 94, 255)
         },
         {
-            id = "hydro_bribe",
-            name = "摩拉律法",
-            element = "hydro",
-            cost = 5,
-            cd = 35,
-            duration = 0,
-            targetType = "any_node",
-            desc = "水之契约与摩拉通神：中立灵穴直接秒占100%；敌方灵穴削减65%共鸣。",
-            badgeColor = Layout.MakeColor(56, 189, 248, 255)
-        },
-        {
             id = "geo_wall",
             name = "坚岩重嶂",
             element = "geo",
@@ -61,15 +61,15 @@ local CardRegistry = {
             badgeColor = Layout.MakeColor(251, 191, 36, 255)
         },
         {
-            id = "pyro_erosion",
-            name = "烈焰侵蚀",
-            element = "pyro",
-            cost = 2,
-            cd = 30,
-            duration = 20,
-            targetType = "enemy_node",
-            desc = "炽火灼烧敌脉，瞬间消灭目标敌方灵穴上 40% 的驻留微粒并切断输出！",
-            badgeColor = Layout.MakeColor(244, 63, 94, 255)
+            id = "hydro_bribe",
+            name = "摩拉律法",
+            element = "hydro",
+            cost = 5,
+            cd = 35,
+            duration = 0,
+            targetType = "any_node",
+            desc = "水之契约与摩拉通神：中立灵穴直接秒占100%；敌方灵穴削减65%共鸣。",
+            badgeColor = Layout.MakeColor(56, 189, 248, 255)
         }
     }
 }
@@ -84,9 +84,8 @@ function CardRegistry.GetCardById(cardId)
 end
 
 function CardRegistry.GetDefaultDeck()
-    -- 默认装配 4 张核心卡：千风庇护(2) + 千风湍流(3) + 轰轰烈焰(4) + 摩拉律法(5) = 14 (若预算12点可自由替换)
-    -- 初始推荐：千风庇护(2) + 千风湍流(3) + 轰轰烈焰(4) = 9点 或 自选组合
-    return { "anemo_shield", "anemo_turb", "pyro_blast", "hydro_bribe" }
+    -- 按消耗权能升序推荐：千风庇护(2) + 烈焰侵蚀(2) + 千风湍流(3) + 轰轰烈焰(4) = 11点
+    return { "anemo_shield", "pyro_erosion", "anemo_turb", "pyro_blast" }
 end
 
 return CardRegistry

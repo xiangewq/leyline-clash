@@ -328,7 +328,7 @@ local function CacheUIControls()
         UI.timerText      = FindDeepChild(hud, "HudTimer")
         UI.barPlayer      = FindDeepChild(hud, "BarPlayer")
         UI.barEnemy       = FindDeepChild(hud, "BarEnemy")
-        UI.toastContainer = FindDeepChild(hud, "ToastContainer")
+        UI.toastContainer = FindDeepChild(root, "ToastContainer")
         if UI.toastContainer then
             UI.toastText  = FindDeepChild(UI.toastContainer, "ToastText")
         end
@@ -633,7 +633,7 @@ local function SetupEventHandlers()
                     local used = PrepareView.GetUsedBudget()
                     local count = #PrepareView.selectedIds
                     if action == "equipped" then
-                        HudView.ShowToast(string.format("【已装配】%s (耗能%d) | 预算 %d/%d，已选 %d/4 张", card and card.name or "符印", card and card.cost or 0, used, PrepareView.maxBudget, count))
+                        HudView.ShowToast(string.format("【已装配】%s (耗能%d·CD%ds) | 预算 %d/%d，已选 %d/4 张", card and card.name or "符印", card and card.cost or 0, card and card.cd or 0, used, PrepareView.maxBudget, count))
                     elseif action == "unequipped" then
                         HudView.ShowToast(string.format("【已卸下】%s (归还%d) | 预算 %d/%d，已选 %d/4 张", card and card.name or "符印", card and card.cost or 0, used, PrepareView.maxBudget, count))
                     end
@@ -817,6 +817,8 @@ function OnUpdate(dt)
         HudView.UpdateToast(dt, UI.toastContainer, UI.toastText)
 
     elseif gameState.currentState == STATE_PREPARE then
+        PrepareView.Update(dt)
+        PrepareView.Render(UI.prepCards, UI.prepBudgetText, UI.prepHint)
         HudView.UpdateToast(dt, UI.toastContainer, UI.toastText)
 
     elseif gameState.currentState == STATE_PLAYING then

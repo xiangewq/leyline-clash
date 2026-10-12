@@ -26,7 +26,7 @@ function CardBar.Update(cardSlots, deck, cooldowns, selectedSlotIndex)
                 end
 
                 if slot.costCtrl and slot.costCtrl.alive then
-                    slot.costCtrl.text = tostring(card.cost) .. "点"
+                    slot.costCtrl.text = string.format("%d点 · CD %ds", card.cost, card.cd)
                     slot.costCtrl.fontColor = (selectedSlotIndex == i) and Layout.PALETTE.GOLD or Layout.MakeColor(251, 191, 36, 255)
                 end
 

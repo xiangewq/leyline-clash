@@ -27,6 +27,10 @@ function AbilitySystem.InitDeck(cardIdList)
             end
         end
     end
+    -- 确保局内符印栏按消耗权能升序排列 (低费在前，高费在后)
+    table.sort(AbilitySystem.deck, function(a, b)
+        return a.cost < b.cost
+    end)
 end
 
 function AbilitySystem.UpdateCooldowns(dt)
