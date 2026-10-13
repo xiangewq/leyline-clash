@@ -1032,7 +1032,7 @@ const countdownModal = createNode('container', {
   visible: false,
   transformByPlatform: makeTransform({
     offset: [0, 50],
-    size: [440, 180],
+    size: [480, 200],
     pivot: [0.5, 0.5]
   }),
   children: [
@@ -1040,28 +1040,32 @@ const countdownModal = createNode('container', {
       id: 'countdown_text',
       name: 'CountdownText',
       text: '3',
-      fontSize: 68,
+      fontSize: 36,
+      adaptiveFontSize: true,
+      minimumFontSize: 18,
       fontColor: parseColor('#fbbf24'),
       horizontalAlignment: 'Middle',
       verticalAlignment: 'Middle',
-      transformByPlatform: makeTransform({ offset: [0, 18], size: [400, 80], pivot: [0.5, 0.5] })
+      transformByPlatform: makeTransform({ offset: [0, 22], size: [420, 100], pivot: [0.5, 0.5] })
     }),
     createTextbox({
       id: 'countdown_sub',
       name: 'CountdownSub',
-      text: '星图推衍即将开启...',
+      text: '【3 秒】全域地脉连接调配完成...',
       fontSize: 14,
+      adaptiveFontSize: true,
+      minimumFontSize: 10,
       fontColor: parseColor('#38bdf8'),
       horizontalAlignment: 'Middle',
       verticalAlignment: 'Middle',
-      transformByPlatform: makeTransform({ offset: [0, -48], size: [400, 28], pivot: [0.5, 0.5] })
+      transformByPlatform: makeTransform({ offset: [0, -52], size: [420, 36], pivot: [0.5, 0.5] })
     }),
     createNode('image', {
       id: 'countdown_inner_bg',
       name: 'CountdownBg',
       imageId: 100001,
       imageColor: parseColor('#090d16', 0.94),
-      transformByPlatform: makeTransform({ offset: [0, 0], size: [434, 174], pivot: [0.5, 0.5] })
+      transformByPlatform: makeTransform({ offset: [0, 0], size: [474, 194], pivot: [0.5, 0.5] })
     }),
     createNode('image', {
       id: 'countdown_border',

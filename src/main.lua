@@ -516,6 +516,7 @@ local function StartStage(stageId)
             gameState.countdownTimer = 3.6
             gameState.currentState = STATE_COUNTDOWN
             Layout.SetVisible(UI.countdownModal, true)
+            HudView.UpdateCountdown(gameState.countdownTimer, UI.countdownModal, UI.countdownText, UI.countdownSub)
             BalanceConfig.PlayAudioSafe("UI_CLICK")
         end)
         PrepareView.Render(UI.prepCards, UI.prepBudgetText, UI.prepHint)

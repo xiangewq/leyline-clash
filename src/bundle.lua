@@ -2372,29 +2372,41 @@ function HudView.UpdateCountdown(timer, countdownModal, countdownTextCtrl, count
 
     if timer > 0 then
         Layout.SetVisible(countdownModal, true)
+        local countNum = math.ceil(timer)
+        if countNum > 3 then countNum = 3 end
+        if countNum < 1 then countNum = 1 end
+
         if countdownTextCtrl and countdownTextCtrl.alive then
-            local countNum = math.ceil(timer)
-            if countNum > 3 then countNum = 3 end
-            countdownTextCtrl.text = tostring(countNum)
-            countdownTextCtrl.fontColor = Layout.PALETTE.GOLD
+            pcall(function()
+                countdownTextCtrl.text = tostring(countNum)
+                countdownTextCtrl.fontColor = Layout.PALETTE.GOLD
+            end)
         end
         if countdownSubCtrl and countdownSubCtrl.alive then
-            if timer > 2.0 then
-                countdownSubCtrl.text = "全域地脉连接调配完成..."
-            elseif timer > 1.0 then
-                countdownSubCtrl.text = "星轨推衍回路展开中..."
-            else
-                countdownSubCtrl.text = "元素微粒正在凝聚！"
-            end
+            pcall(function()
+                if countNum == 3 then
+                    countdownSubCtrl.text = "【3 秒】全域地脉连接调配完成..."
+                elseif countNum == 2 then
+                    countdownSubCtrl.text = "【2 秒】星轨推衍回路展开中..."
+                else
+                    countdownSubCtrl.text = "【1 秒】元素微粒正在凝聚！"
+                end
+                countdownSubCtrl.fontColor = Layout.PALETTE.PLAYER
+            end)
         end
     elseif timer > -0.6 then
         Layout.SetVisible(countdownModal, true)
         if countdownTextCtrl and countdownTextCtrl.alive then
-            countdownTextCtrl.text = "开始！"
-            countdownTextCtrl.fontColor = Layout.PALETTE.PLAYER
+            pcall(function()
+                countdownTextCtrl.text = "开 始 ！"
+                countdownTextCtrl.fontColor = Layout.PALETTE.PLAYER
+            end)
         end
         if countdownSubCtrl and countdownSubCtrl.alive then
-            countdownSubCtrl.text = "执掌星轨，克敌制胜！"
+            pcall(function()
+                countdownSubCtrl.text = "【开战】执掌星轨，克敌制胜！"
+                countdownSubCtrl.fontColor = Layout.PALETTE.GOLD
+            end)
         end
     else
         Layout.SetVisible(countdownModal, false)
@@ -3134,6 +3146,7 @@ local function StartStage(stageId)
             gameState.countdownTimer = 3.6
             gameState.currentState = STATE_COUNTDOWN
             Layout.SetVisible(UI.countdownModal, true)
+            HudView.UpdateCountdown(gameState.countdownTimer, UI.countdownModal, UI.countdownText, UI.countdownSub)
             BalanceConfig.PlayAudioSafe("UI_CLICK")
         end)
         PrepareView.Render(UI.prepCards, UI.prepBudgetText, UI.prepHint)
