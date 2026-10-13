@@ -1173,8 +1173,8 @@ const hudLayer = createNode('container', {
       id: 'hud_anomaly_box',
       name: 'HudAnomalyBox',
       transformByPlatform: makeTransform({
-        offset: [-580, 405],
-        size: [380, 78],
+        offset: [-580, 382],
+        size: [390, 124],
         pivot: [0.5, 0.5]
       }),
       children: [
@@ -1183,27 +1183,31 @@ const hudLayer = createNode('container', {
           name: 'AnomalyTitle',
           text: '【地脉情报】',
           fontSize: 12,
+          adaptiveFontSize: true,
+          minimumFontSize: 10,
           fontColor: parseColor('#38bdf8'),
           horizontalAlignment: 'Left',
           verticalAlignment: 'Middle',
-          transformByPlatform: makeTransform({ offset: [-170, 22], size: [340, 20], pivot: [0, 0.5] })
+          transformByPlatform: makeTransform({ offset: [-180, 44], size: [360, 26], pivot: [0, 0.5] })
         }),
         createTextbox({
           id: 'hud_anomaly_desc',
           name: 'AnomalyDesc',
           text: '● 标准地脉：常规孕育与输送，前线激战，后方休整',
           fontSize: 10,
+          adaptiveFontSize: true,
+          minimumFontSize: 8,
           fontColor: parseColor('#cbd5e1'),
           horizontalAlignment: 'Left',
-          verticalAlignment: 'Middle',
-          transformByPlatform: makeTransform({ offset: [-170, -10], size: [340, 38], pivot: [0, 0.5] })
+          verticalAlignment: 'Top',
+          transformByPlatform: makeTransform({ offset: [-180, -16], size: [360, 86], pivot: [0, 0.5] })
         }),
         createNode('image', {
           id: 'hud_anomaly_inner_bg',
           name: 'AnomalyBg',
           imageId: 100001,
           imageColor: parseColor('#090d16', 0.9),
-          transformByPlatform: makeTransform({ offset: [0, 0], size: [376, 74], pivot: [0.5, 0.5] })
+          transformByPlatform: makeTransform({ offset: [0, 0], size: [386, 120], pivot: [0.5, 0.5] })
         }),
         createNode('image', {
           id: 'hud_anomaly_border',
@@ -1219,8 +1223,8 @@ const hudLayer = createNode('container', {
       id: 'hud_guide_box',
       name: 'HudGuideBox',
       transformByPlatform: makeTransform({
-        offset: [580, 405],
-        size: [380, 78],
+        offset: [580, 382],
+        size: [390, 124],
         pivot: [0.5, 0.5]
       }),
       children: [
@@ -1229,27 +1233,31 @@ const hudLayer = createNode('container', {
           name: 'GuideTitle',
           text: '【战术操作指引】',
           fontSize: 12,
+          adaptiveFontSize: true,
+          minimumFontSize: 10,
           fontColor: parseColor('#fbbf24'),
           horizontalAlignment: 'Left',
           verticalAlignment: 'Middle',
-          transformByPlatform: makeTransform({ offset: [-170, 22], size: [340, 20], pivot: [0, 0.5] })
+          transformByPlatform: makeTransform({ offset: [-180, 44], size: [360, 26], pivot: [0, 0.5] })
         }),
         createTextbox({
           id: 'hud_guide_desc',
           name: 'GuideDesc',
           text: '● 连线：拖拽己方灵穴至相邻据点建立输送\n● 固守：轻点己方灵穴展开/收拢固守结界\n● 符印：点击下方符印后点击目标灵穴释放',
           fontSize: 10,
+          adaptiveFontSize: true,
+          minimumFontSize: 8,
           fontColor: parseColor('#cbd5e1'),
           horizontalAlignment: 'Left',
-          verticalAlignment: 'Middle',
-          transformByPlatform: makeTransform({ offset: [-170, -10], size: [340, 38], pivot: [0, 0.5] })
+          verticalAlignment: 'Top',
+          transformByPlatform: makeTransform({ offset: [-180, -16], size: [360, 86], pivot: [0, 0.5] })
         }),
         createNode('image', {
           id: 'hud_guide_inner_bg',
           name: 'GuideBg',
           imageId: 100001,
           imageColor: parseColor('#090d16', 0.9),
-          transformByPlatform: makeTransform({ offset: [0, 0], size: [376, 74], pivot: [0.5, 0.5] })
+          transformByPlatform: makeTransform({ offset: [0, 0], size: [386, 120], pivot: [0.5, 0.5] })
         }),
         createNode('image', {
           id: 'hud_guide_border',

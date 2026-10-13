@@ -123,50 +123,88 @@ function HudView.ShowSettlement(isWin, nodes, elapsedTime, modalCtrl, titleCtrl,
     end
 end
 
--- 关卡特殊灵穴效果说明映射表
+-- 关卡特殊灵穴效果说明映射表与重要度排序
 local ANOMALY_DESC_MAP = {
-    WIND_FLOW = "● 疾风流道：地脉输送流速翻倍 (双倍流速)",
-    AMBER_MINE = "● 石珀富矿：石珀滋养，微粒孕育速度翻倍",
-    MIST_RUINS = "● 迷雾荒墟：迷雾遮蔽，微粒孕育速度减半",
+    PLASMA          = "● 赤阳熔核：上限强制限25粒，极速绞肉战场",
     DEFENSE_BASTION = "● 雷暴要塞：雷暴灵障固守，战损减半",
-    PURE_WATER = "● 纯水枢纽：纯水激荡，微粒孕育速度提升54%",
-    PLASMA = "● 赤阳熔核：上限强制限25粒，极速绞肉战场"
+    PURE_WATER      = "● 纯水枢纽：纯水激荡，微粒孕育速度提升54%",
+    WIND_FLOW       = "● 疾风流道：地脉输送流速翻倍 (双倍流速)",
+    AMBER_MINE      = "● 石珀富矿：石珀滋养，微粒孕育速度翻倍",
+    MIST_RUINS      = "● 迷雾荒墟：迷雾遮蔽，微粒孕育速度减半"
+}
+
+local ANOMALY_PRIORITY = {
+    PLASMA          = 1,
+    DEFENSE_BASTION = 2,
+    PURE_WATER      = 3,
+    WIND_FLOW       = 4,
+    AMBER_MINE      = 5,
+    MIST_RUINS      = 6
 }
 
 -- 更新左上角关卡特殊灵穴说明与右上角战术操作说明
 function HudView.UpdateStageInfo(chap, anomalyTitleCtrl, anomalyDescCtrl, guideTitleCtrl, guideDescCtrl)
     if guideTitleCtrl and guideTitleCtrl.alive then
-        guideTitleCtrl.text = "【战术操作指引】"
+        pcall(function()
+            guideTitleCtrl.text = "【战术操作指引】"
+            guideTitleCtrl.fontColor = Layout.PALETTE.GOLD
+        end)
     end
     if guideDescCtrl and guideDescCtrl.alive then
-        guideDescCtrl.text = "● 连线：拖拽己方灵穴至相邻据点建立输送\n● 固守：轻点己方灵穴展开/收拢固守结界\n● 符印：点击下方符印后点击目标灵穴释放"
+        pcall(function()
+            guideDescCtrl.text = "● 连线：拖拽己方灵穴至相邻据点建立输送\n● 固守：轻点己方灵穴展开/收拢固守结界\n● 符印：点击下方符印后点击目标灵穴释放"
+        end)
     end
 
     if anomalyTitleCtrl and anomalyTitleCtrl.alive then
-        local stageTag = (chap and chap.title) and string.match(chap.title, "第 %d 关") or "战场"
-        anomalyTitleCtrl.text = string.format("【%s · 地脉情报】", stageTag)
+        pcall(function()
+            local stageTag = "战场"
+            if chap and chap.title then
+                local m = string.match(chap.title, "第 %d+ 关")
+                if m then
+                    stageTag = m
+                elseif chap.id then
+                    stageTag = string.format("第 %d 关", chap.id)
+                end
+            elseif chap and chap.id then
+                stageTag = string.format("第 %d 关", chap.id)
+            end
+            anomalyTitleCtrl.text = string.format("【%s · 地脉情报】", stageTag)
+            anomalyTitleCtrl.fontColor = Layout.PALETTE.PLAYER
+        end)
     end
 
     if anomalyDescCtrl and anomalyDescCtrl.alive then
-        local lines = {}
-        local seen = {}
-        if chap and chap.nodes then
-            for _, n in ipairs(chap.nodes) do
-                if n.anomaly and n.anomaly ~= "NORMAL" and not seen[n.anomaly] then
-                    seen[n.anomaly] = true
-                    local desc = ANOMALY_DESC_MAP[n.anomaly]
-                    if desc then
-                        table.insert(lines, desc)
+        pcall(function()
+            local anomalyKeys = {}
+            local seen = {}
+            if chap and chap.nodes then
+                for _, n in ipairs(chap.nodes) do
+                    if n.anomaly and n.anomaly ~= "NORMAL" and not seen[n.anomaly] then
+                        seen[n.anomaly] = true
+                        table.insert(anomalyKeys, n.anomaly)
                     end
                 end
             end
-        end
 
-        if #lines == 0 then
-            anomalyDescCtrl.text = "● 标准地脉：常规孕育与输送，前线激战，后方休整\n● 固守结界：驻防灵穴战损削减30%"
-        else
-            anomalyDescCtrl.text = table.concat(lines, "\n")
-        end
+            table.sort(anomalyKeys, function(a, b)
+                return (ANOMALY_PRIORITY[a] or 99) < (ANOMALY_PRIORITY[b] or 99)
+            end)
+
+            local lines = {}
+            for _, k in ipairs(anomalyKeys) do
+                local desc = ANOMALY_DESC_MAP[k]
+                if desc then
+                    table.insert(lines, desc)
+                end
+            end
+
+            if #lines == 0 then
+                anomalyDescCtrl.text = "● 标准地脉：常规孕育与输送，前线激战，后方休整\n● 固守结界：驻防灵穴战损削减30%"
+            else
+                anomalyDescCtrl.text = table.concat(lines, "\n")
+            end
+        end)
     end
 end
 

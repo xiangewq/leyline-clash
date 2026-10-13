@@ -488,6 +488,9 @@ local function StartStage(stageId)
     VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
     Runtime.HideAllParticles()
 
+    -- 立即刷新左上角地脉情报与右上角操作指引
+    HudView.UpdateStageInfo(chap, UI.hudAnomalyTitle, UI.hudAnomalyDesc, UI.hudGuideTitle, UI.hudGuideDesc)
+
     -- 隐藏其他面板，进入战前剧情
     Layout.SetVisible(UI.modeSelectModal, false)
     Layout.SetVisible(UI.chapterSelectModal, false)
@@ -816,6 +819,8 @@ function OnInit()
     VisualRenderer.UpdateNodes(UI.nodeUIList, gameState.nodes, 0)
     CardBar.Update(UI.cardSlots, AbilitySystem.deck, AbilitySystem.cooldowns, nil)
     HudView.UpdateTopBar(gameState.timeRemaining, gameState.nodes, UI.playerPctText, UI.enemyPctText, UI.timerText, UI.barPlayer, UI.barEnemy)
+    local chap = StarMap.currentChapterDef
+    HudView.UpdateStageInfo(chap, UI.hudAnomalyTitle, UI.hudAnomalyDesc, UI.hudGuideTitle, UI.hudGuideDesc)
 
     SetupEventHandlers()
     print("[Starlink] OnInit: 装配完成！准备就绪。")
