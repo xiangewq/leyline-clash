@@ -1025,6 +1025,54 @@ const toastContainer = createNode('container', {
   ]
 });
 
+// 全局战前3秒倒计时 CountdownModal (置于 GameRoot 顶层，大字震撼呈现 3、2、1、开始)
+const countdownModal = createNode('container', {
+  id: 'countdown_modal',
+  name: 'CountdownModal',
+  visible: false,
+  transformByPlatform: makeTransform({
+    offset: [0, 50],
+    size: [440, 180],
+    pivot: [0.5, 0.5]
+  }),
+  children: [
+    createTextbox({
+      id: 'countdown_text',
+      name: 'CountdownText',
+      text: '3',
+      fontSize: 68,
+      fontColor: parseColor('#fbbf24'),
+      horizontalAlignment: 'Middle',
+      verticalAlignment: 'Middle',
+      transformByPlatform: makeTransform({ offset: [0, 18], size: [400, 80], pivot: [0.5, 0.5] })
+    }),
+    createTextbox({
+      id: 'countdown_sub',
+      name: 'CountdownSub',
+      text: '星图推衍即将开启...',
+      fontSize: 14,
+      fontColor: parseColor('#38bdf8'),
+      horizontalAlignment: 'Middle',
+      verticalAlignment: 'Middle',
+      transformByPlatform: makeTransform({ offset: [0, -48], size: [400, 28], pivot: [0.5, 0.5] })
+    }),
+    createNode('image', {
+      id: 'countdown_inner_bg',
+      name: 'CountdownBg',
+      imageId: 100001,
+      imageColor: parseColor('#090d16', 0.94),
+      transformByPlatform: makeTransform({ offset: [0, 0], size: [434, 174], pivot: [0.5, 0.5] })
+    }),
+    createNode('image', {
+      id: 'countdown_border',
+      name: 'CountdownBorder',
+      imageId: 100001,
+      imageColor: parseColor('#fbbf24'),
+      transformByPlatform: makeTransform({ layout: 'stretch' })
+    })
+  ]
+});
+
 const hudLayer = createNode('container', {
   id: 'hud_layer',
   name: 'HudLayer',
@@ -1112,6 +1160,98 @@ const hudLayer = createNode('container', {
           name: 'HudBorder',
           imageId: 100001,
           imageColor: parseColor('#38bdf8'),
+          transformByPlatform: makeTransform({ layout: 'stretch' })
+        })
+      ]
+    }),
+    // 左上角固定位置：关卡特殊灵穴效果说明
+    createNode('container', {
+      id: 'hud_anomaly_box',
+      name: 'HudAnomalyBox',
+      transformByPlatform: makeTransform({
+        offset: [-580, 405],
+        size: [380, 78],
+        pivot: [0.5, 0.5]
+      }),
+      children: [
+        createTextbox({
+          id: 'hud_anomaly_title',
+          name: 'AnomalyTitle',
+          text: '【地脉情报】',
+          fontSize: 12,
+          fontColor: parseColor('#38bdf8'),
+          horizontalAlignment: 'Left',
+          verticalAlignment: 'Middle',
+          transformByPlatform: makeTransform({ offset: [-170, 22], size: [340, 20], pivot: [0, 0.5] })
+        }),
+        createTextbox({
+          id: 'hud_anomaly_desc',
+          name: 'AnomalyDesc',
+          text: '● 标准地脉：常规孕育与输送，前线激战，后方休整',
+          fontSize: 10,
+          fontColor: parseColor('#cbd5e1'),
+          horizontalAlignment: 'Left',
+          verticalAlignment: 'Middle',
+          transformByPlatform: makeTransform({ offset: [-170, -10], size: [340, 38], pivot: [0, 0.5] })
+        }),
+        createNode('image', {
+          id: 'hud_anomaly_inner_bg',
+          name: 'AnomalyBg',
+          imageId: 100001,
+          imageColor: parseColor('#090d16', 0.9),
+          transformByPlatform: makeTransform({ offset: [0, 0], size: [376, 74], pivot: [0.5, 0.5] })
+        }),
+        createNode('image', {
+          id: 'hud_anomaly_border',
+          name: 'AnomalyBorder',
+          imageId: 100001,
+          imageColor: parseColor('#38bdf8', 0.6),
+          transformByPlatform: makeTransform({ layout: 'stretch' })
+        })
+      ]
+    }),
+    // 右上角固定位置：连线与符印释放简要操作说明
+    createNode('container', {
+      id: 'hud_guide_box',
+      name: 'HudGuideBox',
+      transformByPlatform: makeTransform({
+        offset: [580, 405],
+        size: [380, 78],
+        pivot: [0.5, 0.5]
+      }),
+      children: [
+        createTextbox({
+          id: 'hud_guide_title',
+          name: 'GuideTitle',
+          text: '【战术操作指引】',
+          fontSize: 12,
+          fontColor: parseColor('#fbbf24'),
+          horizontalAlignment: 'Left',
+          verticalAlignment: 'Middle',
+          transformByPlatform: makeTransform({ offset: [-170, 22], size: [340, 20], pivot: [0, 0.5] })
+        }),
+        createTextbox({
+          id: 'hud_guide_desc',
+          name: 'GuideDesc',
+          text: '● 连线：拖拽己方灵穴至相邻据点建立输送\n● 固守：轻点己方灵穴展开/收拢固守结界\n● 符印：点击下方符印后点击目标灵穴释放',
+          fontSize: 10,
+          fontColor: parseColor('#cbd5e1'),
+          horizontalAlignment: 'Left',
+          verticalAlignment: 'Middle',
+          transformByPlatform: makeTransform({ offset: [-170, -10], size: [340, 38], pivot: [0, 0.5] })
+        }),
+        createNode('image', {
+          id: 'hud_guide_inner_bg',
+          name: 'GuideBg',
+          imageId: 100001,
+          imageColor: parseColor('#090d16', 0.9),
+          transformByPlatform: makeTransform({ offset: [0, 0], size: [376, 74], pivot: [0.5, 0.5] })
+        }),
+        createNode('image', {
+          id: 'hud_guide_border',
+          name: 'GuideBorder',
+          imageId: 100001,
+          imageColor: parseColor('#fbbf24', 0.6),
           transformByPlatform: makeTransform({ layout: 'stretch' })
         })
       ]
@@ -1311,6 +1451,7 @@ const bgImage = createNode('image', {
 // 组装 GameRoot (同级子节点从前到后排序：第 0 项在最顶层，最后一项在最底层)
 const gameRootChildren = [
   toastContainer,       // <--- 最顶层 (Index 0): 全局浮动播报条，绝不被任何弹窗/遮罩层遮挡！
+  countdownModal,       // <--- Index 1: 战前3秒倒计时弹窗 (3、2、1、开始)
   modeSelectModal,
   chapterSelectModal,
   settleModal,

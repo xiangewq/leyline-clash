@@ -123,4 +123,86 @@ function HudView.ShowSettlement(isWin, nodes, elapsedTime, modalCtrl, titleCtrl,
     end
 end
 
+-- 关卡特殊灵穴效果说明映射表
+local ANOMALY_DESC_MAP = {
+    WIND_FLOW = "● 疾风流道：地脉输送流速翻倍 (双倍流速)",
+    AMBER_MINE = "● 石珀富矿：石珀滋养，微粒孕育速度翻倍",
+    MIST_RUINS = "● 迷雾荒墟：迷雾遮蔽，微粒孕育速度减半",
+    DEFENSE_BASTION = "● 雷暴要塞：雷暴灵障固守，战损减半",
+    PURE_WATER = "● 纯水枢纽：纯水激荡，微粒孕育速度提升54%",
+    PLASMA = "● 赤阳熔核：上限强制限25粒，极速绞肉战场"
+}
+
+-- 更新左上角关卡特殊灵穴说明与右上角战术操作说明
+function HudView.UpdateStageInfo(chap, anomalyTitleCtrl, anomalyDescCtrl, guideTitleCtrl, guideDescCtrl)
+    if guideTitleCtrl and guideTitleCtrl.alive then
+        guideTitleCtrl.text = "【战术操作指引】"
+    end
+    if guideDescCtrl and guideDescCtrl.alive then
+        guideDescCtrl.text = "● 连线：拖拽己方灵穴至相邻据点建立输送\n● 固守：轻点己方灵穴展开/收拢固守结界\n● 符印：点击下方符印后点击目标灵穴释放"
+    end
+
+    if anomalyTitleCtrl and anomalyTitleCtrl.alive then
+        local stageTag = (chap and chap.title) and string.match(chap.title, "第 %d 关") or "战场"
+        anomalyTitleCtrl.text = string.format("【%s · 地脉情报】", stageTag)
+    end
+
+    if anomalyDescCtrl and anomalyDescCtrl.alive then
+        local lines = {}
+        local seen = {}
+        if chap and chap.nodes then
+            for _, n in ipairs(chap.nodes) do
+                if n.anomaly and n.anomaly ~= "NORMAL" and not seen[n.anomaly] then
+                    seen[n.anomaly] = true
+                    local desc = ANOMALY_DESC_MAP[n.anomaly]
+                    if desc then
+                        table.insert(lines, desc)
+                    end
+                end
+            end
+        end
+
+        if #lines == 0 then
+            anomalyDescCtrl.text = "● 标准地脉：常规孕育与输送，前线激战，后方休整\n● 固守结界：驻防灵穴战损削减30%"
+        else
+            anomalyDescCtrl.text = table.concat(lines, "\n")
+        end
+    end
+end
+
+-- 战前 3 秒倒计时更新 (3、2、1、开始)
+function HudView.UpdateCountdown(timer, countdownModal, countdownTextCtrl, countdownSubCtrl)
+    if not countdownModal or not countdownModal.alive then return end
+
+    if timer > 0 then
+        Layout.SetVisible(countdownModal, true)
+        if countdownTextCtrl and countdownTextCtrl.alive then
+            local countNum = math.ceil(timer)
+            if countNum > 3 then countNum = 3 end
+            countdownTextCtrl.text = tostring(countNum)
+            countdownTextCtrl.fontColor = Layout.PALETTE.GOLD
+        end
+        if countdownSubCtrl and countdownSubCtrl.alive then
+            if timer > 2.0 then
+                countdownSubCtrl.text = "全域地脉连接调配完成..."
+            elseif timer > 1.0 then
+                countdownSubCtrl.text = "星轨推衍回路展开中..."
+            else
+                countdownSubCtrl.text = "元素微粒正在凝聚！"
+            end
+        end
+    elseif timer > -0.6 then
+        Layout.SetVisible(countdownModal, true)
+        if countdownTextCtrl and countdownTextCtrl.alive then
+            countdownTextCtrl.text = "开始！"
+            countdownTextCtrl.fontColor = Layout.PALETTE.PLAYER
+        end
+        if countdownSubCtrl and countdownSubCtrl.alive then
+            countdownSubCtrl.text = "执掌星轨，克敌制胜！"
+        end
+    else
+        Layout.SetVisible(countdownModal, false)
+    end
+end
+
 return HudView

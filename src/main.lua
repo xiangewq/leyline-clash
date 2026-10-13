@@ -29,6 +29,7 @@ local STATE_MODE_SELECT    = "STATE_MODE_SELECT"
 local STATE_CHAPTER_SELECT = "STATE_CHAPTER_SELECT"
 local STATE_DIALOGUE       = "STATE_DIALOGUE"
 local STATE_PREPARE        = "STATE_PREPARE"
+local STATE_COUNTDOWN      = "STATE_COUNTDOWN"   -- 战前3秒倒计时 (3、2、1、开始)
 local STATE_PLAYING        = "STATE_PLAYING"
 local STATE_SETTLEMENT     = "STATE_SETTLEMENT"
 
@@ -37,6 +38,7 @@ local gameState = {
     elapsedTime    = 0,
     timeRemaining  = BalanceConfig.MATCH_DURATION,
     captureTimer   = 0,
+    countdownTimer = 0,
     isGameOver     = false,
     nodes          = {}
 }
@@ -74,6 +76,19 @@ local UI = {
     barEnemy       = nil,
     toastContainer = nil,
     toastText      = nil,
+
+    -- 战前3秒倒计时
+    countdownModal = nil,
+    countdownText  = nil,
+    countdownSub   = nil,
+
+    -- 左上角特殊灵穴说明与右上角操作说明
+    hudAnomalyBox  = nil,
+    hudAnomalyTitle= nil,
+    hudAnomalyDesc = nil,
+    hudGuideBox    = nil,
+    hudGuideTitle  = nil,
+    hudGuideDesc   = nil,
 
     -- 剧情弹窗
     dialogueModal  = nil,
@@ -333,6 +348,25 @@ local function CacheUIControls()
             UI.toastText  = FindDeepChild(UI.toastContainer, "ToastText")
         end
 
+        -- 战前3秒倒计时弹窗
+        UI.countdownModal = FindDeepChild(root, "CountdownModal")
+        if UI.countdownModal then
+            UI.countdownText = FindDeepChild(UI.countdownModal, "CountdownText")
+            UI.countdownSub  = FindDeepChild(UI.countdownModal, "CountdownSub")
+        end
+
+        -- 左上角特殊灵穴说明与右上角操作指引
+        UI.hudAnomalyBox   = FindDeepChild(hud, "HudAnomalyBox")
+        if UI.hudAnomalyBox then
+            UI.hudAnomalyTitle = FindDeepChild(UI.hudAnomalyBox, "AnomalyTitle")
+            UI.hudAnomalyDesc  = FindDeepChild(UI.hudAnomalyBox, "AnomalyDesc")
+        end
+        UI.hudGuideBox     = FindDeepChild(hud, "HudGuideBox")
+        if UI.hudGuideBox then
+            UI.hudGuideTitle   = FindDeepChild(UI.hudGuideBox, "GuideTitle")
+            UI.hudGuideDesc    = FindDeepChild(UI.hudGuideBox, "GuideDesc")
+        end
+
         UI.cardSlots = {}
         for j = 1, 4 do
             local slotGrp = FindDeepChild(hud, "CardSlot_" .. j)
@@ -459,6 +493,7 @@ local function StartStage(stageId)
     Layout.SetVisible(UI.chapterSelectModal, false)
     Layout.SetVisible(UI.settleModal, false)
     Layout.SetVisible(UI.prepareModal, false)
+    Layout.SetVisible(UI.countdownModal, false)
 
     -- 1. 剧情演播
     DialoguePlayer.Init(chap.dialogues, function()
@@ -469,11 +504,19 @@ local function StartStage(stageId)
 
         -- 2. 调配面板初始化 (动态预算)
         PrepareView.Init(chap.budget, function(selectedDeck)
-            print("[Starlink] 战前符印装配完成，启阵出征！")
+            print("[Starlink] 战前符印装配完成，进入战前 3 秒倒计时...")
             AbilitySystem.InitDeck(selectedDeck)
             Layout.SetVisible(UI.prepareModal, false)
-            gameState.currentState = STATE_PLAYING
-            HudView.ShowToast(string.format("【%s】战局开启！铺设光轨，争夺灵穴！", chap.title))
+            SetGameplayLayersVisible(true)
+
+            -- 刷新左上角特殊灵穴说明与右上角战术操作指引
+            HudView.UpdateStageInfo(chap, UI.hudAnomalyTitle, UI.hudAnomalyDesc, UI.hudGuideTitle, UI.hudGuideDesc)
+
+            -- 启动 3 秒倒计时 (3、2、1、开始)
+            gameState.countdownTimer = 3.6
+            gameState.currentState = STATE_COUNTDOWN
+            Layout.SetVisible(UI.countdownModal, true)
+            BalanceConfig.PlayAudioSafe("UI_CLICK")
         end)
         PrepareView.Render(UI.prepCards, UI.prepBudgetText, UI.prepHint)
     end)
@@ -487,14 +530,17 @@ local function SetupEventHandlers()
     -- 1. 全屏光标事件 (连线与轻点)
     if UI.cursorArea and UI.cursorArea.AddCursorEventListener then
         UI.cursorArea:AddCursorEventListener(Enum.CursorEventType.CursorDown, function(data)
+            if gameState.currentState ~= STATE_PLAYING then return end
             local x, y = GetEventPos(data)
             Input.OnCursorDown(x, y, gameState.nodes)
         end)
         UI.cursorArea:AddCursorEventListener(Enum.CursorEventType.CursorDrag, function(data)
+            if gameState.currentState ~= STATE_PLAYING then return end
             local x, y = GetEventPos(data)
             Input.OnCursorDrag(x, y)
         end)
         UI.cursorArea:AddCursorEventListener(Enum.CursorEventType.CursorUp, function(data)
+            if gameState.currentState ~= STATE_PLAYING then return end
             local x, y = GetEventPos(data)
             Input.OnCursorUp(x, y, gameState.nodes)
         end)
@@ -542,8 +588,12 @@ local function SetupEventHandlers()
         )
         if ok then
             BalanceConfig.PlayAudioSafe("SKILL_BLAST")
+            if msg then HudView.ShowToast(msg) end
+        else
+            BalanceConfig.PlayAudioSafe("UI_CLICK")
+            if msg then HudView.ShowToast("【释放失败】" .. msg) end
         end
-        if msg then HudView.ShowToast(msg) end
+        Input.ClearSelectedCard()
         CardBar.Update(UI.cardSlots, AbilitySystem.deck, AbilitySystem.cooldowns, nil)
     end
 
@@ -666,48 +716,29 @@ local function SetupEventHandlers()
                         return
                     end
 
+                    -- 取消智能释放：如果当前已选中该卡牌，再次点击则直接取消选定
                     if Input.GetSelectedCard() == idx then
-                        local smartTargetId = AbilitySystem.GetSmartTarget(card.id, gameState.nodes, RouteManager)
-                        if smartTargetId ~= nil then
-                            Input.ClearSelectedCard()
-                            local ok, msg = AbilitySystem.CastAbility(
-                                idx,
-                                smartTargetId,
-                                gameState.nodes,
-                                RouteManager,
-                                gameState.elapsedTime,
-                                function(x, y, col) CombatResolver.AddSpark(x, y, col) end
-                            )
-                            if ok then
-                                BalanceConfig.PlayAudioSafe("SKILL_BLAST")
-                                if msg then HudView.ShowToast("【快捷施法】" .. msg) end
-                            else
-                                if msg then HudView.ShowToast(msg) end
-                            end
-                            CardBar.Update(UI.cardSlots, AbilitySystem.deck, AbilitySystem.cooldowns, nil)
-                            return
-                        else
-                            Input.ClearSelectedCard()
-                            BalanceConfig.PlayAudioSafe("UI_CLICK")
-                            HudView.ShowToast(string.format("【取消选定】%s", card.name))
-                            CardBar.Update(UI.cardSlots, AbilitySystem.deck, AbilitySystem.cooldowns, nil)
-                            return
-                        end
+                        Input.ClearSelectedCard()
+                        BalanceConfig.PlayAudioSafe("UI_CLICK")
+                        HudView.ShowToast(string.format("【已取消选定】%s", card.name))
+                        CardBar.Update(UI.cardSlots, AbilitySystem.deck, AbilitySystem.cooldowns, nil)
+                        return
                     end
 
+                    -- 选定符印，等待玩家点击目标灵穴
                     Input.SetSelectedCard(idx)
                     BalanceConfig.PlayAudioSafe("UI_CLICK")
                     local targetHint = ""
                     if card.targetType == "enemy_node" then
-                        targetHint = "轻点敌方灵穴轰炸，或再点卡牌自动生效！"
+                        targetHint = "请轻点敌方灵穴释放"
                     elseif card.targetType == "player_node" then
-                        targetHint = "轻点我方灵穴加持，或再点卡牌自动生效！"
+                        targetHint = "请轻点我方灵穴加持"
                     elseif card.targetType == "player_route_node" then
-                        targetHint = "轻点输送中灵穴提速，或再点卡牌自动生效！"
+                        targetHint = "请轻点正在输送中的我方灵穴提速"
                     else
-                        targetHint = "轻点战场灵穴施法，或再点卡牌自动生效！"
+                        targetHint = "请轻点目标灵穴释放"
                     end
-                    HudView.ShowToast(string.format("【已准备】%s（%s）", card.name, targetHint))
+                    HudView.ShowToast(string.format("【已选定】%s（%s，再点符印取消）", card.name, targetHint))
                     CardBar.Update(UI.cardSlots, AbilitySystem.deck, AbilitySystem.cooldowns, idx)
                 end
             end)
@@ -803,6 +834,7 @@ function OnStart()
     Layout.SetVisible(UI.dialogueModal, false)
     Layout.SetVisible(UI.prepareModal, false)
     Layout.SetVisible(UI.settleModal, false)
+    Layout.SetVisible(UI.countdownModal, false)
 end
 
 function OnUpdate(dt)
@@ -820,6 +852,29 @@ function OnUpdate(dt)
         PrepareView.Update(dt)
         PrepareView.Render(UI.prepCards, UI.prepBudgetText, UI.prepHint)
         HudView.UpdateToast(dt, UI.toastContainer, UI.toastText)
+
+    elseif gameState.currentState == STATE_COUNTDOWN then
+        local prevSec = math.ceil(gameState.countdownTimer)
+        gameState.countdownTimer = gameState.countdownTimer - dt
+        local currSec = math.ceil(gameState.countdownTimer)
+        if prevSec > 0 and currSec < prevSec and currSec >= 1 then
+            BalanceConfig.PlayAudioSafe("UI_CLICK")
+        end
+
+        HudView.UpdateCountdown(gameState.countdownTimer, UI.countdownModal, UI.countdownText, UI.countdownSub)
+        HudView.UpdateToast(dt, UI.toastContainer, UI.toastText)
+        VisualRenderer.UpdateNodes(UI.nodeUIList, gameState.nodes, 0)
+        CardBar.Update(UI.cardSlots, AbilitySystem.deck, AbilitySystem.cooldowns, nil)
+        HudView.UpdateTopBar(gameState.timeRemaining, gameState.nodes, UI.playerPctText, UI.enemyPctText, UI.timerText, UI.barPlayer, UI.barEnemy)
+
+        if gameState.countdownTimer <= -0.6 then
+            Layout.SetVisible(UI.countdownModal, false)
+            gameState.currentState = STATE_PLAYING
+            gameState.elapsedTime = 0
+            BalanceConfig.PlayAudioSafe("MATCH_WIN")
+            local chap = StarMap.currentChapterDef
+            HudView.ShowToast(string.format("【%s】推衍启阵！全速进军！", chap and chap.title or "开战"))
+        end
 
     elseif gameState.currentState == STATE_PLAYING then
         gameState.elapsedTime = gameState.elapsedTime + dt
