@@ -139,4 +139,41 @@ function Layout.GetFactionName(faction)
     end
 end
 
+-- 线性插值工具
+function Layout.Lerp(a, b, t)
+    return a + (b - a) * Layout.Clamp(t, 0, 1)
+end
+
+-- 根据阵营获取带指定透明度的光晕色
+function Layout.GetFactionGlowColor(faction, alpha)
+    local a = Layout.Clamp(math.floor(alpha or 120), 0, 255)
+    if faction == "player" then
+        return Layout.MakeColor(56, 189, 248, a)
+    elseif faction == "enemy" or faction == "enemy_red" then
+        return Layout.MakeColor(244, 63, 94, a)
+    elseif faction == "enemy_purple" then
+        return Layout.MakeColor(168, 85, 247, a)
+    elseif faction == "enemy_green" then
+        return Layout.MakeColor(16, 185, 129, a)
+    else
+        return Layout.MakeColor(148, 163, 184, a)
+    end
+end
+
+-- 统一配置文本框的美术样式（开启深色描边、字号、字色与富文本）
+function Layout.ApplyTextStyle(textCtrl, fontSize, fontColor, outlineColor)
+    if not textCtrl or not textCtrl.alive then return end
+    if fontSize then
+        pcall(function() textCtrl.fontSize = fontSize end)
+    end
+    if fontColor then
+        pcall(function() textCtrl.fontColor = fontColor end)
+    end
+    pcall(function()
+        textCtrl.enableOutline = true
+        textCtrl.outlineColor = outlineColor or Layout.PALETTE.BG_DARK
+        textCtrl.richText = true
+    end)
+end
+
 return Layout

@@ -670,6 +670,43 @@ function Layout.GetFactionName(faction)
     end
 end
 
+-- 线性插值工具
+function Layout.Lerp(a, b, t)
+    return a + (b - a) * Layout.Clamp(t, 0, 1)
+end
+
+-- 根据阵营获取带指定透明度的光晕色
+function Layout.GetFactionGlowColor(faction, alpha)
+    local a = Layout.Clamp(math.floor(alpha or 120), 0, 255)
+    if faction == "player" then
+        return Layout.MakeColor(56, 189, 248, a)
+    elseif faction == "enemy" or faction == "enemy_red" then
+        return Layout.MakeColor(244, 63, 94, a)
+    elseif faction == "enemy_purple" then
+        return Layout.MakeColor(168, 85, 247, a)
+    elseif faction == "enemy_green" then
+        return Layout.MakeColor(16, 185, 129, a)
+    else
+        return Layout.MakeColor(148, 163, 184, a)
+    end
+end
+
+-- 统一配置文本框的美术样式（开启深色描边、字号、字色与富文本）
+function Layout.ApplyTextStyle(textCtrl, fontSize, fontColor, outlineColor)
+    if not textCtrl or not textCtrl.alive then return end
+    if fontSize then
+        pcall(function() textCtrl.fontSize = fontSize end)
+    end
+    if fontColor then
+        pcall(function() textCtrl.fontColor = fontColor end)
+    end
+    pcall(function()
+        textCtrl.enableOutline = true
+        textCtrl.outlineColor = outlineColor or Layout.PALETTE.BG_DARK
+        textCtrl.richText = true
+    end)
+end
+
 return Layout
 
 end
@@ -1933,18 +1970,29 @@ _MODULES["world/factionAI"] = _MODULES["src/world/factionAI"]
 
 _MODULES["src/ui/visualRenderer"] = function()
 -- src/ui/visualRenderer.lua
--- 提瓦特星图几何视觉渲染器（光轨羽化光束、正弦能量脉冲、三层差速星轨自转、拓扑交互高亮）
+-- 提瓦特星象仪级几何视觉渲染器
+-- 包含：三层文字分离黄金分割排版、三层差速星环与易主动态弹性波、柔边羽化光轨、正弦呼吸脉冲与拓扑交互指引
 
 local Layout = require("default_import_file/src/core/layout") or require("src/core/layout")
 local StarMap = require("default_import_file/src/world/starMap") or require("src/world/starMap")
 
 local VisualRenderer = {
-    -- 缓存探测特性：消除每帧热点循环内的匿名 pcall 闭包
+    isLayoutInitialized = false,
     hasRadialApiChecked = false,
     hasRadialApi = false
 }
 
--- 初始化连线图元柔边羽化 (消除矩形生硬感，形成流光能量束)
+-- 异象视觉风格表
+local ANOMALY_STYLE = {
+    AMBER_MINE      = { label = "✦ 石珀晶矿", colorKey = "AMBER" },
+    WIND_FLOW       = { label = "❖ 疾风流道", colorKey = "ANEMO" },
+    MIST_RUINS      = { label = "◈ 迷雾荒墟", colorKey = "TEXT_MUTED" },
+    DEFENSE_BASTION = { label = "❖ 雷暴要塞", colorKey = "GOLD" },
+    PURE_WATER      = { label = "✦ 纯水枢纽", colorKey = "PLAYER" },
+    PLASMA          = { label = "✴ 赤阳熔核", colorKey = "ENEMY" }
+}
+
+-- 初始化连线柔边羽化 (消除矩形生硬折角，构建星轨能量束)
 function VisualRenderer.InitLineSoftEdge(routeCtrls, staticLinkCtrls)
     if routeCtrls then
         for _, lineCtrl in ipairs(routeCtrls) do
@@ -1952,7 +2000,7 @@ function VisualRenderer.InitLineSoftEdge(routeCtrls, staticLinkCtrls)
                 pcall(function()
                     lineCtrl.enableSoftEdge = true
                     if lineCtrl.SetSoftEdgeWidth then
-                        lineCtrl:SetSoftEdgeWidth(2, 4) -- 左右微羽化，上下边缘强羽化形成光柱感
+                        lineCtrl:SetSoftEdgeWidth(2, 4)
                     end
                 end)
             end
@@ -1972,7 +2020,49 @@ function VisualRenderer.InitLineSoftEdge(routeCtrls, staticLinkCtrls)
     end
 end
 
--- 动态绘制/变换单条线段条带控件 (使用 width = dist, height = thickness, pivot = (0, 0.5), rotationZ = angle)
+-- 一次性初始化所有灵穴节点的三层文字排版锚点与深色描边样式 (避免每帧重复调用造成额外开销)
+local function EnsureNodeLayoutInitialized(nodeUIList)
+    if VisualRenderer.isLayoutInitialized then return end
+    VisualRenderer.isLayoutInitialized = true
+
+    if not nodeUIList then return end
+    for _, ui in ipairs(nodeUIList) do
+        -- 1. 核心兵力大字 (居中锚定于圆盘正中央)
+        if ui.particleText and ui.particleText.alive then
+            Layout.ApplyTextStyle(ui.particleText, 20, Layout.PALETTE.TEXT_LIGHT, Layout.PALETTE.BG_DARK)
+            pcall(function()
+                ui.particleText.anchoredPositionX = 0
+                ui.particleText.anchoredPositionY = 0
+            end)
+        end
+        -- 2. 底部灵穴名称 (下移至圆盘正下方外侧，不遮挡核心兵力)
+        if ui.titleText and ui.titleText.alive then
+            Layout.ApplyTextStyle(ui.titleText, 12, Layout.PALETTE.TEXT_LIGHT, Layout.PALETTE.BG_DARK)
+            pcall(function()
+                ui.titleText.anchoredPositionX = 0
+                ui.titleText.anchoredPositionY = -34
+            end)
+        end
+        -- 3. 顶部异象标识 (上移至圆盘外侧上方)
+        if ui.anomalyText and ui.anomalyText.alive then
+            Layout.ApplyTextStyle(ui.anomalyText, 11, Layout.PALETTE.GOLD, Layout.PALETTE.BG_DARK)
+            pcall(function()
+                ui.anomalyText.anchoredPositionX = 0
+                ui.anomalyText.anchoredPositionY = 34
+            end)
+        end
+        -- 4. 顶部战术状态提示 (置于异象上方或交替呈现)
+        if ui.statusText and ui.statusText.alive then
+            Layout.ApplyTextStyle(ui.statusText, 11, Layout.PALETTE.ANEMO, Layout.PALETTE.BG_DARK)
+            pcall(function()
+                ui.statusText.anchoredPositionX = 0
+                ui.statusText.anchoredPositionY = 48
+            end)
+        end
+    end
+end
+
+-- 动态绘制/变换单条线段条带控件
 function VisualRenderer.SetLineTransform(lineCtrl, x1, y1, x2, y2, thickness, color)
     if not lineCtrl or not lineCtrl.alive then return end
 
@@ -1994,7 +2084,6 @@ end
 
 -- 更新所有活跃光轨与拖拽连线（支持正弦能量呼吸脉冲与拖拽导引）
 function VisualRenderer.UpdateRoutes(routeCtrls, routes, nodes, dragLineCtrl, inputState, elapsedTime)
-    -- 1. 活跃光轨
     local activeCount = #routes
     local maxCtrls = #routeCtrls
 
@@ -2010,15 +2099,14 @@ function VisualRenderer.UpdateRoutes(routeCtrls, routes, nodes, dragLineCtrl, in
                     local baseCol = Layout.GetFactionColor(r.faction)
                     local isBoosted = (nA.anomaly == "WIND_FLOW" or (r.boostedUntil and r.boostedUntil > elapsedTime))
 
-                    -- 处于「疾风流道」或「千风湍流」：千风翠碧色
                     if isBoosted then
                         baseCol = Layout.PALETTE.ANEMO
                     end
 
-                    -- 正弦能量脉冲：粗细在 6px~9px 间平滑呼吸，透明度在 170~250 之间流转
+                    -- 正弦能量脉冲：粗细 5.5px~8.5px 呼吸，透明度 170~250 流转
                     local pulse = 0.5 + 0.5 * math.sin(elapsedTime * 5.0 + (r.fromId or 0))
-                    local baseThickness = isBoosted and 8.0 or 5.5
-                    local thickness = baseThickness + pulse * 2.5
+                    local baseThickness = isBoosted and 7.5 or 5.0
+                    local thickness = baseThickness + pulse * 2.2
                     local alpha = math.floor(170 + pulse * 80)
                     local pulseCol = Layout.WithAlpha(baseCol, alpha)
 
@@ -2032,19 +2120,20 @@ function VisualRenderer.UpdateRoutes(routeCtrls, routes, nodes, dragLineCtrl, in
         end
     end
 
-    -- 2. 拖拽实时导引线 (金岩光芒引导线)
+    -- 拖拽实时导引线 (曜金星轨引导)
     if dragLineCtrl and dragLineCtrl.alive then
         if inputState.isDragging and inputState.dragSourceId ~= nil then
             local sourceNode = StarMap.GetNode(nodes, inputState.dragSourceId)
             if sourceNode then
                 local pulse = 0.5 + 0.5 * math.sin(elapsedTime * 8.0)
-                local dragThickness = 3.5 + pulse * 1.5
+                local dragThickness = 3.2 + pulse * 1.5
+                local dragColor = Layout.WithAlpha(Layout.PALETTE.GOLD, math.floor(160 + pulse * 95))
                 VisualRenderer.SetLineTransform(
                     dragLineCtrl,
                     sourceNode.x, sourceNode.y,
                     inputState.dragCurrentX, inputState.dragCurrentY,
                     dragThickness,
-                    Layout.PALETTE.GOLD
+                    dragColor
                 )
             else
                 Layout.SetVisible(dragLineCtrl, false)
@@ -2055,8 +2144,10 @@ function VisualRenderer.UpdateRoutes(routeCtrls, routes, nodes, dragLineCtrl, in
     end
 end
 
--- 更新地脉节点各层视觉呈现（差速自转、心跳呼吸、拖拽拓扑高亮、文字描边与字号动态映射）
+-- 更新地脉节点视觉呈现 (三层文字黄金分割排版、差速旋转、易主/受击弹性波、拓扑连通高亮)
 function VisualRenderer.UpdateNodes(nodeUIList, nodes, elapsedTime, inputState)
+    EnsureNodeLayoutInitialized(nodeUIList)
+
     local isDragging = inputState and inputState.isDragging and inputState.dragSourceId ~= nil
     local dragSourceId = isDragging and inputState.dragSourceId or nil
     local validNeighborsMap = {}
@@ -2072,159 +2163,171 @@ function VisualRenderer.UpdateNodes(nodeUIList, nodes, elapsedTime, inputState)
         local ui = nodeUIList[i]
         if ui then
             local factionColor = Layout.GetFactionColor(node.faction)
+            local currentParts = math.floor(node.particles or 0)
             local isSource = (isDragging and node.id == dragSourceId)
             local isValidNeighbor = (isDragging and validNeighborsMap[node.id])
+            local phase = (node.id or i) * 1.5
 
-            -- 0. 节点整体缩放与明暗处理 (拖拽连线时合法邻居高亮并轻微放大，非邻居半透明压暗)
-            if isDragging then
-                if isSource then
-                    ui.group.localScaleX = 1.18
-                    ui.group.localScaleY = 1.18
-                elseif isValidNeighbor then
-                    local neighPulse = 1.12 + 0.05 * math.sin(elapsedTime * 6.0 + node.id)
-                    ui.group.localScaleX = neighPulse
-                    ui.group.localScaleY = neighPulse
+            -- 1. 监测易主与兵力跳变，驱动动效弹性缩放冲击波 (Scale Pop)
+            if ui.lastFaction ~= nil and ui.lastFaction ~= node.faction then
+                ui.capturePulse = 1.0 -- 易主爆发强烈冲击波
+            end
+            if ui.lastParticles ~= nil and ui.lastParticles ~= currentParts then
+                ui.numberPulse = math.min(1.0, (ui.numberPulse or 0) + 0.45)
+            end
+            ui.lastFaction = node.faction
+            ui.lastParticles = currentParts
+            ui.capturePulse = math.max(0, (ui.capturePulse or 0) - 0.05)
+            ui.numberPulse  = math.max(0, (ui.numberPulse or 0) - 0.08)
+
+            -- 2. 节点整体缩放与明暗处理 (拖拽连线时合法邻居高亮并放大，非邻居半透明压暗)
+            if ui.group and ui.group.alive then
+                if isDragging then
+                    if isSource then
+                        ui.group.localScaleX = 1.18
+                        ui.group.localScaleY = 1.18
+                    elseif isValidNeighbor then
+                        local neighPulse = 1.12 + 0.05 * math.sin(elapsedTime * 6.0 + phase)
+                        ui.group.localScaleX = neighPulse
+                        ui.group.localScaleY = neighPulse
+                    else
+                        ui.group.localScaleX = 0.94
+                        ui.group.localScaleY = 0.94
+                    end
                 else
-                    ui.group.localScaleX = 0.95
-                    ui.group.localScaleY = 0.95
+                    -- 平时底盘自呼吸脉冲
+                    local baseScale = node.isIdle and 0.88 or (1.0 + 0.03 * math.sin(elapsedTime * 3.0 + phase))
+                    ui.group.localScaleX = baseScale
+                    ui.group.localScaleY = baseScale
                 end
-            else
-                -- 正常对局底盘心跳呼吸：休眠节点缩小，活跃节点轻微脉动
-                local baseScale = node.isIdle and 0.88 or (1.0 + 0.035 * math.sin(elapsedTime * 3.2 + node.id))
-                ui.group.localScaleX = baseScale
-                ui.group.localScaleY = baseScale
             end
 
-            -- 1. 固守结界环 (第一层：顺时针差速自转，护盾激活时加速旋转 90 deg/s)
+            -- 3. 固守防御环 (第一层：顺时针差速自转 + 庇护/固守状态展示)
             if ui.defenseRing and ui.defenseRing.alive then
                 local isShielded = (node.protectedUntil and node.protectedUntil > elapsedTime)
-                local rotSpeed = isShielded and 90 or 18
-                ui.defenseRing.localRotationZ = (elapsedTime * rotSpeed + node.id * 37) % 360
+                local isFortified = (node.isDefensive and node.routeTo == nil and node.faction ~= "neutral")
 
-                if node.isDefensive and node.routeTo == nil then
+                if isShielded or isFortified or isValidNeighbor then
                     Layout.SetVisible(ui.defenseRing, true)
-                    ui.defenseRing.imageColor = Layout.PALETTE.GOLD_ALPHA
-                elseif isShielded then
-                    Layout.SetVisible(ui.defenseRing, true)
-                    ui.defenseRing.imageColor = Layout.PALETTE.ANEMO
-                elseif isValidNeighbor then
-                    -- 拖拽经过合法邻居时闪耀金环指引
-                    Layout.SetVisible(ui.defenseRing, true)
-                    ui.defenseRing.imageColor = Layout.PALETTE.GOLD
+                    local rotSpeed = isShielded and 80 or 20
+                    ui.defenseRing.localRotationZ = (elapsedTime * rotSpeed + phase * 20) % 360
+                    local ringScale = 1.04 + 0.05 * math.sin(elapsedTime * 4.5 + phase)
+                    pcall(function()
+                        ui.defenseRing.localScaleX = ringScale
+                        ui.defenseRing.localScaleY = ringScale
+                    end)
+
+                    if isShielded then
+                        local pulseA = 170 + 80 * (0.5 + 0.5 * math.sin(elapsedTime * 7.0))
+                        ui.defenseRing.imageColor = Layout.WithAlpha(Layout.PALETTE.ANEMO, pulseA)
+                    elseif isFortified then
+                        ui.defenseRing.imageColor = Layout.PALETTE.GOLD_ALPHA
+                    elseif isValidNeighbor then
+                        ui.defenseRing.imageColor = Layout.PALETTE.GOLD
+                    end
                 else
                     Layout.SetVisible(ui.defenseRing, false)
                 end
             end
 
-            -- 2. 节点主体共鸣外环 (第二层：逆时针微转，平滑填充过渡，消除每帧 pcall)
+            -- 4. 灵穴核心底盘 (BaseDisc)：阵营暗底染色 + 内陆休眠微缩 / 易主回弹
+            if ui.baseDisc and ui.baseDisc.alive then
+                local breathe = node.isIdle and -0.06 or (0.03 * math.sin(elapsedTime * 3.0 + phase))
+                local discScale = 1.0 + breathe + (ui.capturePulse * 0.32)
+                local discAlpha = node.isIdle and 140 or 225
+                ui.baseDisc.imageColor = Layout.GetFactionGlowColor(node.faction, discAlpha)
+                pcall(function()
+                    ui.baseDisc.localScaleX = discScale
+                    ui.baseDisc.localScaleY = discScale
+                end)
+            end
+
+            -- 5. 灵穴主体共鸣外环 (第二层：逆时针微转 + Lerp 阻尼平滑进度)
             if ui.resonanceRing and ui.resonanceRing.alive then
-                ui.resonanceRing.localRotationZ = -(elapsedTime * 12 + node.id * 23) % 360
+                ui.resonanceRing.localRotationZ = -(elapsedTime * 14 + phase * 15) % 360
 
                 if isDragging and not isSource and not isValidNeighbor then
-                    ui.resonanceRing.imageColor = Layout.WithAlpha(factionColor, 95)
+                    ui.resonanceRing.imageColor = Layout.WithAlpha(factionColor, 90)
                 else
                     ui.resonanceRing.imageColor = factionColor
                 end
 
-                local targetProgress = Layout.Clamp(node.control / 100, 0.05, 1.0)
-                ui.currentFill = (ui.currentFill or targetProgress) + (targetProgress - (ui.currentFill or targetProgress)) * 0.2
+                local targetProgress = Layout.Clamp((node.control or 100) / 100, 0.06, 1.0)
+                ui.smoothProgress = Layout.Lerp(ui.smoothProgress or targetProgress, targetProgress, 0.2)
+
+                local ringPop = 1.0 + (ui.capturePulse * 0.25)
+                pcall(function()
+                    ui.resonanceRing.localScaleX = ringPop
+                    ui.resonanceRing.localScaleY = ringPop
+                end)
 
                 if not VisualRenderer.hasRadialApiChecked then
                     VisualRenderer.hasRadialApiChecked = true
-                    VisualRenderer.hasRadialApi = (ui.resonanceRing.SetFillRadial360 ~= nil)
+                    VisualRenderer.hasRadialApi = (ui.resonanceRing.SetFillRadial360 ~= nil and Enum and Enum.ImageFillRadialType ~= nil)
                 end
 
                 if VisualRenderer.hasRadialApi then
-                    ui.resonanceRing:SetFillRadial360(Enum.ImageFillRadialType.Top, ui.currentFill)
+                    ui.resonanceRing:SetFillRadial360(Enum.ImageFillRadialType.Top, ui.smoothProgress)
                 else
-                    ui.resonanceRing.fillAmount = ui.currentFill
+                    ui.resonanceRing.fillAmount = ui.smoothProgress
                 end
             end
 
-            -- 3. 兵力与灵穴名称统筹呈现 (统一深色描边 + 兵力字号动态映射)
-            local currentParts = math.floor(node.particles or 0)
-            if ui.titleText and ui.titleText.alive then
-                -- 启用深色描边
-                if ui.titleText.enableOutline ~= nil and not ui.titleText._outlined then
-                    ui.titleText.enableOutline = true
-                    ui.titleText.outlineColor = Layout.MakeColor(15, 20, 35, 230)
-                    ui.titleText._outlined = true
-                end
-
-                -- 动态映射字号：兵力越充沛越具威慑感 (12 ~ 15)
-                local dynamicFontSize = math.floor(Layout.Clamp(12 + currentParts * 0.08, 12, 15))
-                if ui.titleText.fontSize ~= dynamicFontSize then
-                    ui.titleText.fontSize = dynamicFontSize
-                end
-
-                ui.titleText.text = string.format("%s (%d)", node.name, currentParts)
-                if isDragging and not isSource and not isValidNeighbor then
-                    ui.titleText.fontColor = Layout.WithAlpha(Layout.PALETTE.TEXT_LIGHT, 120)
-                else
-                    ui.titleText.fontColor = Layout.PALETTE.TEXT_LIGHT
-                end
-                Layout.SetVisible(ui.titleText, true)
-            end
-
+            -- 6. 核心兵力数字与底部灵穴名称分离渲染 (黄金分割排版)
             if ui.particleText and ui.particleText.alive then
-                Layout.SetVisible(ui.particleText, false)
+                Layout.SetVisible(ui.particleText, true)
+                ui.particleText.text = tostring(currentParts)
+                local dynamicFontSize = math.floor(Layout.Clamp(17 + currentParts * 0.12 + ui.numberPulse * 3, 17, 25))
+                pcall(function()
+                    ui.particleText.fontSize = dynamicFontSize
+                    local numScale = 1.0 + ui.numberPulse * 0.16
+                    ui.particleText.localScaleX = numScale
+                    ui.particleText.localScaleY = numScale
+                end)
+                ui.particleText.fontColor = (currentParts >= 40) and Layout.PALETTE.GOLD or Layout.PALETTE.TEXT_LIGHT
             end
 
-            -- 4. 异象标识文本 (统一加深色描边)
-            if ui.anomalyText and ui.anomalyText.alive then
-                if ui.anomalyText.enableOutline ~= nil and not ui.anomalyText._outlined then
-                    ui.anomalyText.enableOutline = true
-                    ui.anomalyText.outlineColor = Layout.MakeColor(15, 20, 35, 230)
-                    ui.anomalyText._outlined = true
+            if ui.titleText and ui.titleText.alive then
+                Layout.SetVisible(ui.titleText, true)
+                ui.titleText.text = "「" .. tostring(node.name or "灵穴") .. "」"
+                if isDragging and not isSource and not isValidNeighbor then
+                    ui.titleText.fontColor = Layout.WithAlpha(Layout.PALETTE.TEXT_LIGHT, 110)
+                else
+                    ui.titleText.fontColor = (node.faction == "neutral") and Layout.PALETTE.NEUTRAL or Layout.PALETTE.TEXT_LIGHT
                 end
+            end
 
-                if node.anomaly == "AMBER_MINE" then
-                    ui.anomalyText.text = "【石珀晶矿】"
-                    ui.anomalyText.fontColor = Layout.PALETTE.AMBER
-                    Layout.SetVisible(ui.anomalyText, true)
-                elseif node.anomaly == "WIND_FLOW" then
-                    ui.anomalyText.text = "【疾风流道】"
-                    ui.anomalyText.fontColor = Layout.PALETTE.ANEMO
-                    Layout.SetVisible(ui.anomalyText, true)
-                elseif node.anomaly == "MIST_RUINS" then
-                    ui.anomalyText.text = "【迷雾荒墟】"
-                    ui.anomalyText.fontColor = Layout.PALETTE.TEXT_MUTED
-                    Layout.SetVisible(ui.anomalyText, true)
-                elseif node.anomaly == "DEFENSE_BASTION" then
-                    ui.anomalyText.text = "【雷暴要塞】"
-                    ui.anomalyText.fontColor = Layout.PALETTE.GOLD
-                    Layout.SetVisible(ui.anomalyText, true)
-                elseif node.anomaly == "PURE_WATER" then
-                    ui.anomalyText.text = "【纯水枢纽】"
-                    ui.anomalyText.fontColor = Layout.PALETTE.PLAYER
-                    Layout.SetVisible(ui.anomalyText, true)
-                elseif node.anomaly == "PLASMA" then
-                    ui.anomalyText.text = "【赤阳熔核】"
-                    ui.anomalyText.fontColor = Layout.PALETTE.ENEMY
+            -- 7. 顶部异象标签 (提瓦特星象符号与专属配色)
+            local hasAnomaly = false
+            if ui.anomalyText and ui.anomalyText.alive then
+                local style = node.anomaly and ANOMALY_STYLE[node.anomaly]
+                if style then
+                    hasAnomaly = true
+                    ui.anomalyText.text = style.label
+                    ui.anomalyText.fontColor = Layout.PALETTE[style.colorKey] or Layout.PALETTE.GOLD
                     Layout.SetVisible(ui.anomalyText, true)
                 else
                     Layout.SetVisible(ui.anomalyText, false)
                 end
             end
 
-            -- 5. 占领进度与状态标签
+            -- 8. 顶部实时战术状态小字 (护盾倒计时、固守、掌控动摇、内陆休眠)
             if ui.statusText and ui.statusText.alive then
-                if ui.statusText.enableOutline ~= nil and not ui.statusText._outlined then
-                    ui.statusText.enableOutline = true
-                    ui.statusText.outlineColor = Layout.MakeColor(15, 20, 35, 230)
-                    ui.statusText._outlined = true
-                end
+                pcall(function()
+                    ui.statusText.anchoredPositionY = hasAnomaly and 50 or 34
+                end)
 
-                if node.faction == "neutral" then
-                    if (node.control or 0) > 0 and node.contenderFaction then
-                        local fName = Layout.GetFactionName(node.contenderFaction)
-                        local col = Layout.GetFactionColor(node.contenderFaction)
-                        ui.statusText.text = string.format("[%s掌控 %d%%]", fName, math.floor(node.control))
-                        ui.statusText.fontColor = col
-                        Layout.SetVisible(ui.statusText, true)
-                    else
-                        Layout.SetVisible(ui.statusText, false)
-                    end
+                if node.protectedUntil and node.protectedUntil > elapsedTime then
+                    local remain = math.max(0.1, node.protectedUntil - elapsedTime)
+                    ui.statusText.text = string.format("❖ 庇护 %.1fs", remain)
+                    ui.statusText.fontColor = Layout.PALETTE.ANEMO
+                    Layout.SetVisible(ui.statusText, true)
+                elseif node.faction == "neutral" and (node.control or 0) > 0 and node.contenderFaction then
+                    local fName = Layout.GetFactionName(node.contenderFaction)
+                    local col = Layout.GetFactionColor(node.contenderFaction)
+                    ui.statusText.text = string.format("[%s掌控 %d%%]", fName, math.floor(node.control))
+                    ui.statusText.fontColor = col
+                    Layout.SetVisible(ui.statusText, true)
                 elseif node.faction ~= "neutral" and (node.control or 100) < 100 then
                     local fName = Layout.GetFactionName(node.faction)
                     local col = Layout.GetFactionColor(node.faction)
@@ -2232,15 +2335,15 @@ function VisualRenderer.UpdateNodes(nodeUIList, nodes, elapsedTime, inputState)
                     ui.statusText.fontColor = col
                     Layout.SetVisible(ui.statusText, true)
                 elseif node.isIdle then
-                    ui.statusText.text = "[腹地休眠]"
+                    ui.statusText.text = "◈ 腹地休眠"
                     ui.statusText.fontColor = Layout.PALETTE.TEXT_MUTED
                     Layout.SetVisible(ui.statusText, true)
-                elseif node.isDefensive and node.routeTo == nil then
-                    ui.statusText.text = "[驻阵固守]"
+                elseif node.isDefensive and node.routeTo == nil and node.faction ~= "neutral" then
+                    ui.statusText.text = "✦ 固守结界"
                     ui.statusText.fontColor = Layout.PALETTE.GOLD
                     Layout.SetVisible(ui.statusText, true)
                 elseif node.routeTo ~= nil then
-                    ui.statusText.text = "[输送中 ➔]"
+                    ui.statusText.text = "➔ 输送中"
                     ui.statusText.fontColor = factionColor
                     Layout.SetVisible(ui.statusText, true)
                 else
@@ -2253,7 +2356,6 @@ end
 
 -- 关卡拓扑几何重布局 (按当前章节的节点坐标与连线刷新沙盘)
 function VisualRenderer.ApplyStageLayout(nodeUIList, nodes, staticLinkCtrls, links)
-    -- 1. 更新节点位置与可见性
     for i, ui in ipairs(nodeUIList) do
         local node = nodes[i]
         if node and ui.group and ui.group.alive then
@@ -2265,7 +2367,6 @@ function VisualRenderer.ApplyStageLayout(nodeUIList, nodes, staticLinkCtrls, lin
         end
     end
 
-    -- 2. 更新静态底轨连线
     if staticLinkCtrls and links then
         for i, linkCtrl in ipairs(staticLinkCtrls) do
             local link = links[i]
@@ -2305,7 +2406,7 @@ _MODULES["ui/visualRenderer"] = _MODULES["src/ui/visualRenderer"]
 
 _MODULES["src/ui/dialoguePlayer"] = function()
 -- src/ui/dialoguePlayer.lua
--- 开场逐字剧情演播器（阿贝多与派蒙台词演出、跳过与推进）
+-- 开场逐字剧情演示播报 (UTF-8 安全逐字打印、原神剧场级对话框、呼吸光标提示)
 
 local Layout = require("default_import_file/src/core/layout") or require("src/core/layout")
 
@@ -2313,31 +2414,59 @@ local DialoguePlayer = {
     DIALOGUES = {
         {
             speaker = "派蒙",
-            color = Layout.PALETTE.GOLD,
+            title   = "最好的伙伴",
+            color   = Layout.PALETTE.GOLD,
             content = "哇！阿贝多，这个泛着蓝光的大圆盘是什么呀？\n上面亮晶晶的小圆点，看起来好像……会发光的甜甜花糖豆！"
         },
         {
             speaker = "阿贝多",
-            color = Layout.PALETTE.PLAYER,
+            title   = "白垩之子",
+            color   = Layout.PALETTE.PLAYER,
             content = "呵呵，派蒙，这可不能吃。这是我和教令院学者共同复原的\n古代战争推衍法器——「地脉星图棋盘」。"
         },
         {
             speaker = "阿贝多",
-            color = Layout.PALETTE.PLAYER,
-            content = "盘面上每一个光点都象征着一处地脉灵穴，而流动的光尘则是纯净元素微粒。\n拖拽己方灵穴铺设光轨，轻点灵穴收拢防御。"
+            title   = "白垩之子",
+            color   = Layout.PALETTE.PLAYER,
+            content = "盘面上每一个光点都象征着一处地脉灵穴，而流动的光尘则是纯净元素微粒。\n拖拽己方灵穴铺设光轨，轻点灵穴即可收拢固守。"
         },
         {
             speaker = "派蒙",
-            color = Layout.PALETTE.GOLD,
-            content = "听起来很有意思！旅行者，快调配你的战术符印，\n我们一起执掌星盘赢得推衍吧！"
+            title   = "最好的伙伴",
+            color   = Layout.PALETTE.GOLD,
+            content = "听起来很有意思！旅行者，快调配你的战术符印，\n让我们一起执掌星盘赢得推衍吧！"
         }
     },
     currentIndex = 1,
     charIndex = 0,
     charTimer = 0,
+    elapsed = 0,
     isComplete = false,
+    isStyleApplied = false,
     onFinished = nil
 }
+
+-- UTF-8 安全步进函数：从当前字节位置向前推进 count 个完整 UTF-8 字符，避免切断 3 字节中文产生乱码
+local function StepUTF8ByteIndex(str, currentByteIdx, charStepCount)
+    local len = #str
+    local idx = currentByteIdx or 0
+    for _ = 1, (charStepCount or 1) do
+        if idx >= len then return len end
+        local nextPos = idx + 1
+        local b = string.byte(str, nextPos)
+        if not b then return len end
+        local charBytes = 1
+        if b >= 240 then
+            charBytes = 4
+        elseif b >= 224 then
+            charBytes = 3
+        elseif b >= 192 then
+            charBytes = 2
+        end
+        idx = math.min(len, idx + charBytes)
+    end
+    return idx
+end
 
 function DialoguePlayer.Init(dialoguesOrCb, onFinishedCallback)
     if type(dialoguesOrCb) == "table" then
@@ -2350,7 +2479,9 @@ function DialoguePlayer.Init(dialoguesOrCb, onFinishedCallback)
     DialoguePlayer.currentIndex = 1
     DialoguePlayer.charIndex = 0
     DialoguePlayer.charTimer = 0
+    DialoguePlayer.elapsed = 0
     DialoguePlayer.isComplete = false
+    DialoguePlayer.isStyleApplied = false
 end
 
 function DialoguePlayer.GetCurrentLine()
@@ -2361,50 +2492,66 @@ end
 function DialoguePlayer.Update(dt, speakerTextCtrl, contentTextCtrl)
     if DialoguePlayer.isComplete then return end
 
-    local line = DialoguePlayer.GetCurrentLine()
-    if not line then
+    DialoguePlayer.elapsed = (DialoguePlayer.elapsed or 0) + dt
+
+    if not DialoguePlayer.isStyleApplied then
+        DialoguePlayer.isStyleApplied = true
+        Layout.ApplyTextStyle(speakerTextCtrl, 20, Layout.PALETTE.GOLD, Layout.PALETTE.BG_DARK)
+        Layout.ApplyTextStyle(contentTextCtrl, 17, Layout.PALETTE.TEXT_LIGHT, Layout.PALETTE.BG_DARK)
+        pcall(function() contentTextCtrl.lineSpacing = 1.25 end)
+    end
+
+    local cur = DialoguePlayer.GetCurrentLine()
+    if not cur then
         DialoguePlayer.Finish()
         return
     end
 
     if speakerTextCtrl and speakerTextCtrl.alive then
-        speakerTextCtrl.text = "【" .. line.speaker .. "】"
-        local col = line.color
-        if not col then
-            if line.speaker == "阿贝多" then
-                col = Layout.PALETTE.PLAYER
-            elseif line.speaker == "派蒙" then
-                col = Layout.PALETTE.GOLD
-            else
-                col = Layout.PALETTE.TEXT_LIGHT
-            end
-        end
-        local colInt = type(col) == "number" and col or (Layout and Layout.ToColorInt and Layout.ToColorInt(col) or Layout.PALETTE.GOLD)
-        pcall(function() speakerTextCtrl.fontColor = colInt end)
+        local titleSuffix = cur.title and (" · 「" .. cur.title .. "」") or ""
+        speakerTextCtrl.text = "✦ " .. tostring(cur.speaker or "") .. titleSuffix
+        speakerTextCtrl.fontColor = cur.color or Layout.PALETTE.GOLD
     end
 
+    local fullText = cur.content or ""
+    local totalBytes = #fullText
 
-    DialoguePlayer.charTimer = DialoguePlayer.charTimer + dt
-    if DialoguePlayer.charTimer >= 0.03 then
-        DialoguePlayer.charTimer = 0
-        local totalLen = utf8 and utf8.len(line.content) or string.len(line.content)
-        if DialoguePlayer.charIndex < totalLen then
-            DialoguePlayer.charIndex = DialoguePlayer.charIndex + 1
+    if DialoguePlayer.charIndex < totalBytes then
+        DialoguePlayer.charTimer = DialoguePlayer.charTimer + dt
+        if DialoguePlayer.charTimer >= 0.028 then
+            DialoguePlayer.charTimer = 0
+            DialoguePlayer.charIndex = StepUTF8ByteIndex(fullText, DialoguePlayer.charIndex, 1)
         end
     end
 
     if contentTextCtrl and contentTextCtrl.alive then
-        -- 简易截取或直接呈现全段文字
-        contentTextCtrl.text = line.content
+        local subStr = string.sub(fullText, 1, DialoguePlayer.charIndex)
+        -- 整句打字完毕后，在句末追加呼吸闪烁的光标；打字中展示推进星芒
+        if DialoguePlayer.charIndex >= totalBytes then
+            local cursor = (math.floor(DialoguePlayer.elapsed * 3) % 2 == 0) and "  ▾" or "  ▿"
+            contentTextCtrl.text = subStr .. cursor
+        else
+            contentTextCtrl.text = subStr .. " ✦"
+        end
     end
 end
 
 function DialoguePlayer.Next()
-    if DialoguePlayer.currentIndex < #DialoguePlayer.DIALOGUES then
+    local cur = DialoguePlayer.GetCurrentLine()
+    if not cur then return end
+    local fullText = cur.content or ""
+
+    if DialoguePlayer.charIndex < #fullText then
+        -- 点击快速完成当前句打字
+        DialoguePlayer.charIndex = #fullText
+    else
         DialoguePlayer.currentIndex = DialoguePlayer.currentIndex + 1
         DialoguePlayer.charIndex = 0
-    else
-        DialoguePlayer.Finish()
+        DialoguePlayer.charTimer = 0
+        local list = DialoguePlayer.currentList or DialoguePlayer.DIALOGUES
+        if DialoguePlayer.currentIndex > #list then
+            DialoguePlayer.Finish()
+        end
     end
 end
 
@@ -2668,35 +2815,94 @@ _MODULES["ui/prepareView"] = _MODULES["src/ui/prepareView"]
 
 _MODULES["src/ui/hudView"] = function()
 -- src/ui/hudView.lua
--- HUD 顶部掌控进度、倒计时、浮窗 Toast 播报与终局结算面板
+-- HUD 顶部掌控进度、倒计时、提瓦特敕令风 Toast 浮窗与终局结算面板
 
 local Layout = require("default_import_file/src/core/layout") or require("src/core/layout")
 
 local HudView = {
     toastText = "",
     toastTimer = 0,
+    toastDuration = 2.4,
+    toastRGB = { r = 251, g = 191, b = 36 },
     isSettled = false,
+    isStyleInitialized = false,
     onRetry = nil
 }
 
 function HudView.Init(onRetryCallback)
     HudView.toastText = ""
     HudView.toastTimer = 0
+    HudView.toastDuration = 2.4
+    HudView.toastRGB = { r = 251, g = 191, b = 36 }
     HudView.isSettled = false
+    HudView.isStyleInitialized = false
     HudView.onRetry = onRetryCallback
 end
 
-function HudView.ShowToast(msg)
-    HudView.toastText = msg or ""
-    HudView.toastTimer = 2.5
+-- 根据提示文本内容自动推断视觉语义与提瓦特配色
+local function ResolveToastStyle(msg, explicitType)
+    local t = explicitType
+    if not t then
+        if string.find(msg, "不足") or string.find(msg, "无法") or string.find(msg, "冷却") or string.find(msg, "警告") or string.find(msg, "失守") or string.find(msg, "未连通") then
+            t = "warn"
+        elseif string.find(msg, "符印") or string.find(msg, "施加") or string.find(msg, "激活") or string.find(msg, "守护") then
+            t = "spell"
+        else
+            t = "info"
+        end
+    end
+
+    if t == "warn" then
+        return "❖ ──  " .. msg .. "  ── ❖", { r = 244, g = 63, b = 94 }   -- 绯红警示
+    elseif t == "spell" then
+        return "✦ ──  " .. msg .. "  ── ✦", { r = 52, g = 211, b = 153 }  -- 千风翠碧敕令
+    else
+        return "✦ ──  " .. msg .. "  ── ✦", { r = 251, g = 191, b = 36 }  -- 曜金星轨播报
+    end
+end
+
+function HudView.ShowToast(msg, toastType)
+    local rawMsg = msg or ""
+    local styledText, rgb = ResolveToastStyle(rawMsg, toastType)
+    HudView.toastText = styledText
+    HudView.toastRGB = rgb
+    HudView.toastDuration = 2.4
+    HudView.toastTimer = HudView.toastDuration
 end
 
 function HudView.UpdateToast(dt, toastContainer, toastTextCtrl)
     if HudView.toastTimer > 0 then
         HudView.toastTimer = HudView.toastTimer - dt
         Layout.SetVisible(toastContainer, true)
+
+        -- 计算弹出回弹缩放 (Pop-in) 与尾部淡出 (Fade-out)
+        local elapsed = HudView.toastDuration - HudView.toastTimer
+        local scale = 1.0
+        if elapsed < 0.18 then
+            -- 0 ~ 0.18s: 从 0.84 快速弹至 1.05
+            scale = Layout.Lerp(0.84, 1.05, elapsed / 0.18)
+        elseif elapsed < 0.30 then
+            -- 0.18 ~ 0.30s: 从 1.05 回落至 1.0
+            scale = Layout.Lerp(1.05, 1.0, (elapsed - 0.18) / 0.12)
+        end
+
+        local alpha = 255
+        if HudView.toastTimer < 0.45 then
+            alpha = math.floor(Layout.Clamp(HudView.toastTimer / 0.45, 0, 1) * 255)
+        end
+
+        if toastContainer and toastContainer.alive then
+            pcall(function()
+                toastContainer.localScaleX = scale
+                toastContainer.localScaleY = scale
+            end)
+        end
+
         if toastTextCtrl and toastTextCtrl.alive then
+            Layout.ApplyTextStyle(toastTextCtrl, 18, nil, Layout.PALETTE.BG_DARK)
             toastTextCtrl.text = HudView.toastText
+            local c = HudView.toastRGB
+            toastTextCtrl.fontColor = Layout.MakeColor(c.r, c.g, c.b, alpha)
         end
     else
         Layout.SetVisible(toastContainer, false)
@@ -2705,6 +2911,13 @@ end
 
 -- 更新顶部掌控条与计时
 function HudView.UpdateTopBar(timeRemaining, nodes, playerPctCtrl, enemyPctCtrl, timerCtrl, barPlayerCtrl, barEnemyCtrl)
+    if not HudView.isStyleInitialized then
+        HudView.isStyleInitialized = true
+        Layout.ApplyTextStyle(playerPctCtrl, 15, Layout.PALETTE.PLAYER, Layout.PALETTE.BG_DARK)
+        Layout.ApplyTextStyle(enemyPctCtrl, 15, Layout.PALETTE.ENEMY, Layout.PALETTE.BG_DARK)
+        Layout.ApplyTextStyle(timerCtrl, 20, Layout.PALETTE.TEXT_LIGHT, Layout.PALETTE.BG_DARK)
+    end
+
     local pNodes, eNodes = 0, 0
     local pParticles, eParticles = 0, 0
 
@@ -2727,24 +2940,33 @@ function HudView.UpdateTopBar(timeRemaining, nodes, playerPctCtrl, enemyPctCtrl,
     local ePct = 100 - pPct
 
     if playerPctCtrl and playerPctCtrl.alive then
-        playerPctCtrl.text = "我方掌控 " .. tostring(pPct) .. "%"
+        playerPctCtrl.text = string.format("✦ 我方星轨 %d%% (%d穴)", pPct, pNodes)
     end
     if enemyPctCtrl and enemyPctCtrl.alive then
-        enemyPctCtrl.text = "敌方压制 " .. tostring(ePct) .. "%"
+        enemyPctCtrl.text = string.format("敌方侵蚀 %d%% (%d穴) ❖", ePct, eNodes)
     end
 
     if barPlayerCtrl and barPlayerCtrl.alive then
-        barPlayerCtrl.sizeDeltaX = math.max(10, math.floor(320 * (pPct / 100)))
+        local targetW = math.max(10, math.floor(320 * (pPct / 100)))
+        barPlayerCtrl.sizeDeltaX = math.floor(Layout.Lerp(barPlayerCtrl.sizeDeltaX or targetW, targetW, 0.2))
     end
     if barEnemyCtrl and barEnemyCtrl.alive then
-        barEnemyCtrl.sizeDeltaX = math.max(10, math.floor(320 * (ePct / 100)))
+        local targetW = math.max(10, math.floor(320 * (ePct / 100)))
+        barEnemyCtrl.sizeDeltaX = math.floor(Layout.Lerp(barEnemyCtrl.sizeDeltaX or targetW, targetW, 0.2))
     end
 
     if timerCtrl and timerCtrl.alive then
         local t = math.max(0, math.floor(timeRemaining))
         local m = math.floor(t / 60)
         local s = t % 60
-        timerCtrl.text = string.format("%02d:%02d", m, s)
+        timerCtrl.text = string.format("%02d : %02d", m, s)
+        -- 剩余不足 30 秒时切换为曜金/猩红闪烁警示
+        if t <= 30 then
+            local blink = (math.floor(timeRemaining * 4) % 2 == 0)
+            timerCtrl.fontColor = blink and Layout.PALETTE.ENEMY or Layout.PALETTE.GOLD
+        else
+            timerCtrl.fontColor = Layout.PALETTE.TEXT_LIGHT
+        end
     end
 end
 
@@ -2770,36 +2992,39 @@ function HudView.ShowSettlement(isWin, nodes, elapsedTime, modalCtrl, titleCtrl,
     local timeStr = string.format("%02d:%02d", math.floor(t / 60), t % 60)
 
     if titleCtrl and titleCtrl.alive then
+        Layout.ApplyTextStyle(titleCtrl, 24, nil, Layout.PALETTE.BG_DARK)
         if isWin then
-            titleCtrl.text = "【推衍大捷·全域共鸣】"
-            titleCtrl.fontColor = Layout.PALETTE.PLAYER
+            titleCtrl.text = "✦ ──  地 脉 推 衍 · 大 捷  ── ✦"
+            titleCtrl.fontColor = Layout.PALETTE.GOLD
         else
-            titleCtrl.text = "【推衍中止·灵脉耗竭】"
+            titleCtrl.text = "❖ ──  星 轨 崩 碎 · 惜 败  ── ❖"
             titleCtrl.fontColor = Layout.PALETTE.ENEMY
         end
     end
 
     if descCtrl and descCtrl.alive then
+        Layout.ApplyTextStyle(descCtrl, 15, Layout.PALETTE.TEXT_LIGHT, Layout.PALETTE.BG_DARK)
         if isWin then
-            descCtrl.text = "星盘之理尽在掌控，地脉灵流归于统御。全域敌对势力已被彻底肃清！"
+            descCtrl.text = "星盘之理尽在掌控，地脉灵流归于统御。全域敌对据点已被彻底肃清！"
         else
-            descCtrl.text = "地脉紊乱，推衍消散。我方灵穴已全部失守，请重新注灵推演。"
+            descCtrl.text = "地脉紊乱，推衍消散。我方地脉源枢失守，不妨重新调配战术符印后再战。"
         end
     end
 
     if statsCtrl and statsCtrl.alive then
+        Layout.ApplyTextStyle(statsCtrl, 14, Layout.PALETTE.AMBER, Layout.PALETTE.BG_DARK)
         statsCtrl.text = string.format("占领灵穴：%d/%d  |  存活兵力：%d  |  耗时：%s", pCount, #nodes, pParts, timeStr)
     end
 end
 
 -- 关卡特殊灵穴效果说明映射表与重要度排序
 local ANOMALY_DESC_MAP = {
-    PLASMA          = "● 赤阳熔核：上限强制限25粒，极速绞肉战场",
-    DEFENSE_BASTION = "● 雷暴要塞：雷暴灵障固守，战损减半",
-    PURE_WATER      = "● 纯水枢纽：纯水激荡，微粒孕育速度提升54%",
-    WIND_FLOW       = "● 疾风流道：地脉输送流速翻倍 (双倍流速)",
-    AMBER_MINE      = "● 石珀富矿：石珀滋养，微粒孕育速度翻倍",
-    MIST_RUINS      = "● 迷雾荒墟：迷雾遮蔽，微粒孕育速度减半"
+    PLASMA          = "【赤阳熔核】上限强制限25粒，极速绞肉战场",
+    DEFENSE_BASTION = "【雷暴要塞】雷暴灵障固守，战损减半",
+    PURE_WATER      = "【纯水枢纽】纯水核心与微粒快速回流 (+54%)",
+    WIND_FLOW       = "【疾风流道】地脉输送流速翻倍 (双倍极速)",
+    AMBER_MINE      = "【石珀晶矿】灵穴能量产出速率翻倍 (+100%)",
+    MIST_RUINS      = "【迷雾荒墟】据点驻防加成，微粒孕育减半"
 }
 
 local ANOMALY_PRIORITY = {
@@ -2811,69 +3036,69 @@ local ANOMALY_PRIORITY = {
     MIST_RUINS      = 6
 }
 
--- 更新左上角关卡特殊灵穴说明与右上角战术操作说明
+-- 更新左上角关卡特殊灵穴说明与右上角战术操作说明 (支持去重与 ×N 统计数量)
 function HudView.UpdateStageInfo(chap, anomalyTitleCtrl, anomalyDescCtrl, guideTitleCtrl, guideDescCtrl)
     if guideTitleCtrl and guideTitleCtrl.alive then
-        pcall(function()
-            guideTitleCtrl.text = "【战术操作指引】"
-            guideTitleCtrl.fontColor = Layout.PALETTE.GOLD
-        end)
+        Layout.ApplyTextStyle(guideTitleCtrl, 14, Layout.PALETTE.GOLD, Layout.PALETTE.BG_DARK)
+        guideTitleCtrl.text = "✦ 【战术操作指引】"
     end
     if guideDescCtrl and guideDescCtrl.alive then
-        pcall(function()
-            guideDescCtrl.text = "● 连线：拖拽己方灵穴至相邻据点建立输送\n● 固守：轻点己方灵穴展开/收拢固守结界\n● 符印：点击下方符印后点击目标灵穴释放"
-        end)
+        Layout.ApplyTextStyle(guideDescCtrl, 12, Layout.PALETTE.TEXT_LIGHT, Layout.PALETTE.BG_DARK)
+        guideDescCtrl.text = "● 连线：拖拽己方灵穴至相邻据点建立输送\n● 固守：轻点己方灵穴展开/收拢固守结界\n● 符印：点击下方符印后点击目标灵穴释放"
     end
 
     if anomalyTitleCtrl and anomalyTitleCtrl.alive then
-        pcall(function()
-            local stageTag = "战场"
-            if chap and chap.title then
-                local m = string.match(chap.title, "第 %d+ 关")
-                if m then
-                    stageTag = m
-                elseif chap.id then
-                    stageTag = string.format("第 %d 关", chap.id)
-                end
-            elseif chap and chap.id then
+        Layout.ApplyTextStyle(anomalyTitleCtrl, 14, Layout.PALETTE.PLAYER, Layout.PALETTE.BG_DARK)
+        local stageTag = "战场"
+        if chap and chap.title then
+            local m = string.match(chap.title, "第 %d+ 关")
+            if m then
+                stageTag = m
+            elseif chap.id then
                 stageTag = string.format("第 %d 关", chap.id)
             end
-            anomalyTitleCtrl.text = string.format("【%s · 地脉情报】", stageTag)
-            anomalyTitleCtrl.fontColor = Layout.PALETTE.PLAYER
-        end)
+        elseif chap and chap.id then
+            stageTag = string.format("第 %d 关", chap.id)
+        end
+        anomalyTitleCtrl.text = string.format("✦ 【%s · 地脉情报】", stageTag)
     end
 
     if anomalyDescCtrl and anomalyDescCtrl.alive then
-        pcall(function()
-            local anomalyKeys = {}
-            local seen = {}
-            if chap and chap.nodes then
-                for _, n in ipairs(chap.nodes) do
-                    if n.anomaly and n.anomaly ~= "NORMAL" and not seen[n.anomaly] then
-                        seen[n.anomaly] = true
-                        table.insert(anomalyKeys, n.anomaly)
-                    end
+        Layout.ApplyTextStyle(anomalyDescCtrl, 12, Layout.PALETTE.TEXT_LIGHT, Layout.PALETTE.BG_DARK)
+
+        -- 对战场异象进行去重与数量统计，避免同类型异象刷屏
+        local counts = {}
+        if chap and chap.nodes then
+            for _, n in ipairs(chap.nodes) do
+                if n.anomaly and n.anomaly ~= "NORMAL" and ANOMALY_DESC_MAP[n.anomaly] then
+                    counts[n.anomaly] = (counts[n.anomaly] or 0) + 1
                 end
             end
+        end
 
-            table.sort(anomalyKeys, function(a, b)
-                return (ANOMALY_PRIORITY[a] or 99) < (ANOMALY_PRIORITY[b] or 99)
-            end)
-
-            local lines = {}
-            for _, k in ipairs(anomalyKeys) do
-                local desc = ANOMALY_DESC_MAP[k]
-                if desc then
-                    table.insert(lines, desc)
-                end
-            end
-
-            if #lines == 0 then
-                anomalyDescCtrl.text = "● 标准地脉：常规孕育与输送，前线激战，后方休整\n● 固守结界：驻防灵穴战损削减30%"
-            else
-                anomalyDescCtrl.text = table.concat(lines, "\n")
-            end
+        local anomalyKeys = {}
+        for k, _ in pairs(counts) do
+            table.insert(anomalyKeys, k)
+        end
+        table.sort(anomalyKeys, function(a, b)
+            return (ANOMALY_PRIORITY[a] or 99) < (ANOMALY_PRIORITY[b] or 99)
         end)
+
+        local lines = {}
+        for _, k in ipairs(anomalyKeys) do
+            local desc = ANOMALY_DESC_MAP[k]
+            local cnt = counts[k]
+            if desc and cnt then
+                local suffix = (cnt > 1) and string.format(" ×%d", cnt) or ""
+                table.insert(lines, "  ◆ " .. desc .. suffix)
+            end
+        end
+
+        if #lines == 0 then
+            anomalyDescCtrl.text = "● 标准地脉：常规孕育与输送，前线激战\n● 固守结界：驻防灵穴战损削减30%"
+        else
+            anomalyDescCtrl.text = table.concat(lines, "\n")
+        end
     end
 end
 
@@ -2888,36 +3113,28 @@ function HudView.UpdateCountdown(timer, countdownModal, countdownTextCtrl, count
         if countNum < 1 then countNum = 1 end
 
         if countdownTextCtrl and countdownTextCtrl.alive then
-            pcall(function()
-                countdownTextCtrl.text = tostring(countNum)
-                countdownTextCtrl.fontColor = Layout.PALETTE.GOLD
-            end)
+            Layout.ApplyTextStyle(countdownTextCtrl, 52, Layout.PALETTE.GOLD, Layout.PALETTE.BG_DARK)
+            countdownTextCtrl.text = tostring(countNum)
         end
         if countdownSubCtrl and countdownSubCtrl.alive then
-            pcall(function()
-                if countNum == 3 then
-                    countdownSubCtrl.text = "【3 秒】全域地脉连接调配完成..."
-                elseif countNum == 2 then
-                    countdownSubCtrl.text = "【2 秒】星轨推衍回路展开中..."
-                else
-                    countdownSubCtrl.text = "【1 秒】元素微粒正在凝聚！"
-                end
-                countdownSubCtrl.fontColor = Layout.PALETTE.PLAYER
-            end)
+            Layout.ApplyTextStyle(countdownSubCtrl, 18, Layout.PALETTE.PLAYER, Layout.PALETTE.BG_DARK)
+            if countNum == 3 then
+                countdownSubCtrl.text = "【3 秒】全域地脉连接调配完成..."
+            elseif countNum == 2 then
+                countdownSubCtrl.text = "【2 秒】星轨推衍回路展开中..."
+            else
+                countdownSubCtrl.text = "【1 秒】元素微粒正在凝聚！"
+            end
         end
     elseif timer > -0.6 then
         Layout.SetVisible(countdownModal, true)
         if countdownTextCtrl and countdownTextCtrl.alive then
-            pcall(function()
-                countdownTextCtrl.text = "开 始 ！"
-                countdownTextCtrl.fontColor = Layout.PALETTE.PLAYER
-            end)
+            Layout.ApplyTextStyle(countdownTextCtrl, 44, Layout.PALETTE.PLAYER, Layout.PALETTE.BG_DARK)
+            countdownTextCtrl.text = "开 始 ！"
         end
         if countdownSubCtrl and countdownSubCtrl.alive then
-            pcall(function()
-                countdownSubCtrl.text = "【开战】执掌星轨，克敌制胜！"
-                countdownSubCtrl.fontColor = Layout.PALETTE.GOLD
-            end)
+            Layout.ApplyTextStyle(countdownSubCtrl, 18, Layout.PALETTE.GOLD, Layout.PALETTE.BG_DARK)
+            countdownSubCtrl.text = "【开战】执掌星轨，克敌制胜！"
         end
     else
         Layout.SetVisible(countdownModal, false)
