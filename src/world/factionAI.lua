@@ -113,7 +113,7 @@ function FactionAI.Update(dt, nodes, routeManager)
                             local minAllyParts = 999
 
                             for _, nId in ipairs(neighbors) do
-                                local n = nodes[nId + 1]
+                                local n = StarMap.GetNode(nodes, nId)
                                 local nDist = distMap[nId] or 99
                                 -- 必须是同阵营友军，且距离前线更近 (nDist < nodeDist)
                                 if n and n.faction == fac and nDist < nodeDist then
@@ -138,7 +138,7 @@ function FactionAI.Update(dt, nodes, routeManager)
                         -- ----------------------------------------------------
                         local hostileTargets = {}
                         for _, nId in ipairs(neighbors) do
-                            local n = nodes[nId + 1]
+                            local n = StarMap.GetNode(nodes, nId)
                             if n and n.faction ~= fac then
                                 table.insert(hostileTargets, n)
                             end

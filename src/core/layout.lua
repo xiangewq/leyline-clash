@@ -65,26 +65,50 @@ function Layout.ToColorInt(val)
 end
 
 
--- 提瓦特地脉标准调色板 (使用 0..255 整数)
+-- 从整数色彩中解包 RGBA (0..255)
+function Layout.UnpackColor(colInt)
+    if type(colInt) ~= "number" then return 255, 255, 255, 255 end
+    local val = math.tointeger(colInt) or math.floor(colInt)
+    local a = math.floor(val / 16777216) % 256
+    local r = math.floor(val / 65536) % 256
+    local g = math.floor(val / 256) % 256
+    local b = val % 256
+    return r, g, b, a
+end
+
+-- 调整指定颜色的 Alpha 透明度通道 (0..255)
+function Layout.WithAlpha(colInt, newAlpha)
+    local r, g, b, _ = Layout.UnpackColor(colInt)
+    return Layout.MakeColor(r, g, b, newAlpha)
+end
+
+-- 提瓦特星图标准调色板 (高辨识度深邃星图与元素光晕)
 Layout.PALETTE = {
-    BG_DARK      = Layout.MakeColor(11, 17, 30, 255),
-    PANEL_BG     = Layout.MakeColor(15, 23, 42, 235),
-    PLAYER       = Layout.MakeColor(56, 189, 248, 255),   -- 提瓦特天青蓝 #38bdf8
-    PLAYER_GLOW  = Layout.MakeColor(56, 189, 248, 102),
-    ENEMY        = Layout.MakeColor(244, 63, 94, 255),    -- 侵蚀猩红 #f43f5e (敌方1/愚人众)
-    ENEMY_GLOW   = Layout.MakeColor(244, 63, 94, 102),
-    ENEMY_PURPLE = Layout.MakeColor(168, 85, 247, 255),   -- 深渊暗紫 #a855f7 (敌方2/盗宝团)
-    ENEMY_PURPLE_GLOW = Layout.MakeColor(168, 85, 247, 102),
-    ENEMY_GREEN  = Layout.MakeColor(16, 185, 129, 255),   -- 苍翠机体 #10b981 (敌方3/遗迹机关)
-    ENEMY_GREEN_GLOW  = Layout.MakeColor(16, 185, 129, 102),
-    NEUTRAL      = Layout.MakeColor(148, 163, 184, 255),  -- 远古银岩灰 #94a3b8
-    GOLD         = Layout.MakeColor(251, 191, 36, 255),   -- 固守金岩 #fbbf24
-    GOLD_ALPHA   = Layout.MakeColor(251, 191, 36, 191),
-    ANEMO        = Layout.MakeColor(52, 211, 153, 255),   -- 千风翠碧 #34d399
-    AMBER        = Layout.MakeColor(245, 158, 11, 255),   -- 石珀金橙 #f59e0b
-    TEXT_LIGHT   = Layout.MakeColor(248, 250, 252, 255),
-    TEXT_MUTED   = Layout.MakeColor(100, 116, 139, 255),
-    LINK_INACTIVE= Layout.MakeColor(51, 65, 85, 115)
+    BG_DARK           = Layout.MakeColor(11, 17, 30, 255),
+    PANEL_BG          = Layout.MakeColor(15, 23, 42, 235),
+    -- 玩家地脉：清澈天青冰川蓝
+    PLAYER            = Layout.MakeColor(56, 189, 248, 255),   -- #38bdf8
+    PLAYER_GLOW       = Layout.MakeColor(125, 211, 252, 160),  -- 柔和发光环
+    -- 敌方深渊势力：绛红暗晶
+    ENEMY             = Layout.MakeColor(244, 63, 94, 255),    -- #f43f5e (愚人众/赤红)
+    ENEMY_GLOW        = Layout.MakeColor(251, 113, 133, 160),
+    ENEMY_PURPLE      = Layout.MakeColor(168, 85, 247, 255),   -- 深渊暗紫 (盗宝团)
+    ENEMY_PURPLE_GLOW = Layout.MakeColor(192, 132, 252, 160),
+    ENEMY_GREEN       = Layout.MakeColor(16, 185, 129, 255),   -- 苍翠机体 (遗迹机关)
+    ENEMY_GREEN_GLOW  = Layout.MakeColor(52, 211, 153, 160),
+    -- 中立据点：低饱和星尘冷灰蓝 (不喧宾夺主抢视觉)
+    NEUTRAL           = Layout.MakeColor(148, 163, 184, 180),  -- #94a3b8 半透明星尘
+    NEUTRAL_BORDER    = Layout.MakeColor(100, 116, 139, 140),
+    -- 元素与高光
+    GOLD              = Layout.MakeColor(251, 191, 36, 255),   -- 固守金岩 #fbbf24
+    GOLD_ALPHA        = Layout.MakeColor(251, 191, 36, 191),
+    ANEMO             = Layout.MakeColor(52, 211, 153, 255),   -- 千风翠碧 #34d399
+    AMBER             = Layout.MakeColor(245, 158, 11, 255),   -- 石珀金橙 #f59e0b
+    TEXT_LIGHT        = Layout.MakeColor(248, 250, 252, 255),
+    TEXT_MUTED        = Layout.MakeColor(100, 116, 139, 255),
+    -- 静态底线拓扑：暗星轨
+    LINK_INACTIVE     = Layout.MakeColor(100, 116, 139, 75),
+    LINK_HIGHLIGHT    = Layout.MakeColor(226, 232, 240, 200)   -- 拖拽直连高亮
 }
 
 function Layout.GetFactionColor(faction)

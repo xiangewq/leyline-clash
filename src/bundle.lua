@@ -596,26 +596,50 @@ function Layout.ToColorInt(val)
 end
 
 
--- 提瓦特地脉标准调色板 (使用 0..255 整数)
+-- 从整数色彩中解包 RGBA (0..255)
+function Layout.UnpackColor(colInt)
+    if type(colInt) ~= "number" then return 255, 255, 255, 255 end
+    local val = math.tointeger(colInt) or math.floor(colInt)
+    local a = math.floor(val / 16777216) % 256
+    local r = math.floor(val / 65536) % 256
+    local g = math.floor(val / 256) % 256
+    local b = val % 256
+    return r, g, b, a
+end
+
+-- 调整指定颜色的 Alpha 透明度通道 (0..255)
+function Layout.WithAlpha(colInt, newAlpha)
+    local r, g, b, _ = Layout.UnpackColor(colInt)
+    return Layout.MakeColor(r, g, b, newAlpha)
+end
+
+-- 提瓦特星图标准调色板 (高辨识度深邃星图与元素光晕)
 Layout.PALETTE = {
-    BG_DARK      = Layout.MakeColor(11, 17, 30, 255),
-    PANEL_BG     = Layout.MakeColor(15, 23, 42, 235),
-    PLAYER       = Layout.MakeColor(56, 189, 248, 255),   -- 提瓦特天青蓝 #38bdf8
-    PLAYER_GLOW  = Layout.MakeColor(56, 189, 248, 102),
-    ENEMY        = Layout.MakeColor(244, 63, 94, 255),    -- 侵蚀猩红 #f43f5e (敌方1/愚人众)
-    ENEMY_GLOW   = Layout.MakeColor(244, 63, 94, 102),
-    ENEMY_PURPLE = Layout.MakeColor(168, 85, 247, 255),   -- 深渊暗紫 #a855f7 (敌方2/盗宝团)
-    ENEMY_PURPLE_GLOW = Layout.MakeColor(168, 85, 247, 102),
-    ENEMY_GREEN  = Layout.MakeColor(16, 185, 129, 255),   -- 苍翠机体 #10b981 (敌方3/遗迹机关)
-    ENEMY_GREEN_GLOW  = Layout.MakeColor(16, 185, 129, 102),
-    NEUTRAL      = Layout.MakeColor(148, 163, 184, 255),  -- 远古银岩灰 #94a3b8
-    GOLD         = Layout.MakeColor(251, 191, 36, 255),   -- 固守金岩 #fbbf24
-    GOLD_ALPHA   = Layout.MakeColor(251, 191, 36, 191),
-    ANEMO        = Layout.MakeColor(52, 211, 153, 255),   -- 千风翠碧 #34d399
-    AMBER        = Layout.MakeColor(245, 158, 11, 255),   -- 石珀金橙 #f59e0b
-    TEXT_LIGHT   = Layout.MakeColor(248, 250, 252, 255),
-    TEXT_MUTED   = Layout.MakeColor(100, 116, 139, 255),
-    LINK_INACTIVE= Layout.MakeColor(51, 65, 85, 115)
+    BG_DARK           = Layout.MakeColor(11, 17, 30, 255),
+    PANEL_BG          = Layout.MakeColor(15, 23, 42, 235),
+    -- 玩家地脉：清澈天青冰川蓝
+    PLAYER            = Layout.MakeColor(56, 189, 248, 255),   -- #38bdf8
+    PLAYER_GLOW       = Layout.MakeColor(125, 211, 252, 160),  -- 柔和发光环
+    -- 敌方深渊势力：绛红暗晶
+    ENEMY             = Layout.MakeColor(244, 63, 94, 255),    -- #f43f5e (愚人众/赤红)
+    ENEMY_GLOW        = Layout.MakeColor(251, 113, 133, 160),
+    ENEMY_PURPLE      = Layout.MakeColor(168, 85, 247, 255),   -- 深渊暗紫 (盗宝团)
+    ENEMY_PURPLE_GLOW = Layout.MakeColor(192, 132, 252, 160),
+    ENEMY_GREEN       = Layout.MakeColor(16, 185, 129, 255),   -- 苍翠机体 (遗迹机关)
+    ENEMY_GREEN_GLOW  = Layout.MakeColor(52, 211, 153, 160),
+    -- 中立据点：低饱和星尘冷灰蓝 (不喧宾夺主抢视觉)
+    NEUTRAL           = Layout.MakeColor(148, 163, 184, 180),  -- #94a3b8 半透明星尘
+    NEUTRAL_BORDER    = Layout.MakeColor(100, 116, 139, 140),
+    -- 元素与高光
+    GOLD              = Layout.MakeColor(251, 191, 36, 255),   -- 固守金岩 #fbbf24
+    GOLD_ALPHA        = Layout.MakeColor(251, 191, 36, 191),
+    ANEMO             = Layout.MakeColor(52, 211, 153, 255),   -- 千风翠碧 #34d399
+    AMBER             = Layout.MakeColor(245, 158, 11, 255),   -- 石珀金橙 #f59e0b
+    TEXT_LIGHT        = Layout.MakeColor(248, 250, 252, 255),
+    TEXT_MUTED        = Layout.MakeColor(100, 116, 139, 255),
+    -- 静态底线拓扑：暗星轨
+    LINK_INACTIVE     = Layout.MakeColor(100, 116, 139, 75),
+    LINK_HIGHLIGHT    = Layout.MakeColor(226, 232, 240, 200)   -- 拖拽直连高亮
 }
 
 function Layout.GetFactionColor(faction)
@@ -659,20 +683,24 @@ local Layout = require("default_import_file/src/core/layout") or require("src/co
 
 local Runtime = {}
 
--- 微粒图元对象池 (复用已挂载的 UI 控件，杜绝单帧高频创建/销毁)
+-- 微粒图元对象池 (120个控件全量池化复用，杜绝单帧高频创建/销毁)
 local ParticlePool = {
     controls = {},
-    capacity = 80,
+    capacity = 120,
     activeCount = 0
 }
 
 function Runtime.InitParticlePool(controlList)
     ParticlePool.controls = controlList or {}
-    ParticlePool.capacity = #ParticlePool.controls
+    ParticlePool.capacity = #ParticlePool.controls > 0 and #ParticlePool.controls or 120
     ParticlePool.activeCount = 0
-    -- 默认隐藏所有池内微粒控件
+    -- 默认隐藏所有池内微粒控件并初始化基础尺寸与中轴点
     for _, ctrl in ipairs(ParticlePool.controls) do
         Layout.SetVisible(ctrl, false)
+        if ctrl and ctrl.alive then
+            ctrl.sizeDeltaX = 8
+            ctrl.sizeDeltaY = 8
+        end
     end
 end
 
@@ -689,15 +717,44 @@ function Runtime.UpdateParticles(movingParticles, factionColorGetter)
         if ctrl and ctrl.alive then
             if i <= count then
                 local p = movingParticles[i]
-                -- 计算当前插值坐标
-                local curX = p.startX + (p.targetX - p.startX) * p.progress
-                local curY = p.startY + (p.targetY - p.startY) * p.progress
+                local prog = Layout.Clamp(p.progress or 0, 0, 1.0)
+
+                -- 1. 基础线性插值坐标
+                local baseX = p.startX + (p.targetX - p.startX) * prog
+                local baseY = p.startY + (p.targetY - p.startY) * prog
+
+                -- 2. 蜿蜒法向正弦微摆 (S-Curve Flow)：两端归零，中途宛如流质星芒汇入
+                local waveFactor = math.sin(prog * math.pi)
+                local sinWave = math.sin(prog * math.pi * 4.0 + (p.seed or 0)) * 5.0 * waveFactor
+                local curX = baseX + (p.nx or 0) * sinWave
+                local curY = baseY + (p.ny or 0) * sinWave
 
                 ctrl.anchoredPositionX = curX
                 ctrl.anchoredPositionY = curY
 
+                -- 3. 方向对齐与流光拉伸 (Motion Stretch)
+                ctrl.localRotationZ = p.angle or 0
+                local isBoosted = p.isBoosted or false
+                local isMerged = (p.payload and p.payload > 1)
+
+                -- 聚合微粒或加速流道更加修长明亮
+                local scaleX = isBoosted and 2.4 or 1.8
+                local scaleY = isBoosted and 0.8 or 0.65
+                if isMerged then
+                    scaleX = scaleX * 1.3
+                    scaleY = scaleY * 1.35
+                end
+                ctrl.localScaleX = scaleX
+                ctrl.localScaleY = scaleY
+
                 if factionColorGetter and p.faction then
-                    ctrl.imageColor = factionColorGetter(p.faction)
+                    local baseCol = factionColorGetter(p.faction)
+                    -- 高能量或加速微粒提升亮度
+                    if isBoosted or isMerged then
+                        ctrl.imageColor = Layout.WithAlpha(baseCol, 255)
+                    else
+                        ctrl.imageColor = Layout.WithAlpha(baseCol, 225)
+                    end
                 end
 
                 Layout.SetVisible(ctrl, true)
@@ -876,6 +933,21 @@ function StarMap.LoadStage(stageIndex)
     return chap
 end
 
+-- 安全获取节点（统一收敛 0-Based 与 1-Based 下标混用隐患）
+function StarMap.GetNode(nodes, nodeId)
+    if not nodes or nodeId == nil then return nil end
+    return nodes[nodeId + 1]
+end
+
+-- 获取两节点构成的无向边唯一键 (min_max)
+function StarMap.GetEdgeKey(idA, idB)
+    if idA < idB then
+        return idA .. "_" .. idB
+    else
+        return idB .. "_" .. idA
+    end
+end
+
 -- 判定两节点间是否存在地脉直通流道
 function StarMap.AreNodesLinked(idA, idB)
     for _, link in ipairs(StarMap.LINKS) do
@@ -951,7 +1023,7 @@ function NodeEntity.CheckIsInland(node, allNodes)
     local neighbors = StarMap.GetNeighbors(node.id)
     if #neighbors == 0 then return false end
     for _, nId in ipairs(neighbors) do
-        local n = allNodes[nId + 1]
+        local n = StarMap.GetNode(allNodes, nId)
         if not n or n.faction ~= node.faction then
             return false
         end
@@ -1169,8 +1241,8 @@ function RouteManager.SetRoute(fromId, toId, faction, nodes)
         return false, "两灵穴间不存在直通地脉流道！"
     end
 
-    local fromNode = nodes[fromId + 1]
-    local toNode = nodes[toId + 1]
+    local fromNode = StarMap.GetNode(nodes, fromId)
+    local toNode = StarMap.GetNode(nodes, toId)
     if not fromNode or not toNode then return false end
 
     -- 单节点同一时间仅允许存在 1 条对外输出光轨
@@ -1223,41 +1295,62 @@ function RouteManager.GetRouteFrom(fromId)
     return nil
 end
 
--- 每帧更新：物流发射与微粒航行
+-- 每帧更新：物流发射、中途相向空间分桶碰撞决算与微粒航行
 function RouteManager.Update(dt, nodes, elapsedTime, onCombatHitCallback, onCaptureCallback, onRevertNeutralCallback)
-    -- 1. 物流发射
+    -- 1. 物流发射（含高负荷自动数据包聚合 Packet Merging 机制）
+    local activeParticleCount = #RouteManager.movingParticles
+    local isHighLoad = (activeParticleCount >= 96) -- 超过 120 容积的 80% 触发聚合
+
     for _, route in ipairs(RouteManager.routes) do
-        local fromNode = nodes[route.fromId + 1]
-        local toNode = nodes[route.toId + 1]
+        local fromNode = StarMap.GetNode(nodes, route.fromId)
+        local toNode = StarMap.GetNode(nodes, route.toId)
 
         if fromNode and toNode and fromNode.faction == route.faction then
             route.sendTimer = (route.sendTimer or 0) + dt
-            local rate = BalanceConfig.BASE_TRANSPORT_RATE
-            if fromNode.anomaly == "WIND_FLOW" or route.boostedUntil > elapsedTime then
-                rate = BalanceConfig.BOOST_TRANSPORT_RATE
-            end
+            local isBoosted = (fromNode.anomaly == "WIND_FLOW" or (route.boostedUntil and route.boostedUntil > elapsedTime))
+            local rate = isBoosted and BalanceConfig.BOOST_TRANSPORT_RATE or BalanceConfig.BASE_TRANSPORT_RATE
 
             local interval = 1.0 / rate
             if route.sendTimer >= interval then
                 route.sendTimer = 0
                 -- 节点保留基础守备兵力 (默认 3 粒，防止基地永久定格在 1 且防守空虚)
                 local safeFloor = BalanceConfig.SAFE_GARRISON or 3
-                if fromNode.particles > safeFloor then
-                    fromNode.particles = fromNode.particles - 1
+                local available = fromNode.particles - safeFloor
+                if available > 0 then
+                    -- 数据包聚合计算：高负载时单次发射 2~3 粒
+                    local payload = 1
+                    if isHighLoad and available >= 2 then
+                        payload = math.min(3, available)
+                    end
+                    fromNode.particles = fromNode.particles - payload
+
                     local dx = toNode.x - fromNode.x
                     local dy = toNode.y - fromNode.y
                     local dist = math.sqrt(dx * dx + dy * dy)
+                    if dist <= 0.001 then dist = 1 end
+
+                    local nx = -dy / dist
+                    local ny = dx / dist
+                    local rad = math.atan(dy, dx)
+                    local angle = math.deg(rad)
 
                     table.insert(RouteManager.movingParticles, {
                         fromId = fromNode.id,
                         toId = toNode.id,
+                        edgeKey = StarMap.GetEdgeKey(fromNode.id, toNode.id),
                         faction = route.faction,
+                        payload = payload,
                         progress = 0,
                         startX = fromNode.x,
                         startY = fromNode.y,
                         targetX = toNode.x,
                         targetY = toNode.y,
-                        totalDist = dist
+                        totalDist = dist,
+                        nx = nx,
+                        ny = ny,
+                        angle = angle,
+                        seed = (fromNode.id * 17 + toNode.id * 31) % 100,
+                        isBoosted = isBoosted
                     })
                 end
             end
@@ -1265,16 +1358,79 @@ function RouteManager.Update(dt, nodes, elapsedTime, onCombatHitCallback, onCapt
     end
 
     -- 2. 飞行微粒位移更新
-    for i = #RouteManager.movingParticles, 1, -1 do
-        local p = RouteManager.movingParticles[i]
+    for _, p in ipairs(RouteManager.movingParticles) do
         local step = (BalanceConfig.PARTICLE_SPEED * dt) / p.totalDist
         p.progress = p.progress + step
+    end
 
-        if p.progress >= 1.0 then
-            -- 到达目标节点
-            local targetNode = nodes[p.toId + 1]
+    -- 3. O(N) 空间边分桶中途碰撞决算 (同一条边相向而行的大对撞)
+    local edgeBuckets = {}
+    for i, p in ipairs(RouteManager.movingParticles) do
+        if p.progress < 1.0 and (p.payload or 1) > 0 then
+            local k = p.edgeKey
+            if not edgeBuckets[k] then
+                edgeBuckets[k] = { i }
+            else
+                table.insert(edgeBuckets[k], i)
+            end
+        end
+    end
+
+    for _, indices in pairs(edgeBuckets) do
+        if #indices >= 2 then
+            for idxA = 1, #indices do
+                local i = indices[idxA]
+                local pA = RouteManager.movingParticles[i]
+                if pA and (pA.payload or 1) > 0 then
+                    for idxB = idxA + 1, #indices do
+                        local j = indices[idxB]
+                        local pB = RouteManager.movingParticles[j]
+                        -- 仅在相向对流且不同阵营时发生交汇湮灭
+                        if pB and (pB.payload or 1) > 0 and pA.faction ~= pB.faction and pA.fromId == pB.toId and pA.toId == pB.fromId then
+                            -- 一维交汇比对：两相向质点进度之和 >= 1.0 即说明在航道中途相撞！
+                            if (pA.progress + pB.progress) >= 1.0 then
+                                local colX = pA.startX + (pA.targetX - pA.startX) * pA.progress
+                                local colY = pA.startY + (pA.targetY - pA.startY) * pA.progress
+                                if onCombatHitCallback then
+                                    onCombatHitCallback({ x = colX, y = colY })
+                                end
+                                BalanceConfig.PlayAudioSafe("NODE_DEFEND")
+
+                                local payA = pA.payload or 1
+                                local payB = pB.payload or 1
+                                if payA == payB then
+                                    pA.payload = 0
+                                    pB.payload = 0
+                                elseif payA > payB then
+                                    pA.payload = payA - payB
+                                    pB.payload = 0
+                                else
+                                    pB.payload = payB - payA
+                                    pA.payload = 0
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    -- 4. 到达目标节点或中途湮灭结算
+    for i = #RouteManager.movingParticles, 1, -1 do
+        local p = RouteManager.movingParticles[i]
+        local payload = p.payload or 1
+
+        if payload <= 0 then
+            -- 中途碰撞完全消散
+            table.remove(RouteManager.movingParticles, i)
+        elseif p.progress >= 1.0 then
+            -- 成功抵达目标据点
+            local targetNode = StarMap.GetNode(nodes, p.toId)
             if targetNode then
-                RouteManager.OnParticleArrive(p, targetNode, onCombatHitCallback, onCaptureCallback, onRevertNeutralCallback, elapsedTime)
+                for _ = 1, payload do
+                    RouteManager.OnParticleArrive(p, targetNode, onCombatHitCallback, onCaptureCallback, onRevertNeutralCallback, elapsedTime)
+                end
             end
             table.remove(RouteManager.movingParticles, i)
         end
@@ -1364,6 +1520,7 @@ _MODULES["src/world/abilitySystem"] = function()
 
 local BalanceConfig = require("default_import_file/src/data/balanceConfig") or require("src/data/balanceConfig")
 local CardRegistry = require("default_import_file/src/data/cardRegistry") or require("src/data/cardRegistry")
+local StarMap = require("default_import_file/src/world/starMap") or require("src/world/starMap")
 
 local AbilitySystem = {
     deck = {},             -- 当前装配的4张卡片元数据
@@ -1411,7 +1568,7 @@ function AbilitySystem.CastAbility(slotIndex, targetNodeId, nodes, routeManager,
         return false, "符印权能仍在凝聚冷却中！"
     end
 
-    local targetNode = nodes[targetNodeId + 1]
+    local targetNode = StarMap.GetNode(nodes, targetNodeId)
     if not targetNode then return false, "未选中合法灵穴" end
 
     if card.id == "anemo_shield" then
@@ -1683,7 +1840,7 @@ function FactionAI.Update(dt, nodes, routeManager)
                             local minAllyParts = 999
 
                             for _, nId in ipairs(neighbors) do
-                                local n = nodes[nId + 1]
+                                local n = StarMap.GetNode(nodes, nId)
                                 local nDist = distMap[nId] or 99
                                 -- 必须是同阵营友军，且距离前线更近 (nDist < nodeDist)
                                 if n and n.faction == fac and nDist < nodeDist then
@@ -1708,7 +1865,7 @@ function FactionAI.Update(dt, nodes, routeManager)
                         -- ----------------------------------------------------
                         local hostileTargets = {}
                         for _, nId in ipairs(neighbors) do
-                            local n = nodes[nId + 1]
+                            local n = StarMap.GetNode(nodes, nId)
                             if n and n.faction ~= fac then
                                 table.insert(hostileTargets, n)
                             end
@@ -1776,11 +1933,44 @@ _MODULES["world/factionAI"] = _MODULES["src/world/factionAI"]
 
 _MODULES["src/ui/visualRenderer"] = function()
 -- src/ui/visualRenderer.lua
--- 纯 Lua 几何视觉渲染器（光轨条带变换、共鸣环填充、固守结界与导引线绘制）
+-- 提瓦特星图几何视觉渲染器（光轨羽化光束、正弦能量脉冲、三层差速星轨自转、拓扑交互高亮）
 
 local Layout = require("default_import_file/src/core/layout") or require("src/core/layout")
+local StarMap = require("default_import_file/src/world/starMap") or require("src/world/starMap")
 
-local VisualRenderer = {}
+local VisualRenderer = {
+    -- 缓存探测特性：消除每帧热点循环内的匿名 pcall 闭包
+    hasRadialApiChecked = false,
+    hasRadialApi = false
+}
+
+-- 初始化连线图元柔边羽化 (消除矩形生硬感，形成流光能量束)
+function VisualRenderer.InitLineSoftEdge(routeCtrls, staticLinkCtrls)
+    if routeCtrls then
+        for _, lineCtrl in ipairs(routeCtrls) do
+            if lineCtrl and lineCtrl.alive then
+                pcall(function()
+                    lineCtrl.enableSoftEdge = true
+                    if lineCtrl.SetSoftEdgeWidth then
+                        lineCtrl:SetSoftEdgeWidth(2, 4) -- 左右微羽化，上下边缘强羽化形成光柱感
+                    end
+                end)
+            end
+        end
+    end
+    if staticLinkCtrls then
+        for _, sCtrl in ipairs(staticLinkCtrls) do
+            if sCtrl and sCtrl.alive then
+                pcall(function()
+                    sCtrl.enableSoftEdge = true
+                    if sCtrl.SetSoftEdgeWidth then
+                        sCtrl:SetSoftEdgeWidth(1, 2)
+                    end
+                end)
+            end
+        end
+    end
+end
 
 -- 动态绘制/变换单条线段条带控件 (使用 width = dist, height = thickness, pivot = (0, 0.5), rotationZ = angle)
 function VisualRenderer.SetLineTransform(lineCtrl, x1, y1, x2, y2, thickness, color)
@@ -1802,7 +1992,7 @@ function VisualRenderer.SetLineTransform(lineCtrl, x1, y1, x2, y2, thickness, co
     Layout.SetVisible(lineCtrl, true)
 end
 
--- 更新所有活跃光轨与拖拽连线
+-- 更新所有活跃光轨与拖拽连线（支持正弦能量呼吸脉冲与拖拽导引）
 function VisualRenderer.UpdateRoutes(routeCtrls, routes, nodes, dragLineCtrl, inputState, elapsedTime)
     -- 1. 活跃光轨
     local activeCount = #routes
@@ -1813,18 +2003,26 @@ function VisualRenderer.UpdateRoutes(routeCtrls, routes, nodes, dragLineCtrl, in
         if ctrl and ctrl.alive then
             if i <= activeCount then
                 local r = routes[i]
-                local nA = nodes[r.fromId + 1]
-                local nB = nodes[r.toId + 1]
+                local nA = StarMap.GetNode(nodes, r.fromId)
+                local nB = StarMap.GetNode(nodes, r.toId)
 
                 if nA and nB then
-                    local col = Layout.GetFactionColor(r.faction)
-                    local thickness = 4
-                    -- 处于「疾风流道」(千风隘口) 或施加「千风湍流」符印：激活提瓦特千风翠绿粗流道特效 (10粒/秒高速流)
-                    if nA.anomaly == "WIND_FLOW" or r.boostedUntil > elapsedTime then
-                        col = Layout.PALETTE.ANEMO
-                        thickness = 6
+                    local baseCol = Layout.GetFactionColor(r.faction)
+                    local isBoosted = (nA.anomaly == "WIND_FLOW" or (r.boostedUntil and r.boostedUntil > elapsedTime))
+
+                    -- 处于「疾风流道」或「千风湍流」：千风翠碧色
+                    if isBoosted then
+                        baseCol = Layout.PALETTE.ANEMO
                     end
-                    VisualRenderer.SetLineTransform(ctrl, nA.x, nA.y, nB.x, nB.y, thickness, col)
+
+                    -- 正弦能量脉冲：粗细在 6px~9px 间平滑呼吸，透明度在 170~250 之间流转
+                    local pulse = 0.5 + 0.5 * math.sin(elapsedTime * 5.0 + (r.fromId or 0))
+                    local baseThickness = isBoosted and 8.0 or 5.5
+                    local thickness = baseThickness + pulse * 2.5
+                    local alpha = math.floor(170 + pulse * 80)
+                    local pulseCol = Layout.WithAlpha(baseCol, alpha)
+
+                    VisualRenderer.SetLineTransform(ctrl, nA.x, nA.y, nB.x, nB.y, thickness, pulseCol)
                 else
                     Layout.SetVisible(ctrl, false)
                 end
@@ -1834,16 +2032,18 @@ function VisualRenderer.UpdateRoutes(routeCtrls, routes, nodes, dragLineCtrl, in
         end
     end
 
-    -- 2. 拖拽实时导引线
+    -- 2. 拖拽实时导引线 (金岩光芒引导线)
     if dragLineCtrl and dragLineCtrl.alive then
         if inputState.isDragging and inputState.dragSourceId ~= nil then
-            local sourceNode = nodes[inputState.dragSourceId + 1]
+            local sourceNode = StarMap.GetNode(nodes, inputState.dragSourceId)
             if sourceNode then
+                local pulse = 0.5 + 0.5 * math.sin(elapsedTime * 8.0)
+                local dragThickness = 3.5 + pulse * 1.5
                 VisualRenderer.SetLineTransform(
                     dragLineCtrl,
                     sourceNode.x, sourceNode.y,
                     inputState.dragCurrentX, inputState.dragCurrentY,
-                    3,
+                    dragThickness,
                     Layout.PALETTE.GOLD
                 )
             else
@@ -1855,54 +2055,129 @@ function VisualRenderer.UpdateRoutes(routeCtrls, routes, nodes, dragLineCtrl, in
     end
 end
 
--- 更新地脉节点各层视觉呈现
-function VisualRenderer.UpdateNodes(nodeUIList, nodes, elapsedTime)
+-- 更新地脉节点各层视觉呈现（差速自转、心跳呼吸、拖拽拓扑高亮、文字描边与字号动态映射）
+function VisualRenderer.UpdateNodes(nodeUIList, nodes, elapsedTime, inputState)
+    local isDragging = inputState and inputState.isDragging and inputState.dragSourceId ~= nil
+    local dragSourceId = isDragging and inputState.dragSourceId or nil
+    local validNeighborsMap = {}
+
+    if isDragging and dragSourceId ~= nil then
+        local nList = StarMap.GetNeighbors(dragSourceId)
+        for _, nId in ipairs(nList) do
+            validNeighborsMap[nId] = true
+        end
+    end
+
     for i, node in ipairs(nodes) do
         local ui = nodeUIList[i]
         if ui then
             local factionColor = Layout.GetFactionColor(node.faction)
+            local isSource = (isDragging and node.id == dragSourceId)
+            local isValidNeighbor = (isDragging and validNeighborsMap[node.id])
 
-            -- 1. 固守结界环
+            -- 0. 节点整体缩放与明暗处理 (拖拽连线时合法邻居高亮并轻微放大，非邻居半透明压暗)
+            if isDragging then
+                if isSource then
+                    ui.group.localScaleX = 1.18
+                    ui.group.localScaleY = 1.18
+                elseif isValidNeighbor then
+                    local neighPulse = 1.12 + 0.05 * math.sin(elapsedTime * 6.0 + node.id)
+                    ui.group.localScaleX = neighPulse
+                    ui.group.localScaleY = neighPulse
+                else
+                    ui.group.localScaleX = 0.95
+                    ui.group.localScaleY = 0.95
+                end
+            else
+                -- 正常对局底盘心跳呼吸：休眠节点缩小，活跃节点轻微脉动
+                local baseScale = node.isIdle and 0.88 or (1.0 + 0.035 * math.sin(elapsedTime * 3.2 + node.id))
+                ui.group.localScaleX = baseScale
+                ui.group.localScaleY = baseScale
+            end
+
+            -- 1. 固守结界环 (第一层：顺时针差速自转，护盾激活时加速旋转 90 deg/s)
             if ui.defenseRing and ui.defenseRing.alive then
+                local isShielded = (node.protectedUntil and node.protectedUntil > elapsedTime)
+                local rotSpeed = isShielded and 90 or 18
+                ui.defenseRing.localRotationZ = (elapsedTime * rotSpeed + node.id * 37) % 360
+
                 if node.isDefensive and node.routeTo == nil then
                     Layout.SetVisible(ui.defenseRing, true)
                     ui.defenseRing.imageColor = Layout.PALETTE.GOLD_ALPHA
-                elseif node.protectedUntil > elapsedTime then
+                elseif isShielded then
                     Layout.SetVisible(ui.defenseRing, true)
                     ui.defenseRing.imageColor = Layout.PALETTE.ANEMO
+                elseif isValidNeighbor then
+                    -- 拖拽经过合法邻居时闪耀金环指引
+                    Layout.SetVisible(ui.defenseRing, true)
+                    ui.defenseRing.imageColor = Layout.PALETTE.GOLD
                 else
                     Layout.SetVisible(ui.defenseRing, false)
                 end
             end
 
-            -- 2. 节点主体共鸣外环 (使用 SetFillRadial360 或 fillAmount 呈现 0%~100% 进度)
+            -- 2. 节点主体共鸣外环 (第二层：逆时针微转，平滑填充过渡，消除每帧 pcall)
             if ui.resonanceRing and ui.resonanceRing.alive then
-                ui.resonanceRing.imageColor = factionColor
-                local progress = Layout.Clamp(node.control / 100, 0.05, 1.0)
-                if ui.resonanceRing.SetFillRadial360 then
-                    pcall(function()
-                        ui.resonanceRing:SetFillRadial360(Enum.ImageFillRadialType.Top, progress)
-                    end)
+                ui.resonanceRing.localRotationZ = -(elapsedTime * 12 + node.id * 23) % 360
+
+                if isDragging and not isSource and not isValidNeighbor then
+                    ui.resonanceRing.imageColor = Layout.WithAlpha(factionColor, 95)
                 else
-                    ui.resonanceRing.fillAmount = progress
+                    ui.resonanceRing.imageColor = factionColor
+                end
+
+                local targetProgress = Layout.Clamp(node.control / 100, 0.05, 1.0)
+                ui.currentFill = (ui.currentFill or targetProgress) + (targetProgress - (ui.currentFill or targetProgress)) * 0.2
+
+                if not VisualRenderer.hasRadialApiChecked then
+                    VisualRenderer.hasRadialApiChecked = true
+                    VisualRenderer.hasRadialApi = (ui.resonanceRing.SetFillRadial360 ~= nil)
+                end
+
+                if VisualRenderer.hasRadialApi then
+                    ui.resonanceRing:SetFillRadial360(Enum.ImageFillRadialType.Top, ui.currentFill)
+                else
+                    ui.resonanceRing.fillAmount = ui.currentFill
                 end
             end
 
-            -- 3. 兵力与灵穴名称显示 (由 TitleText 居中统筹呈现：灵穴名称 (兵力)，如 西风前哨 (20))
+            -- 3. 兵力与灵穴名称统筹呈现 (统一深色描边 + 兵力字号动态映射)
             local currentParts = math.floor(node.particles or 0)
             if ui.titleText and ui.titleText.alive then
+                -- 启用深色描边
+                if ui.titleText.enableOutline ~= nil and not ui.titleText._outlined then
+                    ui.titleText.enableOutline = true
+                    ui.titleText.outlineColor = Layout.MakeColor(15, 20, 35, 230)
+                    ui.titleText._outlined = true
+                end
+
+                -- 动态映射字号：兵力越充沛越具威慑感 (12 ~ 15)
+                local dynamicFontSize = math.floor(Layout.Clamp(12 + currentParts * 0.08, 12, 15))
+                if ui.titleText.fontSize ~= dynamicFontSize then
+                    ui.titleText.fontSize = dynamicFontSize
+                end
+
                 ui.titleText.text = string.format("%s (%d)", node.name, currentParts)
-                ui.titleText.fontColor = Layout.PALETTE.TEXT_LIGHT
+                if isDragging and not isSource and not isValidNeighbor then
+                    ui.titleText.fontColor = Layout.WithAlpha(Layout.PALETTE.TEXT_LIGHT, 120)
+                else
+                    ui.titleText.fontColor = Layout.PALETTE.TEXT_LIGHT
+                end
                 Layout.SetVisible(ui.titleText, true)
             end
 
-            -- particleText 隐藏，避免在 52px 紧凑圆盘中与 TitleText 产生双层重叠
             if ui.particleText and ui.particleText.alive then
                 Layout.SetVisible(ui.particleText, false)
             end
 
-            -- 4. 异象标识文本
+            -- 4. 异象标识文本 (统一加深色描边)
             if ui.anomalyText and ui.anomalyText.alive then
+                if ui.anomalyText.enableOutline ~= nil and not ui.anomalyText._outlined then
+                    ui.anomalyText.enableOutline = true
+                    ui.anomalyText.outlineColor = Layout.MakeColor(15, 20, 35, 230)
+                    ui.anomalyText._outlined = true
+                end
+
                 if node.anomaly == "AMBER_MINE" then
                     ui.anomalyText.text = "【石珀晶矿】"
                     ui.anomalyText.fontColor = Layout.PALETTE.AMBER
@@ -1932,8 +2207,14 @@ function VisualRenderer.UpdateNodes(nodeUIList, nodes, elapsedTime)
                 end
             end
 
-            -- 5. 占领进度与状态标签 (占领中/动摇中/输送中/固守中/休眠中)
+            -- 5. 占领进度与状态标签
             if ui.statusText and ui.statusText.alive then
+                if ui.statusText.enableOutline ~= nil and not ui.statusText._outlined then
+                    ui.statusText.enableOutline = true
+                    ui.statusText.outlineColor = Layout.MakeColor(15, 20, 35, 230)
+                    ui.statusText._outlined = true
+                end
+
                 if node.faction == "neutral" then
                     if (node.control or 0) > 0 and node.contenderFaction then
                         local fName = Layout.GetFactionName(node.contenderFaction)
@@ -1989,8 +2270,8 @@ function VisualRenderer.ApplyStageLayout(nodeUIList, nodes, staticLinkCtrls, lin
         for i, linkCtrl in ipairs(staticLinkCtrls) do
             local link = links[i]
             if link and linkCtrl and linkCtrl.alive then
-                local nA = nodes[link[1] + 1]
-                local nB = nodes[link[2] + 1]
+                local nA = StarMap.GetNode(nodes, link[1])
+                local nB = StarMap.GetNode(nodes, link[2])
                 if nA and nB then
                     VisualRenderer.SetLineTransform(linkCtrl, nA.x, nA.y, nB.x, nB.y, 2, Layout.PALETTE.LINK_INACTIVE)
                 else
@@ -2689,6 +2970,12 @@ function CardBar.Update(cardSlots, deck, cooldowns, selectedSlotIndex)
                     end
                 end
 
+                -- 选定符印进入施法等待态：卡槽微抬升与高亮，提示玩家选取目标灵穴
+                if slot.container.anchoredPositionY ~= nil then
+                    local targetY = (selectedSlotIndex == i) and 14 or 0
+                    slot.container.anchoredPositionY = targetY
+                end
+
                 -- 冷却遮罩
                 if cd > 0 then
                     Layout.SetVisible(slot.maskCtrl, true)
@@ -2889,6 +3176,275 @@ return ChapterSelectView
 end
 _MODULES["ui/chapterSelectView"] = _MODULES["src/ui/chapterSelectView"]
 
+_MODULES["src/ui/uiBinder"] = function()
+-- src/ui/uiBinder.lua
+-- 控件树深度检索、各层图元容器集中缓存与生命周期辅助管理
+
+local Layout = require("default_import_file/src/core/layout") or require("src/core/layout")
+
+local UIBinder = {}
+
+-- 深度递归查找指定名称的子控件
+function UIBinder.FindDeepChild(parent, name)
+    if not parent or not parent.alive then return nil end
+    local direct = parent:FindChild(name)
+    if direct then return direct end
+    local children = parent:GetChildren()
+    if children then
+        for _, child in ipairs(children) do
+            local found = UIBinder.FindDeepChild(child, name)
+            if found then return found end
+        end
+    end
+    return nil
+end
+
+-- 辅助：静音原生按钮 clickAudioId，避免引擎底层默认点击音效与脚本 PlayAudioSafe 重叠双响
+function UIBinder.SilenceButton(btn)
+    if btn and btn.alive then
+        pcall(function() btn.clickAudioId = 0 end)
+    end
+end
+
+-- 集中缓存全量 UI 控件树结构
+function UIBinder.BindControls(script, game)
+    local root = nil
+    if script and script.GetParam then
+        local pId = script:GetParam("RootCanvasID")
+        if pId and type(pId) == "number" and game and game.GetClientUIControl then
+            root = game.GetClientUIControl(pId)
+        end
+    end
+    if not root and script and script.object then
+        root = script.object
+    end
+    if not root and game and game.FindClientUIRoot then
+        root = game.FindClientUIRoot("StarlinkCanvas") or game.FindClientUIRoot("GameRoot")
+    end
+    if not root and game and game.GetClientUIRoots then
+        local roots = game.GetClientUIRoots()
+        if roots and #roots > 0 then root = roots[1] end
+    end
+
+    local UI = {
+        root = root
+    }
+
+    -- 1. 全局输入检测层与拖拽导引线
+    UI.cursorArea = UIBinder.FindDeepChild(root, "GlobalCursorArea")
+    UI.dragLine   = UIBinder.FindDeepChild(root, "DragLine")
+
+    -- 2. 模式选择弹窗
+    UI.modeSelectModal = UIBinder.FindDeepChild(root, "ModeSelectModal")
+    if UI.modeSelectModal then
+        UI.modeStoryBtn     = UIBinder.FindDeepChild(UI.modeSelectModal, "ModeStoryBtn")
+        UI.modeChallengeBtn = UIBinder.FindDeepChild(UI.modeSelectModal, "ModeChallengeBtn")
+        UI.modeQuitBtn      = UIBinder.FindDeepChild(UI.modeSelectModal, "ModeQuitBtn")
+    end
+
+    -- 3. 关卡章节选择弹窗
+    UI.chapterSelectModal = UIBinder.FindDeepChild(root, "ChapterSelectModal")
+    UI.chapterCards = {}
+    if UI.chapterSelectModal then
+        UI.chapDesc     = UIBinder.FindDeepChild(UI.chapterSelectModal, "ChapterDesc")
+        UI.chapTitle    = UIBinder.FindDeepChild(UI.chapterSelectModal, "ChapterTitle")
+        UI.chapStartBtn = UIBinder.FindDeepChild(UI.chapterSelectModal, "ChapterStartBtn")
+        if UI.chapStartBtn then
+            UI.chapStartTxt = UIBinder.FindDeepChild(UI.chapStartBtn, "Text")
+        end
+        UI.chapBackBtn  = UIBinder.FindDeepChild(UI.chapterSelectModal, "ChapterBackBtn")
+
+        for idx = 1, 5 do
+            local cardBtn = UIBinder.FindDeepChild(UI.chapterSelectModal, "ChapterCard_" .. idx)
+            if cardBtn then
+                table.insert(UI.chapterCards, {
+                    button     = cardBtn,
+                    tagCtrl    = UIBinder.FindDeepChild(cardBtn, "TagText"),
+                    infoCtrl   = UIBinder.FindDeepChild(cardBtn, "InfoText"),
+                    budgetCtrl = UIBinder.FindDeepChild(cardBtn, "BudgetText"),
+                    titleCtrl  = UIBinder.FindDeepChild(cardBtn, "TitleText"),
+                    bgCtrl     = UIBinder.FindDeepChild(cardBtn, "CardBg"),
+                    borderCtrl = UIBinder.FindDeepChild(cardBtn, "CardBorder")
+                })
+            end
+        end
+    end
+
+    -- 4. 光轨条带池与静态连线池 (20 条动态光轨 + 30 条静态底轨)
+    UI.routeCtrls = {}
+    UI.staticLinkCtrls = {}
+    UI.linksLayer = UIBinder.FindDeepChild(root, "LinksLayer")
+    if UI.linksLayer then
+        for i = 1, 20 do
+            local line = UIBinder.FindDeepChild(UI.linksLayer, "RouteLine_" .. i)
+            if line then table.insert(UI.routeCtrls, line) end
+        end
+        for i = 0, 29 do
+            local sLine = UIBinder.FindDeepChild(UI.linksLayer, "StaticLink_" .. i)
+            if sLine then table.insert(UI.staticLinkCtrls, sLine) end
+        end
+    end
+
+    -- 5. 微粒对象池 (120个全量池化)
+    UI.particleCtrls = {}
+    UI.particlesLayer = UIBinder.FindDeepChild(root, "ParticlesLayer")
+    if UI.particlesLayer then
+        for i = 1, 120 do
+            local p = UIBinder.FindDeepChild(UI.particlesLayer, "P_" .. i)
+            if p then table.insert(UI.particleCtrls, p) end
+        end
+    end
+
+    -- 6. 22 座地脉灵穴 UI 组
+    UI.nodeUIList = {}
+    UI.nodesLayer = UIBinder.FindDeepChild(root, "NodesLayer")
+    if UI.nodesLayer then
+        for i = 0, 21 do
+            local grp = UIBinder.FindDeepChild(UI.nodesLayer, "NodeGroup_" .. i)
+            if grp then
+                table.insert(UI.nodeUIList, {
+                    group        = grp,
+                    defenseRing  = UIBinder.FindDeepChild(grp, "DefenseRing"),
+                    baseDisc     = UIBinder.FindDeepChild(grp, "BaseDisc"),
+                    resonanceRing= UIBinder.FindDeepChild(grp, "ResonanceRing"),
+                    titleText    = UIBinder.FindDeepChild(grp, "TitleText"),
+                    particleText = UIBinder.FindDeepChild(grp, "ParticleText"),
+                    anomalyText  = UIBinder.FindDeepChild(grp, "AnomalyText"),
+                    statusText   = UIBinder.FindDeepChild(grp, "StatusText")
+                })
+            end
+        end
+    end
+
+    -- 7. 顶部 HUD 与战术情报
+    UI.hudLayer = UIBinder.FindDeepChild(root, "HudLayer")
+    local hud = UI.hudLayer
+    if hud then
+        UI.playerPctText  = UIBinder.FindDeepChild(hud, "HudPlayerPct")
+        UI.enemyPctText   = UIBinder.FindDeepChild(hud, "HudEnemyPct")
+        UI.timerText      = UIBinder.FindDeepChild(hud, "HudTimer")
+        UI.barPlayer      = UIBinder.FindDeepChild(hud, "BarPlayer")
+        UI.barEnemy       = UIBinder.FindDeepChild(hud, "BarEnemy")
+        UI.toastContainer = UIBinder.FindDeepChild(root, "ToastContainer")
+        if UI.toastContainer then
+            UI.toastText  = UIBinder.FindDeepChild(UI.toastContainer, "ToastText")
+        end
+
+        -- 战前3秒倒计时
+        UI.countdownModal = UIBinder.FindDeepChild(root, "CountdownModal")
+        if UI.countdownModal then
+            UI.countdownText = UIBinder.FindDeepChild(UI.countdownModal, "CountdownText")
+            UI.countdownSub  = UIBinder.FindDeepChild(UI.countdownModal, "CountdownSub")
+        end
+
+        -- 左上角地脉说明与右上角指引
+        UI.hudAnomalyBox   = UIBinder.FindDeepChild(hud, "HudAnomalyBox")
+        if UI.hudAnomalyBox then
+            UI.hudAnomalyTitle = UIBinder.FindDeepChild(UI.hudAnomalyBox, "AnomalyTitle")
+            UI.hudAnomalyDesc  = UIBinder.FindDeepChild(UI.hudAnomalyBox, "AnomalyDesc")
+        end
+        UI.hudGuideBox     = UIBinder.FindDeepChild(hud, "HudGuideBox")
+        if UI.hudGuideBox then
+            UI.hudGuideTitle   = UIBinder.FindDeepChild(UI.hudGuideBox, "GuideTitle")
+            UI.hudGuideDesc    = UIBinder.FindDeepChild(UI.hudGuideBox, "GuideDesc")
+        end
+
+        UI.cardSlots = {}
+        for j = 1, 4 do
+            local slotGrp = UIBinder.FindDeepChild(hud, "CardSlot_" .. j)
+            if slotGrp then
+                table.insert(UI.cardSlots, {
+                    container  = slotGrp,
+                    borderCtrl = UIBinder.FindDeepChild(slotGrp, "Border"),
+                    nameCtrl   = UIBinder.FindDeepChild(slotGrp, "NameText"),
+                    costCtrl   = UIBinder.FindDeepChild(slotGrp, "CostText"),
+                    maskCtrl   = UIBinder.FindDeepChild(slotGrp, "CdMask"),
+                    cdTextCtrl = UIBinder.FindDeepChild(slotGrp, "CdText")
+                })
+            end
+        end
+    end
+
+    -- 8. 剧情演播弹窗
+    UI.dialogueModal = UIBinder.FindDeepChild(root, "DialogueModal")
+    if UI.dialogueModal then
+        UI.dlgSpeaker = UIBinder.FindDeepChild(UI.dialogueModal, "DlgSpeaker")
+        UI.dlgContent = UIBinder.FindDeepChild(UI.dialogueModal, "DlgContent")
+        UI.dlgSkipBtn = UIBinder.FindDeepChild(UI.dialogueModal, "DlgSkipBtn")
+        UI.dlgNextBtn = UIBinder.FindDeepChild(UI.dialogueModal, "DlgNextBtn")
+    end
+
+    -- 9. 战前调配弹窗
+    UI.prepareModal = UIBinder.FindDeepChild(root, "PrepareModal")
+    UI.prepCards = {}
+    if UI.prepareModal then
+        UI.prepBudgetText = UIBinder.FindDeepChild(UI.prepareModal, "PrepBudgetText")
+        UI.prepHint       = UIBinder.FindDeepChild(UI.prepareModal, "PrepHint")
+        UI.prepTitle      = UIBinder.FindDeepChild(UI.prepareModal, "PrepTitle")
+        UI.prepStartBtn   = UIBinder.FindDeepChild(UI.prepareModal, "PrepStartBtn")
+        for k = 1, 6 do
+            local cardBtn = UIBinder.FindDeepChild(UI.prepareModal, "PrepCard_" .. k)
+            if cardBtn then
+                table.insert(UI.prepCards, {
+                    button     = cardBtn,
+                    checkCtrl  = UIBinder.FindDeepChild(cardBtn, "CheckTag"),
+                    costCtrl   = UIBinder.FindDeepChild(cardBtn, "CostText"),
+                    descCtrl   = UIBinder.FindDeepChild(cardBtn, "DescText"),
+                    nameCtrl   = UIBinder.FindDeepChild(cardBtn, "NameText"),
+                    bgCtrl     = UIBinder.FindDeepChild(cardBtn, "CardBg"),
+                    borderCtrl = UIBinder.FindDeepChild(cardBtn, "CardBorder")
+                })
+            end
+        end
+    end
+
+    -- 10. 常驻侧边导航栏 (除剧情演播外常驻于左上角)
+    UI.quickNavLayer = UIBinder.FindDeepChild(root, "QuickNavLayer")
+    if UI.quickNavLayer then
+        UI.sideRestartBtn = UIBinder.FindDeepChild(UI.quickNavLayer, "SideRestartBtn")
+        UI.sideSettleBtn  = UIBinder.FindDeepChild(UI.quickNavLayer, "SideSettleBtn")
+    end
+
+    -- 11. 退出挑战 / 游玩结算二次确认弹窗
+    UI.settleConfirmModal = UIBinder.FindDeepChild(root, "SettleConfirmModal")
+    if UI.settleConfirmModal then
+        UI.confirmResumeBtn  = UIBinder.FindDeepChild(UI.settleConfirmModal, "ConfirmResumeBtn")
+        UI.confirmRestartBtn = UIBinder.FindDeepChild(UI.settleConfirmModal, "ConfirmRestartBtn")
+        UI.confirmQuitBtn    = UIBinder.FindDeepChild(UI.settleConfirmModal, "ConfirmQuitBtn")
+        UI.confirmDesc       = UIBinder.FindDeepChild(UI.settleConfirmModal, "ConfirmDesc")
+        UI.confirmTitle      = UIBinder.FindDeepChild(UI.settleConfirmModal, "ConfirmTitle")
+    end
+
+    -- 12. 终局结算演出弹窗
+    UI.settleModal = UIBinder.FindDeepChild(root, "SettleModal")
+    if UI.settleModal then
+        UI.settleTitle      = UIBinder.FindDeepChild(UI.settleModal, "SettleTitle")
+        UI.settleDesc       = UIBinder.FindDeepChild(UI.settleModal, "SettleDesc")
+        UI.settleStats      = UIBinder.FindDeepChild(UI.settleModal, "SettleStats")
+        UI.settleNextBtn    = UIBinder.FindDeepChild(UI.settleModal, "SettleNextBtn")
+        UI.settleRetryBtn   = UIBinder.FindDeepChild(UI.settleModal, "SettleRetryBtn")
+        UI.settleChapBtn    = UIBinder.FindDeepChild(UI.settleModal, "SettleChapterBtn")
+        UI.settleRestartBtn = UIBinder.FindDeepChild(UI.settleModal, "SettleRestartBtn")
+        UI.settleQuitBtn    = UIBinder.FindDeepChild(UI.settleModal, "SettleQuitBtn")
+    end
+
+    return UI
+end
+
+-- 控制战斗核心沙盘层（灵穴、光轨、微粒、HUD）可见性
+function UIBinder.SetGameplayLayersVisible(UI, visible)
+    if not UI then return end
+    Layout.SetVisible(UI.nodesLayer, visible)
+    Layout.SetVisible(UI.linksLayer, visible)
+    Layout.SetVisible(UI.particlesLayer, visible)
+    Layout.SetVisible(UI.hudLayer, visible)
+end
+
+return UIBinder
+
+end
+_MODULES["ui/uiBinder"] = _MODULES["src/ui/uiBinder"]
+
 
 -- ========== MAIN ENTRYPOINT ==========
 -- src/main.lua
@@ -2916,6 +3472,7 @@ local HudView         = require("default_import_file/src/ui/hudView") or require
 local CardBar         = require("default_import_file/src/ui/cardBar") or require("src/ui/cardBar")
 local ModeSelectView  = require("default_import_file/src/ui/modeSelectView") or require("src/ui/modeSelectView")
 local ChapterSelectView = require("default_import_file/src/ui/chapterSelectView") or require("src/ui/chapterSelectView")
+local UIBinder        = require("default_import_file/src/ui/uiBinder") or require("src/ui/uiBinder")
 
 -- 全局游戏状态机枚举
 local STATE_MODE_SELECT    = "STATE_MODE_SELECT"
@@ -2936,85 +3493,8 @@ local gameState = {
     nodes          = {}
 }
 
--- UI 控件绑定容器
-local UI = {
-    root           = nil,
-    cursorArea     = nil,
-    dragLine       = nil,
-    routeCtrls     = {},
-    staticLinkCtrls= {},
-    particleCtrls  = {},
-    nodeUIList     = {},
-    cardSlots      = {},
-
-    -- 模式选择弹窗
-    modeSelectModal  = nil,
-    modeStoryBtn     = nil,
-    modeChallengeBtn = nil,
-
-    -- 章节选择弹窗
-    chapterSelectModal = nil,
-    chapterCards       = {},
-    chapDesc           = nil,
-    chapTitle          = nil,
-    chapStartBtn       = nil,
-    chapStartTxt       = nil,
-    chapBackBtn        = nil,
-
-    -- 顶部 HUD
-    playerPctText  = nil,
-    enemyPctText   = nil,
-    timerText      = nil,
-    barPlayer      = nil,
-    barEnemy       = nil,
-    toastContainer = nil,
-    toastText      = nil,
-
-    -- 战前3秒倒计时
-    countdownModal = nil,
-    countdownText  = nil,
-    countdownSub   = nil,
-
-    -- 左上角特殊灵穴说明与右上角操作说明
-    hudAnomalyBox  = nil,
-    hudAnomalyTitle= nil,
-    hudAnomalyDesc = nil,
-    hudGuideBox    = nil,
-    hudGuideTitle  = nil,
-    hudGuideDesc   = nil,
-
-    -- 剧情弹窗
-    dialogueModal  = nil,
-    dlgSpeaker     = nil,
-    dlgContent     = nil,
-    dlgSkipBtn     = nil,
-    dlgNextBtn     = nil,
-
-    -- 模式选择弹窗
-    modeSelectModal    = nil,
-    modeStoryBtn       = nil,
-    modeChallengeBtn   = nil,
-    modeQuitBtn        = nil,
-
-    -- 战前构筑弹窗
-    prepareModal   = nil,
-    prepBudgetText = nil,
-    prepHint       = nil,
-    prepTitle      = nil,
-    prepStartBtn   = nil,
-    prepCards      = {},
-
-    -- 结算弹窗
-    settleModal      = nil,
-    settleTitle      = nil,
-    settleDesc       = nil,
-    settleStats      = nil,
-    settleNextBtn    = nil,
-    settleRetryBtn   = nil,
-    settleChapBtn    = nil,
-    settleRestartBtn = nil,
-    settleQuitBtn    = nil
-}
+-- UI 控件绑定容器 (由 UIBinder.BindControls 统筹填充)
+local UI = {}
 
 -- 初始化沙盘所有灵穴实体
 local function InitNodes()
@@ -3116,248 +3596,17 @@ local function CheckMatchEnd(isTimeout)
     end
 end
 
--- 深度递归查找指定名称的子控件
-local function FindDeepChild(parent, name)
-    if not parent or not parent.alive then return nil end
-    local direct = parent:FindChild(name)
-    if direct then return direct end
-    local children = parent:GetChildren()
-    if children then
-        for _, child in ipairs(children) do
-            local found = FindDeepChild(child, name)
-            if found then return found end
-        end
-    end
-    return nil
-end
-
--- 缓存控件树引用
+-- 缓存控件树引用 (统一由 UIBinder.BindControls 处理)
 local function CacheUIControls()
-    local root = nil
-    if script and script.GetParam then
-        local pId = script:GetParam("RootCanvasID")
-        if pId and type(pId) == "number" and game and game.GetClientUIControl then
-            root = game.GetClientUIControl(pId)
-        end
-    end
-    if not root and script and script.object then
-        root = script.object
-    end
-    if not root and game and game.FindClientUIRoot then
-        root = game.FindClientUIRoot("StarlinkCanvas") or game.FindClientUIRoot("GameRoot")
-    end
-    if not root and game and game.GetClientUIRoots then
-        local roots = game.GetClientUIRoots()
-        if roots and #roots > 0 then root = roots[1] end
-    end
-    UI.root = root
-
-    -- 全局检测层与拖拽导引线
-    UI.cursorArea = FindDeepChild(root, "GlobalCursorArea")
-    UI.dragLine   = FindDeepChild(root, "DragLine")
-
-    -- 模式选择弹窗
-    UI.modeSelectModal  = FindDeepChild(root, "ModeSelectModal")
-    if UI.modeSelectModal then
-        UI.modeStoryBtn     = FindDeepChild(UI.modeSelectModal, "ModeStoryBtn")
-        UI.modeChallengeBtn = FindDeepChild(UI.modeSelectModal, "ModeChallengeBtn")
-        UI.modeQuitBtn      = FindDeepChild(UI.modeSelectModal, "ModeQuitBtn")
-    end
-
-    -- 关卡章节选择弹窗
-    UI.chapterSelectModal = FindDeepChild(root, "ChapterSelectModal")
-    UI.chapterCards = {}
-    if UI.chapterSelectModal then
-        UI.chapDesc     = FindDeepChild(UI.chapterSelectModal, "ChapterDesc")
-        UI.chapTitle    = FindDeepChild(UI.chapterSelectModal, "ChapterTitle")
-        UI.chapStartBtn = FindDeepChild(UI.chapterSelectModal, "ChapterStartBtn")
-        if UI.chapStartBtn then
-            UI.chapStartTxt = FindDeepChild(UI.chapStartBtn, "Text")
-        end
-        UI.chapBackBtn  = FindDeepChild(UI.chapterSelectModal, "ChapterBackBtn")
-
-        for idx = 1, 5 do
-            local cardBtn = FindDeepChild(UI.chapterSelectModal, "ChapterCard_" .. idx)
-            if cardBtn then
-                table.insert(UI.chapterCards, {
-                    button     = cardBtn,
-                    tagCtrl    = FindDeepChild(cardBtn, "TagText"),
-                    infoCtrl   = FindDeepChild(cardBtn, "InfoText"),
-                    budgetCtrl = FindDeepChild(cardBtn, "BudgetText"),
-                    titleCtrl  = FindDeepChild(cardBtn, "TitleText"),
-                    bgCtrl     = FindDeepChild(cardBtn, "CardBg"),
-                    borderCtrl = FindDeepChild(cardBtn, "CardBorder")
-                })
-            end
-        end
-    end
-
-    -- 光轨条带池与静态连线池 (25 条动态光轨 + 40 条静态底轨)
-    UI.routeCtrls = {}
-    UI.staticLinkCtrls = {}
-    UI.linksLayer = FindDeepChild(root, "LinksLayer")
-    if UI.linksLayer then
-        for i = 1, 25 do
-            local line = FindDeepChild(UI.linksLayer, "RouteLine_" .. i)
-            if line then table.insert(UI.routeCtrls, line) end
-        end
-        for i = 0, 39 do
-            local sLine = FindDeepChild(UI.linksLayer, "StaticLink_" .. i)
-            if sLine then table.insert(UI.staticLinkCtrls, sLine) end
-        end
-    end
-
-    -- 微粒对象池 (120个)
-    UI.particleCtrls = {}
-    UI.particlesLayer = FindDeepChild(root, "ParticlesLayer")
-    if UI.particlesLayer then
-        for i = 1, 120 do
-            local p = FindDeepChild(UI.particlesLayer, "P_" .. i)
-            if p then table.insert(UI.particleCtrls, p) end
-        end
-    end
+    UI = UIBinder.BindControls(script, game)
     Runtime.InitParticlePool(UI.particleCtrls)
-
-    -- 22 座地脉灵穴 UI 组 (支持全5关剧情模式最大18座并预留富余预算)
-    UI.nodeUIList = {}
-    UI.nodesLayer = FindDeepChild(root, "NodesLayer")
-    if UI.nodesLayer then
-        for i = 0, 21 do
-            local grp = FindDeepChild(UI.nodesLayer, "NodeGroup_" .. i)
-            if grp then
-                table.insert(UI.nodeUIList, {
-                    group        = grp,
-                    defenseRing  = FindDeepChild(grp, "DefenseRing"),
-                    baseDisc     = FindDeepChild(grp, "BaseDisc"),
-                    resonanceRing= FindDeepChild(grp, "ResonanceRing"),
-                    titleText    = FindDeepChild(grp, "TitleText"),
-                    particleText = FindDeepChild(grp, "ParticleText"),
-                    anomalyText  = FindDeepChild(grp, "AnomalyText"),
-                    statusText   = FindDeepChild(grp, "StatusText")
-                })
-            end
-        end
-    end
-
-    -- 顶部 HUD
-    UI.hudLayer = FindDeepChild(root, "HudLayer")
-    local hud = UI.hudLayer
-    if hud then
-        UI.playerPctText  = FindDeepChild(hud, "HudPlayerPct")
-        UI.enemyPctText   = FindDeepChild(hud, "HudEnemyPct")
-        UI.timerText      = FindDeepChild(hud, "HudTimer")
-        UI.barPlayer      = FindDeepChild(hud, "BarPlayer")
-        UI.barEnemy       = FindDeepChild(hud, "BarEnemy")
-        UI.toastContainer = FindDeepChild(root, "ToastContainer")
-        if UI.toastContainer then
-            UI.toastText  = FindDeepChild(UI.toastContainer, "ToastText")
-        end
-
-        -- 战前3秒倒计时弹窗
-        UI.countdownModal = FindDeepChild(root, "CountdownModal")
-        if UI.countdownModal then
-            UI.countdownText = FindDeepChild(UI.countdownModal, "CountdownText")
-            UI.countdownSub  = FindDeepChild(UI.countdownModal, "CountdownSub")
-        end
-
-        -- 左上角特殊灵穴说明与右上角操作指引
-        UI.hudAnomalyBox   = FindDeepChild(hud, "HudAnomalyBox")
-        if UI.hudAnomalyBox then
-            UI.hudAnomalyTitle = FindDeepChild(UI.hudAnomalyBox, "AnomalyTitle")
-            UI.hudAnomalyDesc  = FindDeepChild(UI.hudAnomalyBox, "AnomalyDesc")
-        end
-        UI.hudGuideBox     = FindDeepChild(hud, "HudGuideBox")
-        if UI.hudGuideBox then
-            UI.hudGuideTitle   = FindDeepChild(UI.hudGuideBox, "GuideTitle")
-            UI.hudGuideDesc    = FindDeepChild(UI.hudGuideBox, "GuideDesc")
-        end
-
-        UI.cardSlots = {}
-        for j = 1, 4 do
-            local slotGrp = FindDeepChild(hud, "CardSlot_" .. j)
-            if slotGrp then
-                table.insert(UI.cardSlots, {
-                    container  = slotGrp,
-                    borderCtrl = FindDeepChild(slotGrp, "Border"),
-                    nameCtrl   = FindDeepChild(slotGrp, "NameText"),
-                    costCtrl   = FindDeepChild(slotGrp, "CostText"),
-                    maskCtrl   = FindDeepChild(slotGrp, "CdMask"),
-                    cdTextCtrl = FindDeepChild(slotGrp, "CdText")
-                })
-            end
-        end
-    end
-
-    -- 剧情弹窗
-    UI.dialogueModal = FindDeepChild(root, "DialogueModal")
-    if UI.dialogueModal then
-        UI.dlgSpeaker = FindDeepChild(UI.dialogueModal, "DlgSpeaker")
-        UI.dlgContent = FindDeepChild(UI.dialogueModal, "DlgContent")
-        UI.dlgSkipBtn = FindDeepChild(UI.dialogueModal, "DlgSkipBtn")
-        UI.dlgNextBtn = FindDeepChild(UI.dialogueModal, "DlgNextBtn")
-    end
-
-    -- 战前调配弹窗
-    UI.prepareModal = FindDeepChild(root, "PrepareModal")
-    UI.prepCards = {}
-    if UI.prepareModal then
-        UI.prepBudgetText = FindDeepChild(UI.prepareModal, "PrepBudgetText")
-        UI.prepHint       = FindDeepChild(UI.prepareModal, "PrepHint")
-        UI.prepTitle      = FindDeepChild(UI.prepareModal, "PrepTitle")
-        UI.prepStartBtn   = FindDeepChild(UI.prepareModal, "PrepStartBtn")
-        for k = 1, 6 do
-            local cardBtn = FindDeepChild(UI.prepareModal, "PrepCard_" .. k)
-            if cardBtn then
-                table.insert(UI.prepCards, {
-                    button     = cardBtn,
-                    checkCtrl  = FindDeepChild(cardBtn, "CheckTag"),
-                    costCtrl   = FindDeepChild(cardBtn, "CostText"),
-                    descCtrl   = FindDeepChild(cardBtn, "DescText"),
-                    nameCtrl   = FindDeepChild(cardBtn, "NameText"),
-                    bgCtrl     = FindDeepChild(cardBtn, "CardBg"),
-                    borderCtrl = FindDeepChild(cardBtn, "CardBorder")
-                })
-            end
-        end
-    end
-
-    -- 常驻侧边导航栏 (除剧情演播外常驻于左上角)
-    UI.quickNavLayer = FindDeepChild(root, "QuickNavLayer")
-    if UI.quickNavLayer then
-        UI.sideRestartBtn = FindDeepChild(UI.quickNavLayer, "SideRestartBtn")
-        UI.sideSettleBtn  = FindDeepChild(UI.quickNavLayer, "SideSettleBtn")
-    end
-
-    -- 官方风格退出挑战 / 游玩结算二次确认弹窗
-    UI.settleConfirmModal = FindDeepChild(root, "SettleConfirmModal")
-    if UI.settleConfirmModal then
-        UI.confirmResumeBtn  = FindDeepChild(UI.settleConfirmModal, "ConfirmResumeBtn")
-        UI.confirmRestartBtn = FindDeepChild(UI.settleConfirmModal, "ConfirmRestartBtn")
-        UI.confirmQuitBtn    = FindDeepChild(UI.settleConfirmModal, "ConfirmQuitBtn")
-        UI.confirmDesc       = FindDeepChild(UI.settleConfirmModal, "ConfirmDesc")
-        UI.confirmTitle      = FindDeepChild(UI.settleConfirmModal, "ConfirmTitle")
-    end
-
-    -- 结算弹窗
-    UI.settleModal = FindDeepChild(root, "SettleModal")
-    if UI.settleModal then
-        UI.settleTitle      = FindDeepChild(UI.settleModal, "SettleTitle")
-        UI.settleDesc       = FindDeepChild(UI.settleModal, "SettleDesc")
-        UI.settleStats      = FindDeepChild(UI.settleModal, "SettleStats")
-        UI.settleNextBtn    = FindDeepChild(UI.settleModal, "SettleNextBtn")
-        UI.settleRetryBtn   = FindDeepChild(UI.settleModal, "SettleRetryBtn")
-        UI.settleChapBtn    = FindDeepChild(UI.settleModal, "SettleChapterBtn")
-        UI.settleRestartBtn = FindDeepChild(UI.settleModal, "SettleRestartBtn")
-        UI.settleQuitBtn    = FindDeepChild(UI.settleModal, "SettleQuitBtn")
-    end
+    -- 初始化连线柔边羽化 (光束能量脉冲质感)
+    VisualRenderer.InitLineSoftEdge(UI.routeCtrls, UI.staticLinkCtrls)
 end
 
 -- 控制战斗核心层（灵穴、光轨、微粒、HUD）的可见性
 local function SetGameplayLayersVisible(visible)
-    Layout.SetVisible(UI.nodesLayer, visible)
-    Layout.SetVisible(UI.linksLayer, visible)
-    Layout.SetVisible(UI.particlesLayer, visible)
-    Layout.SetVisible(UI.hudLayer, visible)
+    UIBinder.SetGameplayLayersVisible(UI, visible)
 end
 
 -- 提取光标事件位置助手
@@ -4089,10 +4338,10 @@ function OnUpdate(dt)
         -- 6. 符印冷却计时
         AbilitySystem.UpdateCooldowns(dt)
 
-        -- 7. 纯代码视觉渲染刷新
+        -- 7. 纯代码视觉渲染刷新 (含拖拽拓扑高亮与运动形变)
         Runtime.UpdateParticles(RouteManager.movingParticles, Layout.GetFactionColor)
         VisualRenderer.UpdateRoutes(UI.routeCtrls, RouteManager.routes, gameState.nodes, UI.dragLine, Input, gameState.elapsedTime)
-        VisualRenderer.UpdateNodes(UI.nodeUIList, gameState.nodes, gameState.elapsedTime)
+        VisualRenderer.UpdateNodes(UI.nodeUIList, gameState.nodes, gameState.elapsedTime, Input)
         CardBar.Update(UI.cardSlots, AbilitySystem.deck, AbilitySystem.cooldowns, Input.GetSelectedCard())
         HudView.UpdateTopBar(gameState.timeRemaining, gameState.nodes, UI.playerPctText, UI.enemyPctText, UI.timerText, UI.barPlayer, UI.barEnemy)
         HudView.UpdateToast(dt, UI.toastContainer, UI.toastText)

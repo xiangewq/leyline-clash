@@ -38,6 +38,12 @@ function CardBar.Update(cardSlots, deck, cooldowns, selectedSlotIndex)
                     end
                 end
 
+                -- 选定符印进入施法等待态：卡槽微抬升与高亮，提示玩家选取目标灵穴
+                if slot.container.anchoredPositionY ~= nil then
+                    local targetY = (selectedSlotIndex == i) and 14 or 0
+                    slot.container.anchoredPositionY = targetY
+                end
+
                 -- 冷却遮罩
                 if cd > 0 then
                     Layout.SetVisible(slot.maskCtrl, true)

@@ -23,6 +23,7 @@ local HudView         = require("default_import_file/src/ui/hudView") or require
 local CardBar         = require("default_import_file/src/ui/cardBar") or require("src/ui/cardBar")
 local ModeSelectView  = require("default_import_file/src/ui/modeSelectView") or require("src/ui/modeSelectView")
 local ChapterSelectView = require("default_import_file/src/ui/chapterSelectView") or require("src/ui/chapterSelectView")
+local UIBinder        = require("default_import_file/src/ui/uiBinder") or require("src/ui/uiBinder")
 
 -- 全局游戏状态机枚举
 local STATE_MODE_SELECT    = "STATE_MODE_SELECT"
@@ -43,85 +44,8 @@ local gameState = {
     nodes          = {}
 }
 
--- UI 控件绑定容器
-local UI = {
-    root           = nil,
-    cursorArea     = nil,
-    dragLine       = nil,
-    routeCtrls     = {},
-    staticLinkCtrls= {},
-    particleCtrls  = {},
-    nodeUIList     = {},
-    cardSlots      = {},
-
-    -- 模式选择弹窗
-    modeSelectModal  = nil,
-    modeStoryBtn     = nil,
-    modeChallengeBtn = nil,
-
-    -- 章节选择弹窗
-    chapterSelectModal = nil,
-    chapterCards       = {},
-    chapDesc           = nil,
-    chapTitle          = nil,
-    chapStartBtn       = nil,
-    chapStartTxt       = nil,
-    chapBackBtn        = nil,
-
-    -- 顶部 HUD
-    playerPctText  = nil,
-    enemyPctText   = nil,
-    timerText      = nil,
-    barPlayer      = nil,
-    barEnemy       = nil,
-    toastContainer = nil,
-    toastText      = nil,
-
-    -- 战前3秒倒计时
-    countdownModal = nil,
-    countdownText  = nil,
-    countdownSub   = nil,
-
-    -- 左上角特殊灵穴说明与右上角操作说明
-    hudAnomalyBox  = nil,
-    hudAnomalyTitle= nil,
-    hudAnomalyDesc = nil,
-    hudGuideBox    = nil,
-    hudGuideTitle  = nil,
-    hudGuideDesc   = nil,
-
-    -- 剧情弹窗
-    dialogueModal  = nil,
-    dlgSpeaker     = nil,
-    dlgContent     = nil,
-    dlgSkipBtn     = nil,
-    dlgNextBtn     = nil,
-
-    -- 模式选择弹窗
-    modeSelectModal    = nil,
-    modeStoryBtn       = nil,
-    modeChallengeBtn   = nil,
-    modeQuitBtn        = nil,
-
-    -- 战前构筑弹窗
-    prepareModal   = nil,
-    prepBudgetText = nil,
-    prepHint       = nil,
-    prepTitle      = nil,
-    prepStartBtn   = nil,
-    prepCards      = {},
-
-    -- 结算弹窗
-    settleModal      = nil,
-    settleTitle      = nil,
-    settleDesc       = nil,
-    settleStats      = nil,
-    settleNextBtn    = nil,
-    settleRetryBtn   = nil,
-    settleChapBtn    = nil,
-    settleRestartBtn = nil,
-    settleQuitBtn    = nil
-}
+-- UI 控件绑定容器 (由 UIBinder.BindControls 统筹填充)
+local UI = {}
 
 -- 初始化沙盘所有灵穴实体
 local function InitNodes()
@@ -223,248 +147,17 @@ local function CheckMatchEnd(isTimeout)
     end
 end
 
--- 深度递归查找指定名称的子控件
-local function FindDeepChild(parent, name)
-    if not parent or not parent.alive then return nil end
-    local direct = parent:FindChild(name)
-    if direct then return direct end
-    local children = parent:GetChildren()
-    if children then
-        for _, child in ipairs(children) do
-            local found = FindDeepChild(child, name)
-            if found then return found end
-        end
-    end
-    return nil
-end
-
--- 缓存控件树引用
+-- 缓存控件树引用 (统一由 UIBinder.BindControls 处理)
 local function CacheUIControls()
-    local root = nil
-    if script and script.GetParam then
-        local pId = script:GetParam("RootCanvasID")
-        if pId and type(pId) == "number" and game and game.GetClientUIControl then
-            root = game.GetClientUIControl(pId)
-        end
-    end
-    if not root and script and script.object then
-        root = script.object
-    end
-    if not root and game and game.FindClientUIRoot then
-        root = game.FindClientUIRoot("StarlinkCanvas") or game.FindClientUIRoot("GameRoot")
-    end
-    if not root and game and game.GetClientUIRoots then
-        local roots = game.GetClientUIRoots()
-        if roots and #roots > 0 then root = roots[1] end
-    end
-    UI.root = root
-
-    -- 全局检测层与拖拽导引线
-    UI.cursorArea = FindDeepChild(root, "GlobalCursorArea")
-    UI.dragLine   = FindDeepChild(root, "DragLine")
-
-    -- 模式选择弹窗
-    UI.modeSelectModal  = FindDeepChild(root, "ModeSelectModal")
-    if UI.modeSelectModal then
-        UI.modeStoryBtn     = FindDeepChild(UI.modeSelectModal, "ModeStoryBtn")
-        UI.modeChallengeBtn = FindDeepChild(UI.modeSelectModal, "ModeChallengeBtn")
-        UI.modeQuitBtn      = FindDeepChild(UI.modeSelectModal, "ModeQuitBtn")
-    end
-
-    -- 关卡章节选择弹窗
-    UI.chapterSelectModal = FindDeepChild(root, "ChapterSelectModal")
-    UI.chapterCards = {}
-    if UI.chapterSelectModal then
-        UI.chapDesc     = FindDeepChild(UI.chapterSelectModal, "ChapterDesc")
-        UI.chapTitle    = FindDeepChild(UI.chapterSelectModal, "ChapterTitle")
-        UI.chapStartBtn = FindDeepChild(UI.chapterSelectModal, "ChapterStartBtn")
-        if UI.chapStartBtn then
-            UI.chapStartTxt = FindDeepChild(UI.chapStartBtn, "Text")
-        end
-        UI.chapBackBtn  = FindDeepChild(UI.chapterSelectModal, "ChapterBackBtn")
-
-        for idx = 1, 5 do
-            local cardBtn = FindDeepChild(UI.chapterSelectModal, "ChapterCard_" .. idx)
-            if cardBtn then
-                table.insert(UI.chapterCards, {
-                    button     = cardBtn,
-                    tagCtrl    = FindDeepChild(cardBtn, "TagText"),
-                    infoCtrl   = FindDeepChild(cardBtn, "InfoText"),
-                    budgetCtrl = FindDeepChild(cardBtn, "BudgetText"),
-                    titleCtrl  = FindDeepChild(cardBtn, "TitleText"),
-                    bgCtrl     = FindDeepChild(cardBtn, "CardBg"),
-                    borderCtrl = FindDeepChild(cardBtn, "CardBorder")
-                })
-            end
-        end
-    end
-
-    -- 光轨条带池与静态连线池 (25 条动态光轨 + 40 条静态底轨)
-    UI.routeCtrls = {}
-    UI.staticLinkCtrls = {}
-    UI.linksLayer = FindDeepChild(root, "LinksLayer")
-    if UI.linksLayer then
-        for i = 1, 25 do
-            local line = FindDeepChild(UI.linksLayer, "RouteLine_" .. i)
-            if line then table.insert(UI.routeCtrls, line) end
-        end
-        for i = 0, 39 do
-            local sLine = FindDeepChild(UI.linksLayer, "StaticLink_" .. i)
-            if sLine then table.insert(UI.staticLinkCtrls, sLine) end
-        end
-    end
-
-    -- 微粒对象池 (120个)
-    UI.particleCtrls = {}
-    UI.particlesLayer = FindDeepChild(root, "ParticlesLayer")
-    if UI.particlesLayer then
-        for i = 1, 120 do
-            local p = FindDeepChild(UI.particlesLayer, "P_" .. i)
-            if p then table.insert(UI.particleCtrls, p) end
-        end
-    end
+    UI = UIBinder.BindControls(script, game)
     Runtime.InitParticlePool(UI.particleCtrls)
-
-    -- 22 座地脉灵穴 UI 组 (支持全5关剧情模式最大18座并预留富余预算)
-    UI.nodeUIList = {}
-    UI.nodesLayer = FindDeepChild(root, "NodesLayer")
-    if UI.nodesLayer then
-        for i = 0, 21 do
-            local grp = FindDeepChild(UI.nodesLayer, "NodeGroup_" .. i)
-            if grp then
-                table.insert(UI.nodeUIList, {
-                    group        = grp,
-                    defenseRing  = FindDeepChild(grp, "DefenseRing"),
-                    baseDisc     = FindDeepChild(grp, "BaseDisc"),
-                    resonanceRing= FindDeepChild(grp, "ResonanceRing"),
-                    titleText    = FindDeepChild(grp, "TitleText"),
-                    particleText = FindDeepChild(grp, "ParticleText"),
-                    anomalyText  = FindDeepChild(grp, "AnomalyText"),
-                    statusText   = FindDeepChild(grp, "StatusText")
-                })
-            end
-        end
-    end
-
-    -- 顶部 HUD
-    UI.hudLayer = FindDeepChild(root, "HudLayer")
-    local hud = UI.hudLayer
-    if hud then
-        UI.playerPctText  = FindDeepChild(hud, "HudPlayerPct")
-        UI.enemyPctText   = FindDeepChild(hud, "HudEnemyPct")
-        UI.timerText      = FindDeepChild(hud, "HudTimer")
-        UI.barPlayer      = FindDeepChild(hud, "BarPlayer")
-        UI.barEnemy       = FindDeepChild(hud, "BarEnemy")
-        UI.toastContainer = FindDeepChild(root, "ToastContainer")
-        if UI.toastContainer then
-            UI.toastText  = FindDeepChild(UI.toastContainer, "ToastText")
-        end
-
-        -- 战前3秒倒计时弹窗
-        UI.countdownModal = FindDeepChild(root, "CountdownModal")
-        if UI.countdownModal then
-            UI.countdownText = FindDeepChild(UI.countdownModal, "CountdownText")
-            UI.countdownSub  = FindDeepChild(UI.countdownModal, "CountdownSub")
-        end
-
-        -- 左上角特殊灵穴说明与右上角操作指引
-        UI.hudAnomalyBox   = FindDeepChild(hud, "HudAnomalyBox")
-        if UI.hudAnomalyBox then
-            UI.hudAnomalyTitle = FindDeepChild(UI.hudAnomalyBox, "AnomalyTitle")
-            UI.hudAnomalyDesc  = FindDeepChild(UI.hudAnomalyBox, "AnomalyDesc")
-        end
-        UI.hudGuideBox     = FindDeepChild(hud, "HudGuideBox")
-        if UI.hudGuideBox then
-            UI.hudGuideTitle   = FindDeepChild(UI.hudGuideBox, "GuideTitle")
-            UI.hudGuideDesc    = FindDeepChild(UI.hudGuideBox, "GuideDesc")
-        end
-
-        UI.cardSlots = {}
-        for j = 1, 4 do
-            local slotGrp = FindDeepChild(hud, "CardSlot_" .. j)
-            if slotGrp then
-                table.insert(UI.cardSlots, {
-                    container  = slotGrp,
-                    borderCtrl = FindDeepChild(slotGrp, "Border"),
-                    nameCtrl   = FindDeepChild(slotGrp, "NameText"),
-                    costCtrl   = FindDeepChild(slotGrp, "CostText"),
-                    maskCtrl   = FindDeepChild(slotGrp, "CdMask"),
-                    cdTextCtrl = FindDeepChild(slotGrp, "CdText")
-                })
-            end
-        end
-    end
-
-    -- 剧情弹窗
-    UI.dialogueModal = FindDeepChild(root, "DialogueModal")
-    if UI.dialogueModal then
-        UI.dlgSpeaker = FindDeepChild(UI.dialogueModal, "DlgSpeaker")
-        UI.dlgContent = FindDeepChild(UI.dialogueModal, "DlgContent")
-        UI.dlgSkipBtn = FindDeepChild(UI.dialogueModal, "DlgSkipBtn")
-        UI.dlgNextBtn = FindDeepChild(UI.dialogueModal, "DlgNextBtn")
-    end
-
-    -- 战前调配弹窗
-    UI.prepareModal = FindDeepChild(root, "PrepareModal")
-    UI.prepCards = {}
-    if UI.prepareModal then
-        UI.prepBudgetText = FindDeepChild(UI.prepareModal, "PrepBudgetText")
-        UI.prepHint       = FindDeepChild(UI.prepareModal, "PrepHint")
-        UI.prepTitle      = FindDeepChild(UI.prepareModal, "PrepTitle")
-        UI.prepStartBtn   = FindDeepChild(UI.prepareModal, "PrepStartBtn")
-        for k = 1, 6 do
-            local cardBtn = FindDeepChild(UI.prepareModal, "PrepCard_" .. k)
-            if cardBtn then
-                table.insert(UI.prepCards, {
-                    button     = cardBtn,
-                    checkCtrl  = FindDeepChild(cardBtn, "CheckTag"),
-                    costCtrl   = FindDeepChild(cardBtn, "CostText"),
-                    descCtrl   = FindDeepChild(cardBtn, "DescText"),
-                    nameCtrl   = FindDeepChild(cardBtn, "NameText"),
-                    bgCtrl     = FindDeepChild(cardBtn, "CardBg"),
-                    borderCtrl = FindDeepChild(cardBtn, "CardBorder")
-                })
-            end
-        end
-    end
-
-    -- 常驻侧边导航栏 (除剧情演播外常驻于左上角)
-    UI.quickNavLayer = FindDeepChild(root, "QuickNavLayer")
-    if UI.quickNavLayer then
-        UI.sideRestartBtn = FindDeepChild(UI.quickNavLayer, "SideRestartBtn")
-        UI.sideSettleBtn  = FindDeepChild(UI.quickNavLayer, "SideSettleBtn")
-    end
-
-    -- 官方风格退出挑战 / 游玩结算二次确认弹窗
-    UI.settleConfirmModal = FindDeepChild(root, "SettleConfirmModal")
-    if UI.settleConfirmModal then
-        UI.confirmResumeBtn  = FindDeepChild(UI.settleConfirmModal, "ConfirmResumeBtn")
-        UI.confirmRestartBtn = FindDeepChild(UI.settleConfirmModal, "ConfirmRestartBtn")
-        UI.confirmQuitBtn    = FindDeepChild(UI.settleConfirmModal, "ConfirmQuitBtn")
-        UI.confirmDesc       = FindDeepChild(UI.settleConfirmModal, "ConfirmDesc")
-        UI.confirmTitle      = FindDeepChild(UI.settleConfirmModal, "ConfirmTitle")
-    end
-
-    -- 结算弹窗
-    UI.settleModal = FindDeepChild(root, "SettleModal")
-    if UI.settleModal then
-        UI.settleTitle      = FindDeepChild(UI.settleModal, "SettleTitle")
-        UI.settleDesc       = FindDeepChild(UI.settleModal, "SettleDesc")
-        UI.settleStats      = FindDeepChild(UI.settleModal, "SettleStats")
-        UI.settleNextBtn    = FindDeepChild(UI.settleModal, "SettleNextBtn")
-        UI.settleRetryBtn   = FindDeepChild(UI.settleModal, "SettleRetryBtn")
-        UI.settleChapBtn    = FindDeepChild(UI.settleModal, "SettleChapterBtn")
-        UI.settleRestartBtn = FindDeepChild(UI.settleModal, "SettleRestartBtn")
-        UI.settleQuitBtn    = FindDeepChild(UI.settleModal, "SettleQuitBtn")
-    end
+    -- 初始化连线柔边羽化 (光束能量脉冲质感)
+    VisualRenderer.InitLineSoftEdge(UI.routeCtrls, UI.staticLinkCtrls)
 end
 
 -- 控制战斗核心层（灵穴、光轨、微粒、HUD）的可见性
 local function SetGameplayLayersVisible(visible)
-    Layout.SetVisible(UI.nodesLayer, visible)
-    Layout.SetVisible(UI.linksLayer, visible)
-    Layout.SetVisible(UI.particlesLayer, visible)
-    Layout.SetVisible(UI.hudLayer, visible)
+    UIBinder.SetGameplayLayersVisible(UI, visible)
 end
 
 -- 提取光标事件位置助手
@@ -1196,10 +889,10 @@ function OnUpdate(dt)
         -- 6. 符印冷却计时
         AbilitySystem.UpdateCooldowns(dt)
 
-        -- 7. 纯代码视觉渲染刷新
+        -- 7. 纯代码视觉渲染刷新 (含拖拽拓扑高亮与运动形变)
         Runtime.UpdateParticles(RouteManager.movingParticles, Layout.GetFactionColor)
         VisualRenderer.UpdateRoutes(UI.routeCtrls, RouteManager.routes, gameState.nodes, UI.dragLine, Input, gameState.elapsedTime)
-        VisualRenderer.UpdateNodes(UI.nodeUIList, gameState.nodes, gameState.elapsedTime)
+        VisualRenderer.UpdateNodes(UI.nodeUIList, gameState.nodes, gameState.elapsedTime, Input)
         CardBar.Update(UI.cardSlots, AbilitySystem.deck, AbilitySystem.cooldowns, Input.GetSelectedCard())
         HudView.UpdateTopBar(gameState.timeRemaining, gameState.nodes, UI.playerPctText, UI.enemyPctText, UI.timerText, UI.barPlayer, UI.barEnemy)
         HudView.UpdateToast(dt, UI.toastContainer, UI.toastText)

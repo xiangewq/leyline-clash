@@ -41,7 +41,7 @@ function NodeEntity.CheckIsInland(node, allNodes)
     local neighbors = StarMap.GetNeighbors(node.id)
     if #neighbors == 0 then return false end
     for _, nId in ipairs(neighbors) do
-        local n = allNodes[nId + 1]
+        local n = StarMap.GetNode(allNodes, nId)
         if not n or n.faction ~= node.faction then
             return false
         end

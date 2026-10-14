@@ -20,6 +20,21 @@ function StarMap.LoadStage(stageIndex)
     return chap
 end
 
+-- 安全获取节点（统一收敛 0-Based 与 1-Based 下标混用隐患）
+function StarMap.GetNode(nodes, nodeId)
+    if not nodes or nodeId == nil then return nil end
+    return nodes[nodeId + 1]
+end
+
+-- 获取两节点构成的无向边唯一键 (min_max)
+function StarMap.GetEdgeKey(idA, idB)
+    if idA < idB then
+        return idA .. "_" .. idB
+    else
+        return idB .. "_" .. idA
+    end
+end
+
 -- 判定两节点间是否存在地脉直通流道
 function StarMap.AreNodesLinked(idA, idB)
     for _, link in ipairs(StarMap.LINKS) do

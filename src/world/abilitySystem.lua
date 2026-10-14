@@ -3,6 +3,7 @@
 
 local BalanceConfig = require("default_import_file/src/data/balanceConfig") or require("src/data/balanceConfig")
 local CardRegistry = require("default_import_file/src/data/cardRegistry") or require("src/data/cardRegistry")
+local StarMap = require("default_import_file/src/world/starMap") or require("src/world/starMap")
 
 local AbilitySystem = {
     deck = {},             -- 当前装配的4张卡片元数据
@@ -50,7 +51,7 @@ function AbilitySystem.CastAbility(slotIndex, targetNodeId, nodes, routeManager,
         return false, "符印权能仍在凝聚冷却中！"
     end
 
-    local targetNode = nodes[targetNodeId + 1]
+    local targetNode = StarMap.GetNode(nodes, targetNodeId)
     if not targetNode then return false, "未选中合法灵穴" end
 
     if card.id == "anemo_shield" then

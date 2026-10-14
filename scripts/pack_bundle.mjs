@@ -26,6 +26,7 @@ const modules = [
   'ui/cardBar',
   'ui/modeSelectView',
   'ui/chapterSelectView',
+  'ui/uiBinder',
 ];
 
 let bundle = `-- src/bundle.lua: Consolidated standalone bundle for Miliastra UGC
