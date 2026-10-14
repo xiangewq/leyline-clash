@@ -3995,44 +3995,56 @@ local function TriggerNativePersonalSettlement()
     end
 
     -- 触发千星奇域官方服务端逻辑节点图原生结算:
-    local function EmitServerSignal(signalName)
-        print(string.format("[Starlink] 发送服务端监听信号: %s", tostring(signalName)))
+    local function EmitServerSignal(signalName, intParam)
+        print(string.format("[Starlink] 发送服务端监听信号: %s (intParam=%s)", tostring(signalName), tostring(intParam)))
         if not game then return end
         local sent = false
         pcall(function()
             if game.ServerSignal then
                 local sig = game.ServerSignal(signalName)
                 if sig and (type(sig) == "table" or type(sig) == "userdata") and sig.SendSignal then
+                    if intParam ~= nil and sig.AddInt then
+                        sig:AddInt(math.floor(tonumber(intParam) or 1))
+                        print(string.format("[Starlink] 信号已附加整数参数: %s:AddInt(%s)", signalName, tostring(intParam)))
+                    end
                     sig:SendSignal()
                     sent = true
                     print(string.format("[Starlink] 服务端信号已成功发送: %s (sig:SendSignal())", signalName))
                     return
                 end
                 if not sent and type(game.ServerSignal) == "function" then
-                    game.ServerSignal(signalName)
-                    print(string.format("[Starlink] 服务端信号已成功发送: %s (game.ServerSignal(name))", signalName))
+                    if intParam ~= nil then
+                        game.ServerSignal(signalName, { math.floor(tonumber(intParam) or 1) })
+                    else
+                        game.ServerSignal(signalName)
+                    end
+                    print(string.format("[Starlink] 服务端信号已成功发送: %s (game.ServerSignal(name, payload))", signalName))
                 end
             end
         end)
         pcall(function()
             if not sent and game.SendServerSignal then
-                game.SendServerSignal(signalName)
+                if intParam ~= nil then
+                    game.SendServerSignal(signalName, math.floor(tonumber(intParam) or 1))
+                else
+                    game.SendServerSignal(signalName)
+                end
                 print(string.format("[Starlink] 服务端信号已成功发送: %s (game.SendServerSignal(name))", signalName))
             end
         end)
     end
 
-    -- 1. 若满足已通关前 4 关，发送 SetPlayerWinStatus 通知服务端节点图设置玩家胜利状态
+    -- 1. 若满足已通关前 4 关，发送 SetPlayerWinStatus (参数=1) 通知服务端节点图设置玩家胜利状态
     if isSuccess then
-        print("[Starlink] 判定已通关前4关 (成功) -> 发送服务端信号: SetPlayerWinStatus (设置玩家结算成功状态: 胜利)")
-        EmitServerSignal("SetPlayerWinStatus")
+        print("[Starlink] 判定已通关前4关 (成功) -> 发送服务端信号: SetPlayerWinStatus (整数参数=1, 设置玩家结算成功状态: 胜利)")
+        EmitServerSignal("SetPlayerWinStatus", 1)
     else
         print("[Starlink] 未通关前4关 (失败) -> 保持未胜利状态，不发送 SetPlayerWinStatus")
     end
 
-    -- 2. 发送 RequestQuitChallenge 通知服务端节点图执行【结算关卡】原生逻辑，真正退出奇域关卡
-    print("[Starlink] 发送服务端信号: RequestQuitChallenge (触发服务端【结算关卡】节点退出奇域)")
-    EmitServerSignal("RequestQuitChallenge")
+    -- 2. 发送 RequestQuitChallenge (参数=1) 通知服务端节点图执行【结算关卡】原生逻辑，真正退出奇域关卡
+    print("[Starlink] 发送服务端信号: RequestQuitChallenge (整数参数=1, 触发服务端【结算关卡】节点退出奇域)")
+    EmitServerSignal("RequestQuitChallenge", 1)
 end
 
 -- 重开模式：回退到模式选择界面，保留剧情模式关卡解锁与通关进度
