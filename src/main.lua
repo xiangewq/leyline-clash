@@ -160,6 +160,13 @@ local function SetGameplayLayersVisible(visible)
     UIBinder.SetGameplayLayersVisible(UI, visible)
 end
 
+-- 关闭千星奇域退出挑战 / 游玩结算二次确认弹窗
+local function CloseSettleConfirmModal()
+    if UI.settleConfirmModal then
+        Layout.SetVisible(UI.settleConfirmModal, false)
+    end
+end
+
 -- 提取光标事件位置助手
 local function GetEventPos(data)
     if not data then return 0, 0 end
@@ -257,13 +264,6 @@ local function StartStage(stageId)
 
     gameState.currentState = STATE_DIALOGUE
     Layout.SetVisible(UI.dialogueModal, true)
-end
-
--- 关闭千星奇域退出挑战 / 游玩结算二次确认弹窗
-local function CloseSettleConfirmModal()
-    if UI.settleConfirmModal then
-        Layout.SetVisible(UI.settleConfirmModal, false)
-    end
 end
 
 -- 打开千星奇域退出挑战 / 游玩结算二次确认弹窗（动态提示当前进度与成功/失败判定预测）

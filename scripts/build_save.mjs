@@ -1108,13 +1108,13 @@ const cardSlots = [1, 2, 3, 4].map(idx => {
   });
 });
 
-// 常驻侧边导航层 QuickNavLayer (除剧情演播外，随时挂载于屏幕左上角，支持随时重开模式与退出结算)
+// 常驻侧边导航层 QuickNavLayer (除剧情演播外，随时挂载于屏幕左侧情报面板下方，支持随时重开模式与退出结算)
 const quickNavLayer = createNode('container', {
   id: 'quick_nav_layer',
   name: 'QuickNavLayer',
   visible: true,
   transformByPlatform: makeTransform({
-    offset: [-660, 410],
+    offset: [-710, 275],
     size: [280, 48],
     pivot: [0, 0.5]
   }),
@@ -1823,7 +1823,7 @@ for (let i = 0; i < 30; i++) {
       anchor: [0, 0],
       offset: [0, 0],
       size: [100, 2],
-      pivot: [0.5, 0.5]
+      pivot: [0, 0.5]
     })
   }));
 }
