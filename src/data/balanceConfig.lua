@@ -31,22 +31,34 @@ local BalanceConfig = {
     -- 战前构筑预算
     MAX_BUDGET = 12,
 
-    -- 提瓦特官方音效资产 ID 映射表 (基于官方 1,997 音效库精选匹配)
+    -- 提瓦特官方音效资产 ID 映射表 (精选柔和自然、富有沙盘推演质感的音频)
     AUDIO_SLOTS = {
         UI_CLICK     = 50888,    -- 界面按钮点击 / 节点选中 (轻脆通用反馈音)
-        ROUTE_LINK   = 40018,    -- 光轨连接建立 (能量脉冲流道激活)
-        ROUTE_CUT    = 50912,    -- 光轨切断与结界切换 (能量断开清爽音)
-        COMBAT_HIT   = 0,        -- 停用 70 秒长篇风声背景音(原10002)，交火采用纯净粒子光效与震颤
-        SKILL_BLAST  = 40001,    -- 符印轰爆 / 灵穴共鸣爆发 (元素充能大招)
+        ROUTE_LINK   = 50912,    -- 光轨连接建立 (温润清爽能量流道音，取代原40018尖利金属出剑音)
+        ROUTE_CUT    = 50888,    -- 光轨切断与结界切换 (轻脆断开反馈)
+        COMBAT_HIT   = 0,        -- 交火采用纯净粒子光爆与数字跳动，保持听感纯净
+        SKILL_BLAST  = 40001,    -- 符印轰爆 / 星枢共鸣爆发 (元素充能大招)
         MATCH_WIN    = 50961,    -- 全域大捷通关 (秘境挑战成功高昂号角)
-        MATCH_LOSE   = 50962,    -- 灵脉耗竭败退 (挑战失利低沉音)
-        NODE_CAPTURE = 40001,    -- 灵穴完全掌控 (核心充能爆发)
-        NODE_DEFEND  = 20004,    -- 结界护盾吸收抵挡
-        NODE_UPGRADE = 30005     -- 灵穴充能提升 / 强化清越音
+        MATCH_LOSE   = 50962,    -- 星轨耗竭败退 (挑战失利低沉音)
+        NODE_CAPTURE = 40001,    -- 星枢完全掌控 (核心充能爆发)
+        NODE_DEFEND  = 0,        -- 消除消灭守军的高频嗞嗞电流声(原20004)，交火依靠粒子爆破与生命数值跳动
+        NODE_UPGRADE = 30005     -- 星枢充能提升 / 强化清越音
     },
 
-    activeAudioInstances = {}
+    activeAudioInstances = {},
+    lastAudioTimes = {}
 }
+
+-- 节流音频播放器 (同类高频音效施加时间防抖，杜绝重叠杂音)
+function BalanceConfig.PlayAudioThrottled(audioSlotKey, interval)
+    local minInterval = interval or 0.25
+    local now = (os and os.clock) and os.clock() or 0
+    if BalanceConfig.lastAudioTimes[audioSlotKey] and (now - BalanceConfig.lastAudioTimes[audioSlotKey]) < minInterval then
+        return
+    end
+    BalanceConfig.lastAudioTimes[audioSlotKey] = now
+    BalanceConfig.PlayAudioSafe(audioSlotKey)
+end
 
 -- 安全播放音效包装器 (若未配置或ID无效，安全静音运行并以视觉动效兜底)
 function BalanceConfig.PlayAudioSafe(audioSlotKey)

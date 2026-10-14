@@ -127,11 +127,11 @@ function NodeEntity.ApplyArrival(node, particleFaction, onCombatHitCallback, onC
     end
 
     -- 2. 敌对微粒进攻结算
-    -- 核心防御保障：检查目标灵穴是否处于【千风庇护/守护】神圣保护期间
+    -- 核心防御保障：检查目标星枢是否处于【千风庇护/守护】神圣保护期间
     if (node.protectedUntil or 0) > (elapsedTime or 0) then
         -- 千风结界绝对阻挡与湮灭一切敌方微粒！
         -- 守备兵力不扣减、控制度不扣减、绝不沦陷为中立态！
-        BalanceConfig.PlayAudioSafe("NODE_DEFEND")
+        BalanceConfig.PlayAudioThrottled("NODE_DEFEND", 0.25)
         if type(onCombatHitCallback) == "function" then
             onCombatHitCallback(node)
         end
@@ -145,7 +145,7 @@ function NodeEntity.ApplyArrival(node, particleFaction, onCombatHitCallback, onC
             node.particles = node.particles - 1
             -- COMBAT_HIT 保持静音，依靠视觉闪烁
         else
-            BalanceConfig.PlayAudioSafe("NODE_DEFEND")
+            BalanceConfig.PlayAudioThrottled("NODE_DEFEND", 0.25)
         end
         if onCombatHitCallback then
             onCombatHitCallback(node)

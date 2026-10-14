@@ -41,6 +41,7 @@ local gameState = {
     captureTimer   = 0,
     countdownTimer = 0,
     isGameOver     = false,
+    isPaused       = false,
     nodes          = {}
 }
 
@@ -106,6 +107,9 @@ local function CheckMatchEnd(isTimeout)
         -- 玩家大获全胜！
         gameState.isGameOver = true
         gameState.currentState = STATE_SETTLEMENT
+        gameState.isPaused = false
+        if UI.pauseModal then Layout.SetVisible(UI.pauseModal, false) end
+        Layout.SetVisible(UI.quickNavLayer, false)
         VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
         Runtime.HideAllParticles()
         ChapterSelectView.UnlockNextStage(StarMap.currentStage)
@@ -116,6 +120,9 @@ local function CheckMatchEnd(isTimeout)
         -- 玩家兵力全军覆没
         gameState.isGameOver = true
         gameState.currentState = STATE_SETTLEMENT
+        gameState.isPaused = false
+        if UI.pauseModal then Layout.SetVisible(UI.pauseModal, false) end
+        Layout.SetVisible(UI.quickNavLayer, false)
         VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
         Runtime.HideAllParticles()
         BalanceConfig.StopAllAudios()
@@ -125,6 +132,9 @@ local function CheckMatchEnd(isTimeout)
         -- 倒计时归零压哨决胜
         gameState.isGameOver = true
         gameState.currentState = STATE_SETTLEMENT
+        gameState.isPaused = false
+        if UI.pauseModal then Layout.SetVisible(UI.pauseModal, false) end
+        Layout.SetVisible(UI.quickNavLayer, false)
         VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
         Runtime.HideAllParticles()
         local pScore = pNodes * 1000 + pParts * 10
@@ -209,6 +219,8 @@ local function StartStage(stageId)
     gameState.elapsedTime   = 0
     gameState.timeRemaining = chap.duration or BalanceConfig.MATCH_DURATION
     gameState.isGameOver    = false
+    gameState.isPaused      = false
+    if UI.pauseModal then Layout.SetVisible(UI.pauseModal, false) end
 
     -- 呈现战场沙盘层
     SetGameplayLayersVisible(true)
@@ -230,7 +242,7 @@ local function StartStage(stageId)
     Layout.SetVisible(UI.countdownModal, false)
     CloseSettleConfirmModal()
 
-    -- 剧情演播阶段隐藏侧边常驻导航按钮，剧情结束后重新显示
+    -- 严格隔离：战前（剧情演播、符印配置、3秒倒计时）一律强制隐藏快捷控制栏
     Layout.SetVisible(UI.quickNavLayer, false)
 
     -- 1. 剧情演播
@@ -238,7 +250,7 @@ local function StartStage(stageId)
         print("[Starlink] 章节剧情完毕，进入战前符印调配...")
         Layout.SetVisible(UI.dialogueModal, false)
         Layout.SetVisible(UI.prepareModal, true)
-        Layout.SetVisible(UI.quickNavLayer, true)
+        Layout.SetVisible(UI.quickNavLayer, false)
         gameState.currentState = STATE_PREPARE
 
         -- 2. 调配面板初始化 (动态预算)
@@ -246,10 +258,10 @@ local function StartStage(stageId)
             print("[Starlink] 战前符印装配完成，进入战前 3 秒倒计时...")
             AbilitySystem.InitDeck(selectedDeck)
             Layout.SetVisible(UI.prepareModal, false)
-            Layout.SetVisible(UI.quickNavLayer, true)
+            Layout.SetVisible(UI.quickNavLayer, false)
             SetGameplayLayersVisible(true)
 
-            -- 刷新左上角特殊灵穴说明与右上角战术操作指引
+            -- 刷新左上角特殊星枢说明与右上角战术操作指引
             HudView.UpdateStageInfo(chap, UI.hudAnomalyTitle, UI.hudAnomalyDesc, UI.hudGuideTitle, UI.hudGuideDesc)
 
             -- 启动 3 秒倒计时 (3、2、1、开始)
@@ -269,14 +281,14 @@ end
 -- 打开千星奇域退出挑战 / 游玩结算二次确认弹窗（动态提示当前进度与成功/失败判定预测）
 local function OpenSettleConfirmModal()
     BalanceConfig.PlayAudioSafe("UI_CLICK")
-    local completed4 = ChapterSelectView.HasCompletedFirst4Stages()
+    local completed3 = ChapterSelectView.HasCompletedFirst3Stages()
     local clearedCount = ChapterSelectView.GetClearedCount and ChapterSelectView.GetClearedCount() or 0
     if UI.confirmDesc and UI.confirmDesc.alive then
-        if completed4 then
-            UI.confirmDesc.text = string.format("已通关 %d/4 关 · 当前中断将判定为【大捷成功】", clearedCount)
+        if completed3 then
+            UI.confirmDesc.text = string.format("已通关 %d/3 关 · 当前中断将判定为【大捷成功】", clearedCount)
             UI.confirmDesc.fontColor = Layout.PALETTE.GOLD
         else
-            UI.confirmDesc.text = string.format("已通关 %d/4 关 · 未达成前4关，中断将判定为【失败】", clearedCount)
+            UI.confirmDesc.text = string.format("已通关 %d/3 关 · 未达成前3关，中断将判定为【失败】", clearedCount)
             UI.confirmDesc.fontColor = Layout.PALETTE.ENEMY
         end
     end
@@ -285,25 +297,28 @@ local function OpenSettleConfirmModal()
     end
 end
 
--- 触发千星奇域原生系统个人结算 (按规则判定成功/失败)
+-- 触发千星奇域原生系统个人结算 (按规则判定成功/失败：通关前3关判定为胜利)
 local function TriggerNativePersonalSettlement()
     CloseSettleConfirmModal()
-    local completed4 = ChapterSelectView.HasCompletedFirst4Stages()
-    local isSuccess = completed4
-    local clearedCount = ChapterSelectView.GetClearedCount and ChapterSelectView.GetClearedCount() or (isSuccess and 4 or 0)
-    print(string.format("[Starlink] 触发原生系统个人结算: completedFirst4Stages=%s (已通关%d关) => 结算状态: %s",
-        tostring(completed4), clearedCount, isSuccess and "成功" or "失败"))
+    local completed3 = ChapterSelectView.HasCompletedFirst3Stages()
+    local isSuccess = completed3
+    local clearedCount = ChapterSelectView.GetClearedCount and ChapterSelectView.GetClearedCount() or (isSuccess and 3 or 0)
+    print(string.format("[Starlink] 触发原生系统个人结算: completedFirst3Stages=%s (已通关%d关) => 结算状态: %s",
+        tostring(completed3), clearedCount, isSuccess and "成功" or "失败"))
 
     gameState.isGameOver = true
     gameState.currentState = STATE_SETTLEMENT
+    gameState.isPaused = false
+    if UI.pauseModal then Layout.SetVisible(UI.pauseModal, false) end
+    Layout.SetVisible(UI.quickNavLayer, false)
 
     BalanceConfig.StopAllAudios()
     if isSuccess then
         BalanceConfig.PlayAudioSafe("MATCH_WIN")
-        HudView.ShowToast("【推衍圆满·结算成功】已达成前4关推衍，正在结算并退出...")
+        HudView.ShowToast("【推衍圆满·结算成功】已达成前3关推衍，正在结算并退出...")
     else
         BalanceConfig.PlayAudioSafe("MATCH_LOSE")
-        HudView.ShowToast("【推衍未成·结算失败】未达成前4关推衍，已中断挑战...")
+        HudView.ShowToast("【推衍未成·结算失败】未达成前3关推衍，已中断挑战...")
     end
 
     -- 停止战场动态
@@ -358,10 +373,10 @@ local function TriggerNativePersonalSettlement()
 
     -- 1. 向服务端同步结算状态并自动触发结算关卡（节点图中已由设置状态直接流转至结算关卡）
     if isSuccess then
-        print("[Starlink] 判定已通关前4关 (成功) -> 发送服务端信号: SetPlayerWinStatus (设置玩家结算成功状态: 胜利 -> 结算关卡)")
+        print("[Starlink] 判定已通关前3关 (成功) -> 发送服务端信号: SetPlayerWinStatus (设置玩家结算成功状态: 胜利 -> 结算关卡)")
         EmitServerSignal("SetPlayerWinStatus")
     else
-        print("[Starlink] 未通关前4关 (失败) -> 发送服务端信号: SetPlayerLoseStatus (设置玩家结算状态: 失败 -> 结算关卡)")
+        print("[Starlink] 未通关前3关 (失败) -> 发送服务端信号: SetPlayerLoseStatus (设置玩家结算状态: 失败 -> 结算关卡)")
         EmitServerSignal("SetPlayerLoseStatus")
     end
 end
@@ -377,6 +392,9 @@ local function HandleRestartToModeSelect()
     Input.isDragging = false
     Input.dragSourceId = nil
     Input.ClearSelectedCard()
+
+    gameState.isPaused = false
+    if UI.pauseModal then Layout.SetVisible(UI.pauseModal, false) end
 
     -- 隐藏所有战斗与演播面板
     Layout.SetVisible(UI.chapterSelectModal, false)
@@ -403,17 +421,17 @@ local function SetupEventHandlers()
     -- 1. 全屏光标事件 (连线与轻点)
     if UI.cursorArea and UI.cursorArea.AddCursorEventListener then
         UI.cursorArea:AddCursorEventListener(Enum.CursorEventType.CursorDown, function(data)
-            if gameState.currentState ~= STATE_PLAYING then return end
+            if gameState.currentState ~= STATE_PLAYING or gameState.isPaused then return end
             local x, y = GetEventPos(data)
             Input.OnCursorDown(x, y, gameState.nodes)
         end)
         UI.cursorArea:AddCursorEventListener(Enum.CursorEventType.CursorDrag, function(data)
-            if gameState.currentState ~= STATE_PLAYING then return end
+            if gameState.currentState ~= STATE_PLAYING or gameState.isPaused then return end
             local x, y = GetEventPos(data)
             Input.OnCursorDrag(x, y)
         end)
         UI.cursorArea:AddCursorEventListener(Enum.CursorEventType.CursorUp, function(data)
-            if gameState.currentState ~= STATE_PLAYING then return end
+            if gameState.currentState ~= STATE_PLAYING or gameState.isPaused then return end
             local x, y = GetEventPos(data)
             Input.OnCursorUp(x, y, gameState.nodes)
         end)
@@ -596,7 +614,7 @@ local function SetupEventHandlers()
         if slot.container and slot.container.AddCursorEventListener then
             SilenceButton(slot.container)
             slot.container:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
-                if gameState.currentState == STATE_PLAYING then
+                if gameState.currentState == STATE_PLAYING and not gameState.isPaused then
                     local card = AbilitySystem.deck[idx]
                     if not card then return end
 
@@ -615,18 +633,18 @@ local function SetupEventHandlers()
                         return
                     end
 
-                    -- 选定符印，等待玩家点击目标灵穴
+                    -- 选定符印，等待玩家点击目标星枢
                     Input.SetSelectedCard(idx)
                     BalanceConfig.PlayAudioSafe("UI_CLICK")
                     local targetHint = ""
                     if card.targetType == "enemy_node" then
-                        targetHint = "请轻点敌方灵穴释放"
+                        targetHint = "请轻点敌方星枢释放"
                     elseif card.targetType == "player_node" then
-                        targetHint = "请轻点我方灵穴加持"
+                        targetHint = "请轻点我方星枢加持"
                     elseif card.targetType == "player_route_node" then
-                        targetHint = "请轻点正在输送中的我方灵穴提速"
+                        targetHint = "请轻点正在输送中的我方星枢提速"
                     else
-                        targetHint = "请轻点目标灵穴释放"
+                        targetHint = "请轻点目标星枢释放"
                     end
                     HudView.ShowToast(string.format("【已选定】%s（%s，再点符印取消）", card.name, targetHint))
                     CardBar.Update(UI.cardSlots, AbilitySystem.deck, AbilitySystem.cooldowns, idx)
@@ -635,11 +653,41 @@ local function SetupEventHandlers()
         end
     end
 
-    -- 8. 常驻侧边导航栏按钮监听 (重开推衍 & 结算退出)
+    -- 8. 常驻侧边导航栏按钮监听 (暂停、重试当前关、二次确认结算退出)
+    if UI.sidePauseBtn and UI.sidePauseBtn.AddCursorEventListener then
+        SilenceButton(UI.sidePauseBtn)
+        UI.sidePauseBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
+            if gameState.currentState == STATE_PLAYING and not gameState.isGameOver then
+                gameState.isPaused = true
+                if UI.pauseModal then Layout.SetVisible(UI.pauseModal, true) end
+                BalanceConfig.PlayAudioSafe("UI_CLICK")
+            end
+        end)
+    end
+
+    if UI.pauseResumeBtn and UI.pauseResumeBtn.AddCursorEventListener then
+        SilenceButton(UI.pauseResumeBtn)
+        UI.pauseResumeBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
+            gameState.isPaused = false
+            if UI.pauseModal then Layout.SetVisible(UI.pauseModal, false) end
+            BalanceConfig.PlayAudioSafe("UI_CLICK")
+        end)
+    end
+
+    -- 重试按钮：重新挑战当前关卡，从关卡剧情对话重新开始
     if UI.sideRestartBtn and UI.sideRestartBtn.AddCursorEventListener then
         SilenceButton(UI.sideRestartBtn)
         UI.sideRestartBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
-            HandleRestartToModeSelect()
+            BalanceConfig.PlayAudioSafe("UI_CLICK")
+            BalanceConfig.StopAllAudios()
+            VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
+            Runtime.HideAllParticles()
+            if gameState.isPaused then
+                gameState.isPaused = false
+                if UI.pauseModal then Layout.SetVisible(UI.pauseModal, false) end
+            end
+            print(string.format("[Starlink] 【重试当前关卡】: 第 %d 关 (从剧情开始)...", StarMap.currentStage))
+            StartStage(StarMap.currentStage)
         end)
     end
 
@@ -825,12 +873,21 @@ function OnUpdate(dt)
             Layout.SetVisible(UI.countdownModal, false)
             gameState.currentState = STATE_PLAYING
             gameState.elapsedTime = 0
+            gameState.isPaused = false
+            Layout.SetVisible(UI.quickNavLayer, true)
             BalanceConfig.PlayAudioSafe("ROUTE_LINK")
             local chap = StarMap.currentChapterDef
             HudView.ShowToast(string.format("【%s】推衍启阵！全速进军！", chap and chap.title or "开战"))
         end
 
     elseif gameState.currentState == STATE_PLAYING then
+        if gameState.isPaused then
+            -- 处于暂停状态：战局推衍完全冻结（不推进时间、不孕育微粒、不移动微粒、不运行 AI）
+            -- 仅刷新 Toast 提示
+            HudView.UpdateToast(dt, UI.toastContainer, UI.toastText)
+            return
+        end
+
         gameState.elapsedTime = gameState.elapsedTime + dt
         gameState.timeRemaining = gameState.timeRemaining - dt
 
@@ -843,7 +900,7 @@ function OnUpdate(dt)
             ))
         end
 
-        -- 1. 灵穴微粒孕育
+        -- 1. 星枢微粒孕育
         for _, n in ipairs(gameState.nodes) do
             NodeEntity.TickSpawn(n, dt, gameState.nodes, gameState.elapsedTime)
         end

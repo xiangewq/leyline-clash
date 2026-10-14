@@ -219,11 +219,18 @@ function UIBinder.BindControls(script, game)
         end
     end
 
-    -- 10. 常驻侧边导航栏 (除剧情演播外常驻于左上角)
+    -- 10. 常驻侧边导航栏 (战斗控制栏：暂停、重试、退出)
     UI.quickNavLayer = UIBinder.FindDeepChild(root, "QuickNavLayer")
     if UI.quickNavLayer then
+        UI.sidePauseBtn   = UIBinder.FindDeepChild(UI.quickNavLayer, "SidePauseBtn")
         UI.sideRestartBtn = UIBinder.FindDeepChild(UI.quickNavLayer, "SideRestartBtn")
         UI.sideSettleBtn  = UIBinder.FindDeepChild(UI.quickNavLayer, "SideSettleBtn")
+    end
+
+    -- 10.1 战局推衍暂停弹窗
+    UI.pauseModal = UIBinder.FindDeepChild(root, "PauseModal")
+    if UI.pauseModal then
+        UI.pauseResumeBtn = UIBinder.FindDeepChild(UI.pauseModal, "ResumeBtn")
     end
 
     -- 11. 退出挑战 / 游玩结算二次确认弹窗

@@ -318,7 +318,7 @@ function VisualRenderer.UpdateNodes(nodeUIList, nodes, elapsedTime, inputState)
 
             if ui.titleText and ui.titleText.alive then
                 Layout.SetVisible(ui.titleText, true)
-                ui.titleText.text = "「" .. tostring(node.name or "灵穴") .. "」"
+                ui.titleText.text = "「" .. tostring(node.name or "星枢") .. "」"
                 if isDragging and not isSource and not isValidNeighbor then
                     ui.titleText.fontColor = Layout.WithAlpha(Layout.PALETTE.TEXT_LIGHT, 110)
                 else

@@ -124,10 +124,10 @@ function HudView.UpdateTopBar(timeRemaining, nodes, playerPctCtrl, enemyPctCtrl,
     local ePct = 100 - pPct
 
     if playerPctCtrl and playerPctCtrl.alive then
-        playerPctCtrl.text = string.format("✦ 我方星轨 %d%% (%d穴)", pPct, pNodes)
+        playerPctCtrl.text = string.format("✦ 我方星轨 %d%% (%d枢)", pPct, pNodes)
     end
     if enemyPctCtrl and enemyPctCtrl.alive then
-        enemyPctCtrl.text = string.format("敌方侵蚀 %d%% (%d穴) ❖", ePct, eNodes)
+        enemyPctCtrl.text = string.format("敌方侵蚀 %d%% (%d枢) ❖", ePct, eNodes)
     end
 
     if barPlayerCtrl and barPlayerCtrl.alive then
@@ -197,17 +197,17 @@ function HudView.ShowSettlement(isWin, nodes, elapsedTime, modalCtrl, titleCtrl,
 
     if statsCtrl and statsCtrl.alive then
         Layout.ApplyTextStyle(statsCtrl, 14, Layout.PALETTE.AMBER, Layout.PALETTE.BG_DARK)
-        statsCtrl.text = string.format("占领灵穴：%d/%d  |  存活兵力：%d  |  耗时：%s", pCount, #nodes, pParts, timeStr)
+        statsCtrl.text = string.format("占领星枢：%d/%d  |  存活兵力：%d  |  耗时：%s", pCount, #nodes, pParts, timeStr)
     end
 end
 
--- 关卡特殊灵穴效果说明映射表与重要度排序
+-- 关卡特殊星枢效果说明映射表与重要度排序
 local ANOMALY_DESC_MAP = {
     PLASMA          = "【赤阳熔核】上限强制限25粒，极速绞肉战场",
     DEFENSE_BASTION = "【雷暴要塞】雷暴灵障固守，战损减半",
     PURE_WATER      = "【纯水枢纽】纯水核心与微粒快速回流 (+54%)",
     WIND_FLOW       = "【疾风流道】地脉输送流速翻倍 (双倍极速)",
-    AMBER_MINE      = "【石珀晶矿】灵穴能量产出速率翻倍 (+100%)",
+    AMBER_MINE      = "【石珀晶矿】星枢能量产出速率翻倍 (+100%)",
     MIST_RUINS      = "【迷雾荒墟】据点驻防加成，微粒孕育减半"
 }
 
@@ -220,7 +220,7 @@ local ANOMALY_PRIORITY = {
     MIST_RUINS      = 6
 }
 
--- 更新左上角关卡特殊灵穴说明与右上角战术操作说明 (支持去重与 ×N 统计数量)
+-- 更新左上角关卡特殊星枢说明与右上角战术操作说明 (支持去重与 ×N 统计数量)
 function HudView.UpdateStageInfo(chap, anomalyTitleCtrl, anomalyDescCtrl, guideTitleCtrl, guideDescCtrl)
     if guideTitleCtrl and guideTitleCtrl.alive then
         Layout.ApplyTextStyle(guideTitleCtrl, 14, Layout.PALETTE.GOLD, Layout.PALETTE.BG_DARK)
@@ -228,7 +228,7 @@ function HudView.UpdateStageInfo(chap, anomalyTitleCtrl, anomalyDescCtrl, guideT
     end
     if guideDescCtrl and guideDescCtrl.alive then
         Layout.ApplyTextStyle(guideDescCtrl, 12, Layout.PALETTE.TEXT_LIGHT, Layout.PALETTE.BG_DARK)
-        guideDescCtrl.text = "● 连线：拖拽己方灵穴至相邻据点建立输送\n● 固守：轻点己方灵穴展开/收拢固守结界\n● 符印：点击下方符印后点击目标灵穴释放"
+        guideDescCtrl.text = "● 连线：拖拽己方星枢至相邻据点建立输送\n● 固守：轻点己方星枢展开/收拢固守结界\n● 符印：点击下方符印后点击目标星枢释放"
     end
 
     if anomalyTitleCtrl and anomalyTitleCtrl.alive then
@@ -279,7 +279,7 @@ function HudView.UpdateStageInfo(chap, anomalyTitleCtrl, anomalyDescCtrl, guideT
         end
 
         if #lines == 0 then
-            anomalyDescCtrl.text = "● 标准地脉：常规孕育与输送，前线激战\n● 固守结界：驻防灵穴战损削减30%"
+            anomalyDescCtrl.text = "● 标准地脉：常规孕育与输送，前线激战\n● 固守结界：驻防星枢战损削减30%"
         else
             anomalyDescCtrl.text = table.concat(lines, "\n")
         end

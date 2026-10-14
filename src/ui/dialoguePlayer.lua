@@ -21,7 +21,7 @@ local DialoguePlayer = {
             speaker = "阿贝多",
             title   = "白垩之子",
             color   = Layout.PALETTE.PLAYER,
-            content = "盘面上每一个光点都象征着一处地脉灵穴，而流动的光尘则是纯净元素微粒。\n拖拽己方灵穴铺设光轨，轻点灵穴即可收拢固守。"
+            content = "盘面上每一个光点都象征着一处地脉星枢，而流动的光尘则是纯净元素微粒。\n拖拽己方星枢铺设光轨，轻点星枢即可收拢固守。"
         },
         {
             speaker = "派蒙",

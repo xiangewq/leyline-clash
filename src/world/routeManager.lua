@@ -18,7 +18,7 @@ end
 -- 建立单向光轨
 function RouteManager.SetRoute(fromId, toId, faction, nodes)
     if not StarMap.AreNodesLinked(fromId, toId) then
-        return false, "两灵穴间不存在直通地脉流道！"
+        return false, "两星枢间不存在直通地脉流道！"
     end
 
     local fromNode = StarMap.GetNode(nodes, fromId)
@@ -174,7 +174,7 @@ function RouteManager.Update(dt, nodes, elapsedTime, onCombatHitCallback, onCapt
                                 if onCombatHitCallback then
                                     onCombatHitCallback({ x = colX, y = colY })
                                 end
-                                BalanceConfig.PlayAudioSafe("NODE_DEFEND")
+                                BalanceConfig.PlayAudioThrottled("NODE_DEFEND", 0.25)
 
                                 local payA = pA.payload or 1
                                 local payB = pB.payload or 1
@@ -227,7 +227,7 @@ function RouteManager.OnParticleArrive(particle, node, onCombatHitCallback, onCa
             node.particles = node.particles + 1
         elseif (node.protectedUntil or 0) > (elapsedTime or 0) then
             -- 受千风庇护免疫
-            BalanceConfig.PlayAudioSafe("NODE_DEFEND")
+            BalanceConfig.PlayAudioThrottled("NODE_DEFEND", 0.25)
             if onCombatHitCallback then onCombatHitCallback(node) end
         elseif node.particles > 0 then
             node.particles = node.particles - 1

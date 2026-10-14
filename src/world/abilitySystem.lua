@@ -52,12 +52,12 @@ function AbilitySystem.CastAbility(slotIndex, targetNodeId, nodes, routeManager,
     end
 
     local targetNode = StarMap.GetNode(nodes, targetNodeId)
-    if not targetNode then return false, "未选中合法灵穴" end
+    if not targetNode then return false, "未选中合法星枢" end
 
     if card.id == "anemo_shield" then
         -- 千风庇护：仅己方节点
         if targetNode.faction ~= "player" then
-            return false, "【千风庇护】只能施加于我方灵穴！"
+            return false, "【千风庇护】只能施加于我方星枢！"
         end
         targetNode.protectedUntil = elapsedTime + card.duration
         AbilitySystem.cooldowns[slotIndex] = card.cd
@@ -67,7 +67,7 @@ function AbilitySystem.CastAbility(slotIndex, targetNodeId, nodes, routeManager,
     elseif card.id == "anemo_turb" then
         -- 千风湍流：需正在向外输送的己方节点
         if targetNode.faction ~= "player" or targetNode.routeTo == nil then
-            return false, "【千风湍流】需要施加在正在向外输送的己方灵穴上！"
+            return false, "【千风湍流】需要施加在正在向外输送的己方星枢上！"
         end
         local route = routeManager.GetRouteFrom(targetNode.id)
         if route then
@@ -105,20 +105,20 @@ function AbilitySystem.CastAbility(slotIndex, targetNodeId, nodes, routeManager,
             targetNode.isDefensive = true
             AbilitySystem.cooldowns[slotIndex] = card.cd
             BalanceConfig.PlayAudioSafe("UI_CLICK")
-            return true, "【摩拉律法】生效！已直接同化掌管中立灵穴！"
+            return true, "【摩拉律法】生效！已直接同化掌管中立星枢！"
         elseif IsEnemyFaction(targetNode.faction) then
             targetNode.control = math.max(0, targetNode.control - 65)
             AbilitySystem.cooldowns[slotIndex] = card.cd
             BalanceConfig.PlayAudioSafe("UI_CLICK")
             return true, "【摩拉律法】生效！瓦解敌方 65% 共鸣！"
         else
-            return false, "不可对己方灵穴使用摩拉律法"
+            return false, "不可对己方星枢使用摩拉律法"
         end
 
     elseif card.id == "geo_wall" then
         -- 坚岩重嶂：己方据点坚盾加持，增加10微粒并固守20秒
         if targetNode.faction ~= "player" then
-            return false, "【坚岩重嶂】只能施加于我方灵穴！"
+            return false, "【坚岩重嶂】只能施加于我方星枢！"
         end
         targetNode.isDefensive = true
         targetNode.protectedUntil = elapsedTime + card.duration
@@ -130,7 +130,7 @@ function AbilitySystem.CastAbility(slotIndex, targetNodeId, nodes, routeManager,
     elseif card.id == "pyro_erosion" then
         -- 烈焰侵蚀：重创敌对据点并切断其输出航线
         if not IsEnemyFaction(targetNode.faction) then
-            return false, "【烈焰侵蚀】只能施加于敌方灵穴！"
+            return false, "【烈焰侵蚀】只能施加于敌方星枢！"
         end
         local cut = math.max(8, math.floor(targetNode.particles * 0.4))
         targetNode.particles = math.max(0, targetNode.particles - cut)

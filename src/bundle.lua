@@ -52,22 +52,34 @@ local BalanceConfig = {
     -- 战前构筑预算
     MAX_BUDGET = 12,
 
-    -- 提瓦特官方音效资产 ID 映射表 (基于官方 1,997 音效库精选匹配)
+    -- 提瓦特官方音效资产 ID 映射表 (精选柔和自然、富有沙盘推演质感的音频)
     AUDIO_SLOTS = {
         UI_CLICK     = 50888,    -- 界面按钮点击 / 节点选中 (轻脆通用反馈音)
-        ROUTE_LINK   = 40018,    -- 光轨连接建立 (能量脉冲流道激活)
-        ROUTE_CUT    = 50912,    -- 光轨切断与结界切换 (能量断开清爽音)
-        COMBAT_HIT   = 0,        -- 停用 70 秒长篇风声背景音(原10002)，交火采用纯净粒子光效与震颤
-        SKILL_BLAST  = 40001,    -- 符印轰爆 / 灵穴共鸣爆发 (元素充能大招)
+        ROUTE_LINK   = 50912,    -- 光轨连接建立 (温润清爽能量流道音，取代原40018尖利金属出剑音)
+        ROUTE_CUT    = 50888,    -- 光轨切断与结界切换 (轻脆断开反馈)
+        COMBAT_HIT   = 0,        -- 交火采用纯净粒子光爆与数字跳动，保持听感纯净
+        SKILL_BLAST  = 40001,    -- 符印轰爆 / 星枢共鸣爆发 (元素充能大招)
         MATCH_WIN    = 50961,    -- 全域大捷通关 (秘境挑战成功高昂号角)
-        MATCH_LOSE   = 50962,    -- 灵脉耗竭败退 (挑战失利低沉音)
-        NODE_CAPTURE = 40001,    -- 灵穴完全掌控 (核心充能爆发)
-        NODE_DEFEND  = 20004,    -- 结界护盾吸收抵挡
-        NODE_UPGRADE = 30005     -- 灵穴充能提升 / 强化清越音
+        MATCH_LOSE   = 50962,    -- 星轨耗竭败退 (挑战失利低沉音)
+        NODE_CAPTURE = 40001,    -- 星枢完全掌控 (核心充能爆发)
+        NODE_DEFEND  = 0,        -- 消除消灭守军的高频嗞嗞电流声(原20004)，交火依靠粒子爆破与生命数值跳动
+        NODE_UPGRADE = 30005     -- 星枢充能提升 / 强化清越音
     },
 
-    activeAudioInstances = {}
+    activeAudioInstances = {},
+    lastAudioTimes = {}
 }
+
+-- 节流音频播放器 (同类高频音效施加时间防抖，杜绝重叠杂音)
+function BalanceConfig.PlayAudioThrottled(audioSlotKey, interval)
+    local minInterval = interval or 0.25
+    local now = (os and os.clock) and os.clock() or 0
+    if BalanceConfig.lastAudioTimes[audioSlotKey] and (now - BalanceConfig.lastAudioTimes[audioSlotKey]) < minInterval then
+        return
+    end
+    BalanceConfig.lastAudioTimes[audioSlotKey] = now
+    BalanceConfig.PlayAudioSafe(audioSlotKey)
+end
 
 -- 安全播放音效包装器 (若未配置或ID无效，安全静音运行并以视觉动效兜底)
 function BalanceConfig.PlayAudioSafe(audioSlotKey)
@@ -129,7 +141,7 @@ local CardRegistry = {
             cd = 30,
             duration = 20,
             targetType = "player_node",
-            desc = "加持己方灵穴，20秒内免疫任何敌方侵蚀，本土共鸣恢复翻倍。",
+            desc = "加持己方星枢，20秒内免疫任何敌方侵蚀，本土共鸣恢复翻倍。",
             badgeColor = Layout.MakeColor(52, 211, 153, 255)
         },
         {
@@ -140,7 +152,7 @@ local CardRegistry = {
             cd = 30,
             duration = 20,
             targetType = "enemy_node",
-            desc = "炽火灼烧敌脉，瞬间消灭目标敌方灵穴上 40% 的驻留微粒并切断输出！",
+            desc = "炽火灼烧敌脉，瞬间消灭目标敌方星枢上 40% 的驻留微粒并切断输出！",
             badgeColor = Layout.MakeColor(244, 63, 94, 255)
         },
         {
@@ -151,7 +163,7 @@ local CardRegistry = {
             cd = 20,
             duration = 30,
             targetType = "player_route_node",
-            desc = "激发生发之风，30秒内从该灵穴出发的光轨流速翻倍至10粒/秒。",
+            desc = "激发生发之风，30秒内从该星枢出发的光轨流速翻倍至10粒/秒。",
             badgeColor = Layout.MakeColor(52, 211, 153, 255)
         },
         {
@@ -162,7 +174,7 @@ local CardRegistry = {
             cd = 25,
             duration = 0,
             targetType = "enemy_node",
-            desc = "引动燃素轰爆，瞬间消灭目标敌方灵穴上 80% 的驻留微粒！",
+            desc = "引动燃素轰爆，瞬间消灭目标敌方星枢上 80% 的驻留微粒！",
             badgeColor = Layout.MakeColor(244, 63, 94, 255)
         },
         {
@@ -184,7 +196,7 @@ local CardRegistry = {
             cd = 35,
             duration = 0,
             targetType = "any_node",
-            desc = "水之契约与摩拉通神：中立灵穴直接秒占100%；敌方灵穴削减65%共鸣。",
+            desc = "水之契约与摩拉通神：中立星枢直接秒占100%；敌方星枢削减65%共鸣。",
             badgeColor = Layout.MakeColor(56, 189, 248, 255)
         }
     }
@@ -235,11 +247,11 @@ local ChapterConfig = {
                 },
                 {
                     speaker = "阿贝多",
-                    content = "呵呵，派蒙，这是古代战争推衍法器——「地脉星图棋盘」。\n每一个光点象征一处灵穴，流动的光尘则是纯净元素微粒。"
+                    content = "呵呵，派蒙，这是古代战争推衍法器——「地脉星图棋盘」。\n每一个光点象征一处星枢，流动的光尘则是纯净元素微粒。"
                 },
                 {
                     speaker = "阿贝多",
-                    content = "第一关在清泉之畔。拖拽己方灵穴铺设光轨占领中立据点，\n轻点灵穴收拢防御。击溃前方的愚人众阵营即可过关。"
+                    content = "第一关在清泉之畔。拖拽己方星枢铺设光轨占领中立据点，\n轻点星枢收拢防御。击溃前方的愚人众阵营即可过关。"
                 },
                 {
                     speaker = "派蒙",
@@ -289,7 +301,7 @@ local ChapterConfig = {
                 },
                 {
                     speaker = "派蒙",
-                    content = "看！上方那座灵穴泛着青绿风旋，中间那座却被雾气笼罩！\n它们有什么不同吗？"
+                    content = "看！上方那座星枢泛着青绿风旋，中间那座却被雾气笼罩！\n它们有什么不同吗？"
                 },
                 {
                     speaker = "阿贝多",
@@ -343,7 +355,7 @@ local ChapterConfig = {
                 },
                 {
                     speaker = "阿贝多",
-                    content = "这是三方混战演练。红方为愚人众，紫方为盗宝团。\n各方势力不仅会攻击我们，彼此之间也会抢夺灵穴。"
+                    content = "这是三方混战演练。红方为愚人众，紫方为盗宝团。\n各方势力不仅会攻击我们，彼此之间也会抢夺星枢。"
                 },
                 {
                     speaker = "阿贝多",
@@ -456,15 +468,15 @@ local ChapterConfig = {
             budget = 12,
             duration = 360,
             bgm = 10184,
-            desc = "龙脊雪山之巅，远古推衍机全功率觉醒！18 座灵穴交织成网，双核赤阳熔核限制25微粒极速绞杀。",
+            desc = "龙脊雪山之巅，远古推衍机全功率觉醒！18 座星枢交织成网，双核赤阳熔核限制25微粒极速绞杀。",
             dialogues = {
                 {
                     speaker = "阿贝多",
-                    content = "这是推衍沙盘的终极篇章——「极寒凛冬」。\n盘面扩展至 18 座灵穴，地脉网络极为密集复杂。"
+                    content = "这是推衍沙盘的终极篇章——「极寒凛冬」。\n盘面扩展至 18 座星枢，地脉网络极为密集复杂。"
                 },
                 {
                     speaker = "派蒙",
-                    content = "哇，中间那两座灵穴像太阳一样散发着强光！感觉一靠近就会融化！"
+                    content = "哇，中间那两座星枢像太阳一样散发着强光！感觉一靠近就会融化！"
                 },
                 {
                     speaker = "阿贝多",
@@ -1146,11 +1158,11 @@ function NodeEntity.ApplyArrival(node, particleFaction, onCombatHitCallback, onC
     end
 
     -- 2. 敌对微粒进攻结算
-    -- 核心防御保障：检查目标灵穴是否处于【千风庇护/守护】神圣保护期间
+    -- 核心防御保障：检查目标星枢是否处于【千风庇护/守护】神圣保护期间
     if (node.protectedUntil or 0) > (elapsedTime or 0) then
         -- 千风结界绝对阻挡与湮灭一切敌方微粒！
         -- 守备兵力不扣减、控制度不扣减、绝不沦陷为中立态！
-        BalanceConfig.PlayAudioSafe("NODE_DEFEND")
+        BalanceConfig.PlayAudioThrottled("NODE_DEFEND", 0.25)
         if type(onCombatHitCallback) == "function" then
             onCombatHitCallback(node)
         end
@@ -1164,7 +1176,7 @@ function NodeEntity.ApplyArrival(node, particleFaction, onCombatHitCallback, onC
             node.particles = node.particles - 1
             -- COMBAT_HIT 保持静音，依靠视觉闪烁
         else
-            BalanceConfig.PlayAudioSafe("NODE_DEFEND")
+            BalanceConfig.PlayAudioThrottled("NODE_DEFEND", 0.25)
         end
         if onCombatHitCallback then
             onCombatHitCallback(node)
@@ -1275,7 +1287,7 @@ end
 -- 建立单向光轨
 function RouteManager.SetRoute(fromId, toId, faction, nodes)
     if not StarMap.AreNodesLinked(fromId, toId) then
-        return false, "两灵穴间不存在直通地脉流道！"
+        return false, "两星枢间不存在直通地脉流道！"
     end
 
     local fromNode = StarMap.GetNode(nodes, fromId)
@@ -1431,7 +1443,7 @@ function RouteManager.Update(dt, nodes, elapsedTime, onCombatHitCallback, onCapt
                                 if onCombatHitCallback then
                                     onCombatHitCallback({ x = colX, y = colY })
                                 end
-                                BalanceConfig.PlayAudioSafe("NODE_DEFEND")
+                                BalanceConfig.PlayAudioThrottled("NODE_DEFEND", 0.25)
 
                                 local payA = pA.payload or 1
                                 local payB = pB.payload or 1
@@ -1484,7 +1496,7 @@ function RouteManager.OnParticleArrive(particle, node, onCombatHitCallback, onCa
             node.particles = node.particles + 1
         elseif (node.protectedUntil or 0) > (elapsedTime or 0) then
             -- 受千风庇护免疫
-            BalanceConfig.PlayAudioSafe("NODE_DEFEND")
+            BalanceConfig.PlayAudioThrottled("NODE_DEFEND", 0.25)
             if onCombatHitCallback then onCombatHitCallback(node) end
         elseif node.particles > 0 then
             node.particles = node.particles - 1
@@ -1606,12 +1618,12 @@ function AbilitySystem.CastAbility(slotIndex, targetNodeId, nodes, routeManager,
     end
 
     local targetNode = StarMap.GetNode(nodes, targetNodeId)
-    if not targetNode then return false, "未选中合法灵穴" end
+    if not targetNode then return false, "未选中合法星枢" end
 
     if card.id == "anemo_shield" then
         -- 千风庇护：仅己方节点
         if targetNode.faction ~= "player" then
-            return false, "【千风庇护】只能施加于我方灵穴！"
+            return false, "【千风庇护】只能施加于我方星枢！"
         end
         targetNode.protectedUntil = elapsedTime + card.duration
         AbilitySystem.cooldowns[slotIndex] = card.cd
@@ -1621,7 +1633,7 @@ function AbilitySystem.CastAbility(slotIndex, targetNodeId, nodes, routeManager,
     elseif card.id == "anemo_turb" then
         -- 千风湍流：需正在向外输送的己方节点
         if targetNode.faction ~= "player" or targetNode.routeTo == nil then
-            return false, "【千风湍流】需要施加在正在向外输送的己方灵穴上！"
+            return false, "【千风湍流】需要施加在正在向外输送的己方星枢上！"
         end
         local route = routeManager.GetRouteFrom(targetNode.id)
         if route then
@@ -1659,20 +1671,20 @@ function AbilitySystem.CastAbility(slotIndex, targetNodeId, nodes, routeManager,
             targetNode.isDefensive = true
             AbilitySystem.cooldowns[slotIndex] = card.cd
             BalanceConfig.PlayAudioSafe("UI_CLICK")
-            return true, "【摩拉律法】生效！已直接同化掌管中立灵穴！"
+            return true, "【摩拉律法】生效！已直接同化掌管中立星枢！"
         elseif IsEnemyFaction(targetNode.faction) then
             targetNode.control = math.max(0, targetNode.control - 65)
             AbilitySystem.cooldowns[slotIndex] = card.cd
             BalanceConfig.PlayAudioSafe("UI_CLICK")
             return true, "【摩拉律法】生效！瓦解敌方 65% 共鸣！"
         else
-            return false, "不可对己方灵穴使用摩拉律法"
+            return false, "不可对己方星枢使用摩拉律法"
         end
 
     elseif card.id == "geo_wall" then
         -- 坚岩重嶂：己方据点坚盾加持，增加10微粒并固守20秒
         if targetNode.faction ~= "player" then
-            return false, "【坚岩重嶂】只能施加于我方灵穴！"
+            return false, "【坚岩重嶂】只能施加于我方星枢！"
         end
         targetNode.isDefensive = true
         targetNode.protectedUntil = elapsedTime + card.duration
@@ -1684,7 +1696,7 @@ function AbilitySystem.CastAbility(slotIndex, targetNodeId, nodes, routeManager,
     elseif card.id == "pyro_erosion" then
         -- 烈焰侵蚀：重创敌对据点并切断其输出航线
         if not IsEnemyFaction(targetNode.faction) then
-            return false, "【烈焰侵蚀】只能施加于敌方灵穴！"
+            return false, "【烈焰侵蚀】只能施加于敌方星枢！"
         end
         local cut = math.max(8, math.floor(targetNode.particles * 0.4))
         targetNode.particles = math.max(0, targetNode.particles - cut)
@@ -2289,7 +2301,7 @@ function VisualRenderer.UpdateNodes(nodeUIList, nodes, elapsedTime, inputState)
 
             if ui.titleText and ui.titleText.alive then
                 Layout.SetVisible(ui.titleText, true)
-                ui.titleText.text = "「" .. tostring(node.name or "灵穴") .. "」"
+                ui.titleText.text = "「" .. tostring(node.name or "星枢") .. "」"
                 if isDragging and not isSource and not isValidNeighbor then
                     ui.titleText.fontColor = Layout.WithAlpha(Layout.PALETTE.TEXT_LIGHT, 110)
                 else
@@ -2428,7 +2440,7 @@ local DialoguePlayer = {
             speaker = "阿贝多",
             title   = "白垩之子",
             color   = Layout.PALETTE.PLAYER,
-            content = "盘面上每一个光点都象征着一处地脉灵穴，而流动的光尘则是纯净元素微粒。\n拖拽己方灵穴铺设光轨，轻点灵穴即可收拢固守。"
+            content = "盘面上每一个光点都象征着一处地脉星枢，而流动的光尘则是纯净元素微粒。\n拖拽己方星枢铺设光轨，轻点星枢即可收拢固守。"
         },
         {
             speaker = "派蒙",
@@ -2940,10 +2952,10 @@ function HudView.UpdateTopBar(timeRemaining, nodes, playerPctCtrl, enemyPctCtrl,
     local ePct = 100 - pPct
 
     if playerPctCtrl and playerPctCtrl.alive then
-        playerPctCtrl.text = string.format("✦ 我方星轨 %d%% (%d穴)", pPct, pNodes)
+        playerPctCtrl.text = string.format("✦ 我方星轨 %d%% (%d枢)", pPct, pNodes)
     end
     if enemyPctCtrl and enemyPctCtrl.alive then
-        enemyPctCtrl.text = string.format("敌方侵蚀 %d%% (%d穴) ❖", ePct, eNodes)
+        enemyPctCtrl.text = string.format("敌方侵蚀 %d%% (%d枢) ❖", ePct, eNodes)
     end
 
     if barPlayerCtrl and barPlayerCtrl.alive then
@@ -3013,17 +3025,17 @@ function HudView.ShowSettlement(isWin, nodes, elapsedTime, modalCtrl, titleCtrl,
 
     if statsCtrl and statsCtrl.alive then
         Layout.ApplyTextStyle(statsCtrl, 14, Layout.PALETTE.AMBER, Layout.PALETTE.BG_DARK)
-        statsCtrl.text = string.format("占领灵穴：%d/%d  |  存活兵力：%d  |  耗时：%s", pCount, #nodes, pParts, timeStr)
+        statsCtrl.text = string.format("占领星枢：%d/%d  |  存活兵力：%d  |  耗时：%s", pCount, #nodes, pParts, timeStr)
     end
 end
 
--- 关卡特殊灵穴效果说明映射表与重要度排序
+-- 关卡特殊星枢效果说明映射表与重要度排序
 local ANOMALY_DESC_MAP = {
     PLASMA          = "【赤阳熔核】上限强制限25粒，极速绞肉战场",
     DEFENSE_BASTION = "【雷暴要塞】雷暴灵障固守，战损减半",
     PURE_WATER      = "【纯水枢纽】纯水核心与微粒快速回流 (+54%)",
     WIND_FLOW       = "【疾风流道】地脉输送流速翻倍 (双倍极速)",
-    AMBER_MINE      = "【石珀晶矿】灵穴能量产出速率翻倍 (+100%)",
+    AMBER_MINE      = "【石珀晶矿】星枢能量产出速率翻倍 (+100%)",
     MIST_RUINS      = "【迷雾荒墟】据点驻防加成，微粒孕育减半"
 }
 
@@ -3036,7 +3048,7 @@ local ANOMALY_PRIORITY = {
     MIST_RUINS      = 6
 }
 
--- 更新左上角关卡特殊灵穴说明与右上角战术操作说明 (支持去重与 ×N 统计数量)
+-- 更新左上角关卡特殊星枢说明与右上角战术操作说明 (支持去重与 ×N 统计数量)
 function HudView.UpdateStageInfo(chap, anomalyTitleCtrl, anomalyDescCtrl, guideTitleCtrl, guideDescCtrl)
     if guideTitleCtrl and guideTitleCtrl.alive then
         Layout.ApplyTextStyle(guideTitleCtrl, 14, Layout.PALETTE.GOLD, Layout.PALETTE.BG_DARK)
@@ -3044,7 +3056,7 @@ function HudView.UpdateStageInfo(chap, anomalyTitleCtrl, anomalyDescCtrl, guideT
     end
     if guideDescCtrl and guideDescCtrl.alive then
         Layout.ApplyTextStyle(guideDescCtrl, 12, Layout.PALETTE.TEXT_LIGHT, Layout.PALETTE.BG_DARK)
-        guideDescCtrl.text = "● 连线：拖拽己方灵穴至相邻据点建立输送\n● 固守：轻点己方灵穴展开/收拢固守结界\n● 符印：点击下方符印后点击目标灵穴释放"
+        guideDescCtrl.text = "● 连线：拖拽己方星枢至相邻据点建立输送\n● 固守：轻点己方星枢展开/收拢固守结界\n● 符印：点击下方符印后点击目标星枢释放"
     end
 
     if anomalyTitleCtrl and anomalyTitleCtrl.alive then
@@ -3095,7 +3107,7 @@ function HudView.UpdateStageInfo(chap, anomalyTitleCtrl, anomalyDescCtrl, guideT
         end
 
         if #lines == 0 then
-            anomalyDescCtrl.text = "● 标准地脉：常规孕育与输送，前线激战\n● 固守结界：驻防灵穴战损削减30%"
+            anomalyDescCtrl.text = "● 标准地脉：常规孕育与输送，前线激战\n● 固守结界：驻防星枢战损削减30%"
         else
             anomalyDescCtrl.text = table.concat(lines, "\n")
         end
@@ -3281,16 +3293,21 @@ function ChapterSelectView.UnlockNextStage(completedStage)
     end
 end
 
--- 判定是否已完成剧情模式前4关
-function ChapterSelectView.HasCompletedFirst4Stages()
-    if (ChapterSelectView.unlockedStage or 1) >= 5 then
+-- 判定是否已完成剧情模式前3关（结算胜利判定条件）
+function ChapterSelectView.HasCompletedFirst3Stages()
+    if (ChapterSelectView.unlockedStage or 1) >= 4 then
         return true
     end
     local cleared = ChapterSelectView.clearedStages
-    if cleared and cleared[1] and cleared[2] and cleared[3] and cleared[4] then
+    if cleared and cleared[1] and cleared[2] and cleared[3] then
         return true
     end
     return false
+end
+
+-- 兼容旧函数调用
+function ChapterSelectView.HasCompletedFirst4Stages()
+    return ChapterSelectView.HasCompletedFirst3Stages()
 end
 
 -- 获取已通关章节总数
@@ -3356,7 +3373,7 @@ function ChapterSelectView.Render(chapterCards, descTextCtrl, startBtnTxtCtrl)
                 if cardUI.infoCtrl and cardUI.infoCtrl.alive then
                     local fCount = #chap.factions
                     local nCount = #chap.nodes
-                    cardUI.infoCtrl.text = string.format("%d方混战 | %d灵穴 | %d权能", fCount, nCount, chap.budget)
+                    cardUI.infoCtrl.text = string.format("%d方混战 | %d星枢 | %d权能", fCount, nCount, chap.budget)
                     cardUI.infoCtrl.fontColor = isUnlocked and Layout.PALETTE.AMBER or Layout.PALETTE.TEXT_MUTED
                 end
 
@@ -3615,11 +3632,18 @@ function UIBinder.BindControls(script, game)
         end
     end
 
-    -- 10. 常驻侧边导航栏 (除剧情演播外常驻于左上角)
+    -- 10. 常驻侧边导航栏 (战斗控制栏：暂停、重试、退出)
     UI.quickNavLayer = UIBinder.FindDeepChild(root, "QuickNavLayer")
     if UI.quickNavLayer then
+        UI.sidePauseBtn   = UIBinder.FindDeepChild(UI.quickNavLayer, "SidePauseBtn")
         UI.sideRestartBtn = UIBinder.FindDeepChild(UI.quickNavLayer, "SideRestartBtn")
         UI.sideSettleBtn  = UIBinder.FindDeepChild(UI.quickNavLayer, "SideSettleBtn")
+    end
+
+    -- 10.1 战局推衍暂停弹窗
+    UI.pauseModal = UIBinder.FindDeepChild(root, "PauseModal")
+    if UI.pauseModal then
+        UI.pauseResumeBtn = UIBinder.FindDeepChild(UI.pauseModal, "ResumeBtn")
     end
 
     -- 11. 退出挑战 / 游玩结算二次确认弹窗
@@ -3707,6 +3731,7 @@ local gameState = {
     captureTimer   = 0,
     countdownTimer = 0,
     isGameOver     = false,
+    isPaused       = false,
     nodes          = {}
 }
 
@@ -3772,6 +3797,9 @@ local function CheckMatchEnd(isTimeout)
         -- 玩家大获全胜！
         gameState.isGameOver = true
         gameState.currentState = STATE_SETTLEMENT
+        gameState.isPaused = false
+        if UI.pauseModal then Layout.SetVisible(UI.pauseModal, false) end
+        Layout.SetVisible(UI.quickNavLayer, false)
         VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
         Runtime.HideAllParticles()
         ChapterSelectView.UnlockNextStage(StarMap.currentStage)
@@ -3782,6 +3810,9 @@ local function CheckMatchEnd(isTimeout)
         -- 玩家兵力全军覆没
         gameState.isGameOver = true
         gameState.currentState = STATE_SETTLEMENT
+        gameState.isPaused = false
+        if UI.pauseModal then Layout.SetVisible(UI.pauseModal, false) end
+        Layout.SetVisible(UI.quickNavLayer, false)
         VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
         Runtime.HideAllParticles()
         BalanceConfig.StopAllAudios()
@@ -3791,6 +3822,9 @@ local function CheckMatchEnd(isTimeout)
         -- 倒计时归零压哨决胜
         gameState.isGameOver = true
         gameState.currentState = STATE_SETTLEMENT
+        gameState.isPaused = false
+        if UI.pauseModal then Layout.SetVisible(UI.pauseModal, false) end
+        Layout.SetVisible(UI.quickNavLayer, false)
         VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
         Runtime.HideAllParticles()
         local pScore = pNodes * 1000 + pParts * 10
@@ -3875,6 +3909,8 @@ local function StartStage(stageId)
     gameState.elapsedTime   = 0
     gameState.timeRemaining = chap.duration or BalanceConfig.MATCH_DURATION
     gameState.isGameOver    = false
+    gameState.isPaused      = false
+    if UI.pauseModal then Layout.SetVisible(UI.pauseModal, false) end
 
     -- 呈现战场沙盘层
     SetGameplayLayersVisible(true)
@@ -3896,7 +3932,7 @@ local function StartStage(stageId)
     Layout.SetVisible(UI.countdownModal, false)
     CloseSettleConfirmModal()
 
-    -- 剧情演播阶段隐藏侧边常驻导航按钮，剧情结束后重新显示
+    -- 严格隔离：战前（剧情演播、符印配置、3秒倒计时）一律强制隐藏快捷控制栏
     Layout.SetVisible(UI.quickNavLayer, false)
 
     -- 1. 剧情演播
@@ -3904,7 +3940,7 @@ local function StartStage(stageId)
         print("[Starlink] 章节剧情完毕，进入战前符印调配...")
         Layout.SetVisible(UI.dialogueModal, false)
         Layout.SetVisible(UI.prepareModal, true)
-        Layout.SetVisible(UI.quickNavLayer, true)
+        Layout.SetVisible(UI.quickNavLayer, false)
         gameState.currentState = STATE_PREPARE
 
         -- 2. 调配面板初始化 (动态预算)
@@ -3912,10 +3948,10 @@ local function StartStage(stageId)
             print("[Starlink] 战前符印装配完成，进入战前 3 秒倒计时...")
             AbilitySystem.InitDeck(selectedDeck)
             Layout.SetVisible(UI.prepareModal, false)
-            Layout.SetVisible(UI.quickNavLayer, true)
+            Layout.SetVisible(UI.quickNavLayer, false)
             SetGameplayLayersVisible(true)
 
-            -- 刷新左上角特殊灵穴说明与右上角战术操作指引
+            -- 刷新左上角特殊星枢说明与右上角战术操作指引
             HudView.UpdateStageInfo(chap, UI.hudAnomalyTitle, UI.hudAnomalyDesc, UI.hudGuideTitle, UI.hudGuideDesc)
 
             -- 启动 3 秒倒计时 (3、2、1、开始)
@@ -3935,14 +3971,14 @@ end
 -- 打开千星奇域退出挑战 / 游玩结算二次确认弹窗（动态提示当前进度与成功/失败判定预测）
 local function OpenSettleConfirmModal()
     BalanceConfig.PlayAudioSafe("UI_CLICK")
-    local completed4 = ChapterSelectView.HasCompletedFirst4Stages()
+    local completed3 = ChapterSelectView.HasCompletedFirst3Stages()
     local clearedCount = ChapterSelectView.GetClearedCount and ChapterSelectView.GetClearedCount() or 0
     if UI.confirmDesc and UI.confirmDesc.alive then
-        if completed4 then
-            UI.confirmDesc.text = string.format("已通关 %d/4 关 · 当前中断将判定为【大捷成功】", clearedCount)
+        if completed3 then
+            UI.confirmDesc.text = string.format("已通关 %d/3 关 · 当前中断将判定为【大捷成功】", clearedCount)
             UI.confirmDesc.fontColor = Layout.PALETTE.GOLD
         else
-            UI.confirmDesc.text = string.format("已通关 %d/4 关 · 未达成前4关，中断将判定为【失败】", clearedCount)
+            UI.confirmDesc.text = string.format("已通关 %d/3 关 · 未达成前3关，中断将判定为【失败】", clearedCount)
             UI.confirmDesc.fontColor = Layout.PALETTE.ENEMY
         end
     end
@@ -3951,25 +3987,28 @@ local function OpenSettleConfirmModal()
     end
 end
 
--- 触发千星奇域原生系统个人结算 (按规则判定成功/失败)
+-- 触发千星奇域原生系统个人结算 (按规则判定成功/失败：通关前3关判定为胜利)
 local function TriggerNativePersonalSettlement()
     CloseSettleConfirmModal()
-    local completed4 = ChapterSelectView.HasCompletedFirst4Stages()
-    local isSuccess = completed4
-    local clearedCount = ChapterSelectView.GetClearedCount and ChapterSelectView.GetClearedCount() or (isSuccess and 4 or 0)
-    print(string.format("[Starlink] 触发原生系统个人结算: completedFirst4Stages=%s (已通关%d关) => 结算状态: %s",
-        tostring(completed4), clearedCount, isSuccess and "成功" or "失败"))
+    local completed3 = ChapterSelectView.HasCompletedFirst3Stages()
+    local isSuccess = completed3
+    local clearedCount = ChapterSelectView.GetClearedCount and ChapterSelectView.GetClearedCount() or (isSuccess and 3 or 0)
+    print(string.format("[Starlink] 触发原生系统个人结算: completedFirst3Stages=%s (已通关%d关) => 结算状态: %s",
+        tostring(completed3), clearedCount, isSuccess and "成功" or "失败"))
 
     gameState.isGameOver = true
     gameState.currentState = STATE_SETTLEMENT
+    gameState.isPaused = false
+    if UI.pauseModal then Layout.SetVisible(UI.pauseModal, false) end
+    Layout.SetVisible(UI.quickNavLayer, false)
 
     BalanceConfig.StopAllAudios()
     if isSuccess then
         BalanceConfig.PlayAudioSafe("MATCH_WIN")
-        HudView.ShowToast("【推衍圆满·结算成功】已达成前4关推衍，正在结算并退出...")
+        HudView.ShowToast("【推衍圆满·结算成功】已达成前3关推衍，正在结算并退出...")
     else
         BalanceConfig.PlayAudioSafe("MATCH_LOSE")
-        HudView.ShowToast("【推衍未成·结算失败】未达成前4关推衍，已中断挑战...")
+        HudView.ShowToast("【推衍未成·结算失败】未达成前3关推衍，已中断挑战...")
     end
 
     -- 停止战场动态
@@ -4024,10 +4063,10 @@ local function TriggerNativePersonalSettlement()
 
     -- 1. 向服务端同步结算状态并自动触发结算关卡（节点图中已由设置状态直接流转至结算关卡）
     if isSuccess then
-        print("[Starlink] 判定已通关前4关 (成功) -> 发送服务端信号: SetPlayerWinStatus (设置玩家结算成功状态: 胜利 -> 结算关卡)")
+        print("[Starlink] 判定已通关前3关 (成功) -> 发送服务端信号: SetPlayerWinStatus (设置玩家结算成功状态: 胜利 -> 结算关卡)")
         EmitServerSignal("SetPlayerWinStatus")
     else
-        print("[Starlink] 未通关前4关 (失败) -> 发送服务端信号: SetPlayerLoseStatus (设置玩家结算状态: 失败 -> 结算关卡)")
+        print("[Starlink] 未通关前3关 (失败) -> 发送服务端信号: SetPlayerLoseStatus (设置玩家结算状态: 失败 -> 结算关卡)")
         EmitServerSignal("SetPlayerLoseStatus")
     end
 end
@@ -4043,6 +4082,9 @@ local function HandleRestartToModeSelect()
     Input.isDragging = false
     Input.dragSourceId = nil
     Input.ClearSelectedCard()
+
+    gameState.isPaused = false
+    if UI.pauseModal then Layout.SetVisible(UI.pauseModal, false) end
 
     -- 隐藏所有战斗与演播面板
     Layout.SetVisible(UI.chapterSelectModal, false)
@@ -4069,17 +4111,17 @@ local function SetupEventHandlers()
     -- 1. 全屏光标事件 (连线与轻点)
     if UI.cursorArea and UI.cursorArea.AddCursorEventListener then
         UI.cursorArea:AddCursorEventListener(Enum.CursorEventType.CursorDown, function(data)
-            if gameState.currentState ~= STATE_PLAYING then return end
+            if gameState.currentState ~= STATE_PLAYING or gameState.isPaused then return end
             local x, y = GetEventPos(data)
             Input.OnCursorDown(x, y, gameState.nodes)
         end)
         UI.cursorArea:AddCursorEventListener(Enum.CursorEventType.CursorDrag, function(data)
-            if gameState.currentState ~= STATE_PLAYING then return end
+            if gameState.currentState ~= STATE_PLAYING or gameState.isPaused then return end
             local x, y = GetEventPos(data)
             Input.OnCursorDrag(x, y)
         end)
         UI.cursorArea:AddCursorEventListener(Enum.CursorEventType.CursorUp, function(data)
-            if gameState.currentState ~= STATE_PLAYING then return end
+            if gameState.currentState ~= STATE_PLAYING or gameState.isPaused then return end
             local x, y = GetEventPos(data)
             Input.OnCursorUp(x, y, gameState.nodes)
         end)
@@ -4262,7 +4304,7 @@ local function SetupEventHandlers()
         if slot.container and slot.container.AddCursorEventListener then
             SilenceButton(slot.container)
             slot.container:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
-                if gameState.currentState == STATE_PLAYING then
+                if gameState.currentState == STATE_PLAYING and not gameState.isPaused then
                     local card = AbilitySystem.deck[idx]
                     if not card then return end
 
@@ -4281,18 +4323,18 @@ local function SetupEventHandlers()
                         return
                     end
 
-                    -- 选定符印，等待玩家点击目标灵穴
+                    -- 选定符印，等待玩家点击目标星枢
                     Input.SetSelectedCard(idx)
                     BalanceConfig.PlayAudioSafe("UI_CLICK")
                     local targetHint = ""
                     if card.targetType == "enemy_node" then
-                        targetHint = "请轻点敌方灵穴释放"
+                        targetHint = "请轻点敌方星枢释放"
                     elseif card.targetType == "player_node" then
-                        targetHint = "请轻点我方灵穴加持"
+                        targetHint = "请轻点我方星枢加持"
                     elseif card.targetType == "player_route_node" then
-                        targetHint = "请轻点正在输送中的我方灵穴提速"
+                        targetHint = "请轻点正在输送中的我方星枢提速"
                     else
-                        targetHint = "请轻点目标灵穴释放"
+                        targetHint = "请轻点目标星枢释放"
                     end
                     HudView.ShowToast(string.format("【已选定】%s（%s，再点符印取消）", card.name, targetHint))
                     CardBar.Update(UI.cardSlots, AbilitySystem.deck, AbilitySystem.cooldowns, idx)
@@ -4301,11 +4343,41 @@ local function SetupEventHandlers()
         end
     end
 
-    -- 8. 常驻侧边导航栏按钮监听 (重开推衍 & 结算退出)
+    -- 8. 常驻侧边导航栏按钮监听 (暂停、重试当前关、二次确认结算退出)
+    if UI.sidePauseBtn and UI.sidePauseBtn.AddCursorEventListener then
+        SilenceButton(UI.sidePauseBtn)
+        UI.sidePauseBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
+            if gameState.currentState == STATE_PLAYING and not gameState.isGameOver then
+                gameState.isPaused = true
+                if UI.pauseModal then Layout.SetVisible(UI.pauseModal, true) end
+                BalanceConfig.PlayAudioSafe("UI_CLICK")
+            end
+        end)
+    end
+
+    if UI.pauseResumeBtn and UI.pauseResumeBtn.AddCursorEventListener then
+        SilenceButton(UI.pauseResumeBtn)
+        UI.pauseResumeBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
+            gameState.isPaused = false
+            if UI.pauseModal then Layout.SetVisible(UI.pauseModal, false) end
+            BalanceConfig.PlayAudioSafe("UI_CLICK")
+        end)
+    end
+
+    -- 重试按钮：重新挑战当前关卡，从关卡剧情对话重新开始
     if UI.sideRestartBtn and UI.sideRestartBtn.AddCursorEventListener then
         SilenceButton(UI.sideRestartBtn)
         UI.sideRestartBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
-            HandleRestartToModeSelect()
+            BalanceConfig.PlayAudioSafe("UI_CLICK")
+            BalanceConfig.StopAllAudios()
+            VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
+            Runtime.HideAllParticles()
+            if gameState.isPaused then
+                gameState.isPaused = false
+                if UI.pauseModal then Layout.SetVisible(UI.pauseModal, false) end
+            end
+            print(string.format("[Starlink] 【重试当前关卡】: 第 %d 关 (从剧情开始)...", StarMap.currentStage))
+            StartStage(StarMap.currentStage)
         end)
     end
 
@@ -4491,12 +4563,21 @@ function OnUpdate(dt)
             Layout.SetVisible(UI.countdownModal, false)
             gameState.currentState = STATE_PLAYING
             gameState.elapsedTime = 0
+            gameState.isPaused = false
+            Layout.SetVisible(UI.quickNavLayer, true)
             BalanceConfig.PlayAudioSafe("ROUTE_LINK")
             local chap = StarMap.currentChapterDef
             HudView.ShowToast(string.format("【%s】推衍启阵！全速进军！", chap and chap.title or "开战"))
         end
 
     elseif gameState.currentState == STATE_PLAYING then
+        if gameState.isPaused then
+            -- 处于暂停状态：战局推衍完全冻结（不推进时间、不孕育微粒、不移动微粒、不运行 AI）
+            -- 仅刷新 Toast 提示
+            HudView.UpdateToast(dt, UI.toastContainer, UI.toastText)
+            return
+        end
+
         gameState.elapsedTime = gameState.elapsedTime + dt
         gameState.timeRemaining = gameState.timeRemaining - dt
 
@@ -4509,7 +4590,7 @@ function OnUpdate(dt)
             ))
         end
 
-        -- 1. 灵穴微粒孕育
+        -- 1. 星枢微粒孕育
         for _, n in ipairs(gameState.nodes) do
             NodeEntity.TickSpawn(n, dt, gameState.nodes, gameState.elapsedTime)
         end

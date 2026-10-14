@@ -13,7 +13,7 @@ local CardRegistry = {
             cd = 30,
             duration = 20,
             targetType = "player_node",
-            desc = "加持己方灵穴，20秒内免疫任何敌方侵蚀，本土共鸣恢复翻倍。",
+            desc = "加持己方星枢，20秒内免疫任何敌方侵蚀，本土共鸣恢复翻倍。",
             badgeColor = Layout.MakeColor(52, 211, 153, 255)
         },
         {
@@ -24,7 +24,7 @@ local CardRegistry = {
             cd = 30,
             duration = 20,
             targetType = "enemy_node",
-            desc = "炽火灼烧敌脉，瞬间消灭目标敌方灵穴上 40% 的驻留微粒并切断输出！",
+            desc = "炽火灼烧敌脉，瞬间消灭目标敌方星枢上 40% 的驻留微粒并切断输出！",
             badgeColor = Layout.MakeColor(244, 63, 94, 255)
         },
         {
@@ -35,7 +35,7 @@ local CardRegistry = {
             cd = 20,
             duration = 30,
             targetType = "player_route_node",
-            desc = "激发生发之风，30秒内从该灵穴出发的光轨流速翻倍至10粒/秒。",
+            desc = "激发生发之风，30秒内从该星枢出发的光轨流速翻倍至10粒/秒。",
             badgeColor = Layout.MakeColor(52, 211, 153, 255)
         },
         {
@@ -46,7 +46,7 @@ local CardRegistry = {
             cd = 25,
             duration = 0,
             targetType = "enemy_node",
-            desc = "引动燃素轰爆，瞬间消灭目标敌方灵穴上 80% 的驻留微粒！",
+            desc = "引动燃素轰爆，瞬间消灭目标敌方星枢上 80% 的驻留微粒！",
             badgeColor = Layout.MakeColor(244, 63, 94, 255)
         },
         {
@@ -68,7 +68,7 @@ local CardRegistry = {
             cd = 35,
             duration = 0,
             targetType = "any_node",
-            desc = "水之契约与摩拉通神：中立灵穴直接秒占100%；敌方灵穴削减65%共鸣。",
+            desc = "水之契约与摩拉通神：中立星枢直接秒占100%；敌方星枢削减65%共鸣。",
             badgeColor = Layout.MakeColor(56, 189, 248, 255)
         }
     }

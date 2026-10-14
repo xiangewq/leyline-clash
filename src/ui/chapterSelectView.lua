@@ -33,16 +33,21 @@ function ChapterSelectView.UnlockNextStage(completedStage)
     end
 end
 
--- 判定是否已完成剧情模式前4关
-function ChapterSelectView.HasCompletedFirst4Stages()
-    if (ChapterSelectView.unlockedStage or 1) >= 5 then
+-- 判定是否已完成剧情模式前3关（结算胜利判定条件）
+function ChapterSelectView.HasCompletedFirst3Stages()
+    if (ChapterSelectView.unlockedStage or 1) >= 4 then
         return true
     end
     local cleared = ChapterSelectView.clearedStages
-    if cleared and cleared[1] and cleared[2] and cleared[3] and cleared[4] then
+    if cleared and cleared[1] and cleared[2] and cleared[3] then
         return true
     end
     return false
+end
+
+-- 兼容旧函数调用
+function ChapterSelectView.HasCompletedFirst4Stages()
+    return ChapterSelectView.HasCompletedFirst3Stages()
 end
 
 -- 获取已通关章节总数
@@ -108,7 +113,7 @@ function ChapterSelectView.Render(chapterCards, descTextCtrl, startBtnTxtCtrl)
                 if cardUI.infoCtrl and cardUI.infoCtrl.alive then
                     local fCount = #chap.factions
                     local nCount = #chap.nodes
-                    cardUI.infoCtrl.text = string.format("%d方混战 | %d灵穴 | %d权能", fCount, nCount, chap.budget)
+                    cardUI.infoCtrl.text = string.format("%d方混战 | %d星枢 | %d权能", fCount, nCount, chap.budget)
                     cardUI.infoCtrl.fontColor = isUnlocked and Layout.PALETTE.AMBER or Layout.PALETTE.TEXT_MUTED
                 end
 
