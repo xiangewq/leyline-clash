@@ -1787,17 +1787,23 @@ const globalCursorArea = createNode('cursor', {
   transformByPlatform: makeTransform({ layout: 'stretch' })
 });
 
-// 7. 拖拽引导虚线 DragLine
+// 7. 拖拽引导虚线 DragLine (预设像素级柔边羽化，消除倾斜旋转走样)
 const dragLine = createNode('image', {
   id: 'drag_line',
   name: 'DragLine',
   visible: false,
   imageId: 100001,
   imageColor: parseColor('#fbbf24'),
+  enableSoftEdge: true,
+  softEdgeMode: 'Pixel',
+  softEdgeWidthX: 0,
+  softEdgeWidthY: 2,
+  horizontalSoftRange: 0,
+  verticalSoftRange: 100,
   transformByPlatform: makeTransform({
     anchor: [0, 0],
     offset: [0, 0],
-    size: [100, 3],
+    size: [100, 4],
     pivot: [0, 0.5]
   })
 });
@@ -1928,7 +1934,7 @@ const particlesLayer = createNode('container', {
   children: particleChildren
 });
 
-// 10. 光轨拓扑层 LinksLayer (20 条动态流道 + 30 条静态底轨，满足最大27条连线需求且严格控额)
+// 10. 光轨拓扑层 LinksLayer (20 条动态流道 + 36 条静态底轨，满足所有复杂关卡拓扑需求，预设抗锯齿边缘羽化)
 const linkChildren = [];
 for (let i = 1; i <= 20; i++) {
   linkChildren.push(createNode('image', {
@@ -1937,21 +1943,33 @@ for (let i = 1; i <= 20; i++) {
     visible: false,
     imageId: 100001,
     imageColor: parseColor('#38bdf8'),
+    enableSoftEdge: true,
+    softEdgeMode: 'Pixel',
+    softEdgeWidthX: 0,
+    softEdgeWidthY: 2,
+    horizontalSoftRange: 0,
+    verticalSoftRange: 100,
     transformByPlatform: makeTransform({
       anchor: [0, 0],
       offset: [0, 0],
-      size: [100, 4],
+      size: [100, 6],
       pivot: [0, 0.5]
     })
   }));
 }
-for (let i = 0; i < 30; i++) {
+for (let i = 0; i < 36; i++) {
   linkChildren.push(createNode('image', {
     id: `static_link_${i}`,
     name: `StaticLink_${i}`,
     visible: false,
     imageId: 100001,
     imageColor: parseColor('#334155'),
+    enableSoftEdge: true,
+    softEdgeMode: 'Pixel',
+    softEdgeWidthX: 0,
+    softEdgeWidthY: 1.5,
+    horizontalSoftRange: 0,
+    verticalSoftRange: 100,
     transformByPlatform: makeTransform({
       anchor: [0, 0],
       offset: [0, 0],

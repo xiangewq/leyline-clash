@@ -100,7 +100,7 @@ function UIBinder.BindControls(script, game)
             local line = UIBinder.FindDeepChild(UI.linksLayer, "RouteLine_" .. i)
             if line then table.insert(UI.routeCtrls, line) end
         end
-        for i = 0, 29 do
+        for i = 0, 35 do
             local sLine = UIBinder.FindDeepChild(UI.linksLayer, "StaticLink_" .. i)
             if sLine then table.insert(UI.staticLinkCtrls, sLine) end
         end

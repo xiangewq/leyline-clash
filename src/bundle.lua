@@ -452,13 +452,12 @@ local ChapterConfig = {
                 { 11, 9 }, { 11, 7 }, { 12, 8 }, { 12, 6 },
                 { 15, 5 }, { 15, 6 }, { 5, 6 },
                 { 5, 10 }, { 6, 10 },
-                { 9, 7 }, { 7, 8 }, { 8, 10 },
-                { 7, 3 }, { 7, 11 }, { 8, 4 }, { 8, 12 }
+                { 9, 7 }, { 7, 8 }, { 8, 10 }
             }
         },
 
         -- =====================================================================
-        -- 第 5 关：终章·极寒凛冬 (4方混战，18灵穴，满额预算12点，360s)
+        -- 第 5 关：终章·极寒凛冬 (4方混战，18星枢，满额预算12点，360s)
         -- =====================================================================
         {
             id = 5,
@@ -511,17 +510,17 @@ local ChapterConfig = {
                 { 15, 1 }, { 1, 2 }, { 1, 4 },
                 { 0, 3 }, { 3, 2 }, { 3, 10 },
                 { 2, 6 }, { 2, 10 },
-                { 4, 1 }, { 4, 5 }, { 4, 6 },
+                { 4, 5 }, { 4, 6 },
                 { 5, 14 }, { 5, 7 },
-                { 6, 7 }, { 6, 8 }, { 6, 4 },
+                { 6, 7 }, { 6, 8 },
                 { 7, 9 }, { 7, 14 }, { 7, 13 },
                 { 8, 9 }, { 8, 10 },
                 { 9, 11 }, { 9, 13 },
-                { 10, 11 }, { 10, 3 },
+                { 10, 11 },
                 { 11, 12 }, { 11, 13 },
                 { 14, 17 }, { 14, 13 },
                 { 13, 17 }, { 13, 16 }, { 13, 12 },
-                { 12, 16 }, { 12, 11 }
+                { 12, 16 }
             }
         }
     }
@@ -2005,30 +2004,34 @@ local ANOMALY_STYLE = {
 }
 
 -- 初始化连线柔边羽化 (消除矩形生硬折角，构建星轨能量束)
-function VisualRenderer.InitLineSoftEdge(routeCtrls, staticLinkCtrls)
+function VisualRenderer.InitLineSoftEdge(routeCtrls, staticLinkCtrls, dragLineCtrl)
+    local function ApplySoftEdge(ctrl, wy)
+        if not ctrl or not ctrl.alive then return end
+        pcall(function()
+            ctrl.enableSoftEdge = true
+            ctrl.softEdgeMode = "Pixel"
+            ctrl.softEdgeWidthX = 0
+            ctrl.softEdgeWidthY = wy or 2
+            ctrl.verticalSoftRange = 100
+            ctrl.horizontalSoftRange = 0
+            if ctrl.SetSoftEdgeWidth then
+                ctrl:SetSoftEdgeWidth(0, wy or 2)
+            end
+        end)
+    end
+
     if routeCtrls then
         for _, lineCtrl in ipairs(routeCtrls) do
-            if lineCtrl and lineCtrl.alive then
-                pcall(function()
-                    lineCtrl.enableSoftEdge = true
-                    if lineCtrl.SetSoftEdgeWidth then
-                        lineCtrl:SetSoftEdgeWidth(2, 4)
-                    end
-                end)
-            end
+            ApplySoftEdge(lineCtrl, 2)
         end
     end
     if staticLinkCtrls then
         for _, sCtrl in ipairs(staticLinkCtrls) do
-            if sCtrl and sCtrl.alive then
-                pcall(function()
-                    sCtrl.enableSoftEdge = true
-                    if sCtrl.SetSoftEdgeWidth then
-                        sCtrl:SetSoftEdgeWidth(1, 2)
-                    end
-                end)
-            end
+            ApplySoftEdge(sCtrl, 1.5)
         end
+    end
+    if dragLineCtrl then
+        ApplySoftEdge(dragLineCtrl, 2)
     end
 end
 
@@ -2083,8 +2086,8 @@ function VisualRenderer.SetLineTransform(lineCtrl, x1, y1, x2, y2, thickness, co
 
     lineCtrl.anchoredPositionX = x1
     lineCtrl.anchoredPositionY = y1
-    lineCtrl.sizeDeltaX = dist
-    lineCtrl.sizeDeltaY = thickness or 4
+    lineCtrl.sizeDeltaX = math.floor(dist + 0.5)
+    lineCtrl.sizeDeltaY = math.floor((thickness or 4) + 0.5)
     lineCtrl.localRotationZ = angle
 
     if color then
@@ -2115,11 +2118,10 @@ function VisualRenderer.UpdateRoutes(routeCtrls, routes, nodes, dragLineCtrl, in
                         baseCol = Layout.PALETTE.ANEMO
                     end
 
-                    -- 正弦能量脉冲：粗细 5.5px~8.5px 呼吸，透明度 170~250 流转
+                    -- 正弦能量脉冲：厚度固定为整数 (普通 6px，疾风 8px)，能量呼吸完全由 Alpha (175~250) 流转驱动，消除亚像素抖动锯齿
                     local pulse = 0.5 + 0.5 * math.sin(elapsedTime * 5.0 + (r.fromId or 0))
-                    local baseThickness = isBoosted and 7.5 or 5.0
-                    local thickness = baseThickness + pulse * 2.2
-                    local alpha = math.floor(170 + pulse * 80)
+                    local thickness = isBoosted and 8 or 6
+                    local alpha = math.floor(175 + pulse * 75)
                     local pulseCol = Layout.WithAlpha(baseCol, alpha)
 
                     VisualRenderer.SetLineTransform(ctrl, nA.x, nA.y, nB.x, nB.y, thickness, pulseCol)
@@ -2138,7 +2140,7 @@ function VisualRenderer.UpdateRoutes(routeCtrls, routes, nodes, dragLineCtrl, in
             local sourceNode = StarMap.GetNode(nodes, inputState.dragSourceId)
             if sourceNode then
                 local pulse = 0.5 + 0.5 * math.sin(elapsedTime * 8.0)
-                local dragThickness = 3.2 + pulse * 1.5
+                local dragThickness = 4
                 local dragColor = Layout.WithAlpha(Layout.PALETTE.GOLD, math.floor(160 + pulse * 95))
                 VisualRenderer.SetLineTransform(
                     dragLineCtrl,
@@ -2380,17 +2382,34 @@ function VisualRenderer.ApplyStageLayout(nodeUIList, nodes, staticLinkCtrls, lin
     end
 
     if staticLinkCtrls and links then
-        for i, linkCtrl in ipairs(staticLinkCtrls) do
-            local link = links[i]
-            if link and linkCtrl and linkCtrl.alive then
-                local nA = StarMap.GetNode(nodes, link[1])
-                local nB = StarMap.GetNode(nodes, link[2])
-                if nA and nB then
-                    VisualRenderer.SetLineTransform(linkCtrl, nA.x, nA.y, nB.x, nB.y, 2, Layout.PALETTE.LINK_INACTIVE)
-                else
-                    Layout.SetVisible(linkCtrl, false)
+        local renderedEdges = {}
+        local ctrlIdx = 1
+        local maxCtrls = #staticLinkCtrls
+
+        for _, link in ipairs(links) do
+            if link and link[1] ~= nil and link[2] ~= nil and ctrlIdx <= maxCtrls then
+                local edgeKey = StarMap.GetEdgeKey(link[1], link[2])
+                if not renderedEdges[edgeKey] then
+                    renderedEdges[edgeKey] = true
+                    local linkCtrl = staticLinkCtrls[ctrlIdx]
+                    if linkCtrl and linkCtrl.alive then
+                        local nA = StarMap.GetNode(nodes, link[1])
+                        local nB = StarMap.GetNode(nodes, link[2])
+                        if nA and nB then
+                            VisualRenderer.SetLineTransform(linkCtrl, nA.x, nA.y, nB.x, nB.y, 2, Layout.PALETTE.LINK_INACTIVE)
+                        else
+                            Layout.SetVisible(linkCtrl, false)
+                        end
+                        ctrlIdx = ctrlIdx + 1
+                    end
                 end
-            elseif linkCtrl and linkCtrl.alive then
+            end
+        end
+
+        -- 隐藏多余未使用的静态底轨控件
+        for i = ctrlIdx, maxCtrls do
+            local linkCtrl = staticLinkCtrls[i]
+            if linkCtrl and linkCtrl.alive then
                 Layout.SetVisible(linkCtrl, false)
             end
         end
@@ -3513,7 +3532,7 @@ function UIBinder.BindControls(script, game)
             local line = UIBinder.FindDeepChild(UI.linksLayer, "RouteLine_" .. i)
             if line then table.insert(UI.routeCtrls, line) end
         end
-        for i = 0, 29 do
+        for i = 0, 35 do
             local sLine = UIBinder.FindDeepChild(UI.linksLayer, "StaticLink_" .. i)
             if sLine then table.insert(UI.staticLinkCtrls, sLine) end
         end
@@ -3851,8 +3870,8 @@ end
 local function CacheUIControls()
     UI = UIBinder.BindControls(script, game)
     Runtime.InitParticlePool(UI.particleCtrls)
-    -- 初始化连线柔边羽化 (光束能量脉冲质感)
-    VisualRenderer.InitLineSoftEdge(UI.routeCtrls, UI.staticLinkCtrls)
+    -- 初始化连线柔边羽化 (光束能量脉冲质感与抗锯齿)
+    VisualRenderer.InitLineSoftEdge(UI.routeCtrls, UI.staticLinkCtrls, UI.dragLine)
 end
 
 -- 控制战斗核心层（灵穴、光轨、微粒、HUD）的可见性

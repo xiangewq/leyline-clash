@@ -161,8 +161,8 @@ end
 local function CacheUIControls()
     UI = UIBinder.BindControls(script, game)
     Runtime.InitParticlePool(UI.particleCtrls)
-    -- 初始化连线柔边羽化 (光束能量脉冲质感)
-    VisualRenderer.InitLineSoftEdge(UI.routeCtrls, UI.staticLinkCtrls)
+    -- 初始化连线柔边羽化 (光束能量脉冲质感与抗锯齿)
+    VisualRenderer.InitLineSoftEdge(UI.routeCtrls, UI.staticLinkCtrls, UI.dragLine)
 end
 
 -- 控制战斗核心层（灵穴、光轨、微粒、HUD）的可见性
