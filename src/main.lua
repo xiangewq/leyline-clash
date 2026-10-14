@@ -56,6 +56,46 @@ local function InitNodes()
     end
 end
 
+-- 触发千星奇域官方服务端逻辑节点图自定义信号
+local function EmitServerSignal(signalName)
+    print(string.format("[Starlink] 发送服务端监听信号: %s", tostring(signalName)))
+    if not game then return end
+    local sent = false
+    pcall(function()
+        if game.ServerSignal then
+            local sig = game.ServerSignal(signalName)
+            if sig and (type(sig) == "table" or type(sig) == "userdata") and sig.SendSignal then
+                sig:SendSignal()
+                sent = true
+                print(string.format("[Starlink] 服务端信号已成功发送: %s (sig:SendSignal())", signalName))
+                return
+            end
+            if not sent and type(game.ServerSignal) == "function" then
+                game.ServerSignal(signalName)
+                print(string.format("[Starlink] 服务端信号已成功发送: %s (game.ServerSignal(name))", signalName))
+            end
+        end
+    end)
+    pcall(function()
+        if not sent and game.SendServerSignal then
+            game.SendServerSignal(signalName)
+            print(string.format("[Starlink] 服务端信号已成功发送: %s (game.SendServerSignal(name))", signalName))
+        end
+    end)
+end
+
+-- 实时向服务端同步当前的结算胜负状态（胜利/失败），确保使用关卡原生退出时状态也 100% 正确
+local function SyncPlayerWinLoseStatus()
+    local completed3 = ChapterSelectView.HasCompletedFirst3Stages()
+    if completed3 then
+        print("[Starlink] 当前进度已通关第3关 -> 同步服务端状态: SetPlayerWinStatus (胜利)")
+        EmitServerSignal("SetPlayerWinStatus")
+    else
+        print("[Starlink] 当前进度未通关第3关 -> 同步服务端状态: SetPlayerLoseStatus (失败)")
+        EmitServerSignal("SetPlayerLoseStatus")
+    end
+end
+
 -- 胜负判定 (支持 2~4 方多阵营混战)
 local function CheckMatchEnd(isTimeout)
     if gameState.isGameOver then return end
@@ -113,6 +153,7 @@ local function CheckMatchEnd(isTimeout)
         VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
         Runtime.HideAllParticles()
         ChapterSelectView.UnlockNextStage(StarMap.currentStage)
+        SyncPlayerWinLoseStatus()
         BalanceConfig.StopAllAudios()
         BalanceConfig.PlayAudioSafe("MATCH_WIN")
         HudView.ShowSettlement(true, gameState.nodes, gameState.elapsedTime, UI.settleModal, UI.settleTitle, UI.settleDesc, UI.settleStats, UI.settleNextBtn)
@@ -149,6 +190,7 @@ local function CheckMatchEnd(isTimeout)
         BalanceConfig.StopAllAudios()
         if isWin then
             ChapterSelectView.UnlockNextStage(StarMap.currentStage)
+            SyncPlayerWinLoseStatus()
             BalanceConfig.PlayAudioSafe("MATCH_WIN")
         else
             BalanceConfig.PlayAudioSafe("MATCH_LOSE")
@@ -297,7 +339,7 @@ local function OpenSettleConfirmModal()
     end
 end
 
--- 触发千星奇域原生系统个人结算 (按规则判定成功/失败：通关前3关判定为胜利)
+-- 触发千星奇域原生系统个人结算 (先同步胜负状态，再请求结算退出)
 local function TriggerNativePersonalSettlement()
     CloseSettleConfirmModal()
     local completed3 = ChapterSelectView.HasCompletedFirst3Stages()
@@ -343,42 +385,22 @@ local function TriggerNativePersonalSettlement()
         end
     end
 
-    -- 触发千星奇域官方服务端逻辑节点图原生结算:
-    local function EmitServerSignal(signalName)
-        print(string.format("[Starlink] 发送服务端监听信号: %s", tostring(signalName)))
-        if not game then return end
-        local sent = false
-        pcall(function()
-            if game.ServerSignal then
-                local sig = game.ServerSignal(signalName)
-                if sig and (type(sig) == "table" or type(sig) == "userdata") and sig.SendSignal then
-                    sig:SendSignal()
-                    sent = true
-                    print(string.format("[Starlink] 服务端信号已成功发送: %s (sig:SendSignal())", signalName))
-                    return
-                end
-                if not sent and type(game.ServerSignal) == "function" then
-                    game.ServerSignal(signalName)
-                    print(string.format("[Starlink] 服务端信号已成功发送: %s (game.ServerSignal(name))", signalName))
-                end
-            end
-        end)
-        pcall(function()
-            if not sent and game.SendServerSignal then
-                game.SendServerSignal(signalName)
-                print(string.format("[Starlink] 服务端信号已成功发送: %s (game.SendServerSignal(name))", signalName))
-            end
-        end)
-    end
+    -- 1. 先向服务端设置玩家结算胜负状态 (节点1/2: SetPlayerWinStatus / SetPlayerLoseStatus)
+    SyncPlayerWinLoseStatus()
 
-    -- 1. 向服务端同步结算状态并自动触发结算关卡（节点图中已由设置状态直接流转至结算关卡）
-    if isSuccess then
-        print("[Starlink] 判定已通关前3关 (成功) -> 发送服务端信号: SetPlayerWinStatus (设置玩家结算成功状态: 胜利 -> 结算关卡)")
-        EmitServerSignal("SetPlayerWinStatus")
-    else
-        print("[Starlink] 未通关前3关 (失败) -> 发送服务端信号: SetPlayerLoseStatus (设置玩家结算状态: 失败 -> 结算关卡)")
-        EmitServerSignal("SetPlayerLoseStatus")
-    end
+    -- 2. 分离调用：向服务端发送结算退出信号 (节点3: RequestQuitChallenge -> 结算关卡)
+    print("[Starlink] 发送服务端监听信号: RequestQuitChallenge (请求执行关卡结算退出)")
+    EmitServerSignal("RequestQuitChallenge")
+
+    -- 3. 延时双保险补发退出信号，确保服务端逻辑时序绝对可靠
+    pcall(function()
+        if script and script.CreateTimer then
+            script:CreateTimer(0.15, function()
+                print("[Starlink] (延迟帧确认) 补发服务端监听信号: RequestQuitChallenge")
+                EmitServerSignal("RequestQuitChallenge")
+            end)
+        end
+    end)
 end
 
 -- 重开模式：回退到模式选择界面，保留剧情模式关卡解锁与通关进度
@@ -837,6 +859,9 @@ function OnStart()
     Layout.SetVisible(UI.prepareModal, false)
     Layout.SetVisible(UI.settleModal, false)
     Layout.SetVisible(UI.countdownModal, false)
+
+    -- 同步玩家当前胜负状态至服务端，确保玩家即使使用原神原生系统菜单退出，也能正确判定胜负
+    SyncPlayerWinLoseStatus()
 end
 
 function OnUpdate(dt)
