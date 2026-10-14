@@ -31,16 +31,21 @@ local BalanceConfig = {
     -- 战前构筑预算
     MAX_BUDGET = 12,
 
-    -- 提瓦特音频 GUID 槽位映射表 (创作者可在编辑器中填入实机音频 GUID)
+    -- 提瓦特官方音效资产 ID 映射表 (基于官方 1,997 音效库精选匹配)
     AUDIO_SLOTS = {
-        UI_CLICK = 0,       -- 节点选定与按钮点击
-        ROUTE_LINK = 0,     -- 光轨连接建立
-        ROUTE_CUT = 0,      -- 光轨切断与结界激活
-        COMBAT_HIT = 0,     -- 微粒交火火花
-        SKILL_BLAST = 0,    -- 轰轰烈焰与神罚轰爆
-        MATCH_WIN = 0,      -- 全域大捷
-        MATCH_LOSE = 0      -- 灵脉耗竭
-    }
+        UI_CLICK     = 50888,    -- 界面按钮点击 / 节点选中 (轻脆通用反馈音)
+        ROUTE_LINK   = 40018,    -- 光轨连接建立 (能量脉冲流道激活)
+        ROUTE_CUT    = 50912,    -- 光轨切断与结界切换 (能量断开清爽音)
+        COMBAT_HIT   = 0,        -- 停用 70 秒长篇风声背景音(原10002)，交火采用纯净粒子光效与震颤
+        SKILL_BLAST  = 40001,    -- 符印轰爆 / 灵穴共鸣爆发 (元素充能大招)
+        MATCH_WIN    = 50961,    -- 全域大捷通关 (秘境挑战成功高昂号角)
+        MATCH_LOSE   = 50962,    -- 灵脉耗竭败退 (挑战失利低沉音)
+        NODE_CAPTURE = 40001,    -- 灵穴完全掌控 (核心充能爆发)
+        NODE_DEFEND  = 20004,    -- 结界护盾吸收抵挡
+        NODE_UPGRADE = 30005     -- 灵穴充能提升 / 强化清越音
+    },
+
+    activeAudioInstances = {}
 }
 
 -- 安全播放音效包装器 (若未配置或ID无效，安全静音运行并以视觉动效兜底)
@@ -48,9 +53,38 @@ function BalanceConfig.PlayAudioSafe(audioSlotKey)
     local audioId = BalanceConfig.AUDIO_SLOTS[audioSlotKey]
     if audioId and audioId > 0 and game and game.PlayAudio2D then
         pcall(function()
-            game.PlayAudio2D(audioId)
+            local instId = game.PlayAudio2D(audioId)
+            if instId and instId > 0 then
+                table.insert(BalanceConfig.activeAudioInstances, instId)
+                if #BalanceConfig.activeAudioInstances > 50 then
+                    table.remove(BalanceConfig.activeAudioInstances, 1)
+                end
+            end
         end)
     end
 end
+
+-- 彻底停止所有正在播放的音效实例 (对局结束、切换关卡或退出战斗时调用)
+function BalanceConfig.StopAllAudios()
+    if game and game.StopAudio then
+        pcall(function()
+            for _, instId in ipairs(BalanceConfig.activeAudioInstances or {}) do
+                if game.IsAudioAlive then
+                    if game.IsAudioAlive(instId) then
+                        game.StopAudio(instId)
+                    end
+                else
+                    game.StopAudio(instId)
+                end
+            end
+            BalanceConfig.activeAudioInstances = {}
+        end)
+    end
+end
+
+-- 背景音乐已移交关卡编辑器【背景音乐管理】与服务端节点图配置，客户端不再发送网络信号
+function BalanceConfig.SetBGM(bgmId) end
+function BalanceConfig.SetMenuBGM() end
+function BalanceConfig.SetStageBGM(stageId) end
 
 return BalanceConfig

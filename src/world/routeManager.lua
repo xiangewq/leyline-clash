@@ -3,6 +3,7 @@
 
 local BalanceConfig = require("default_import_file/src/data/balanceConfig") or require("src/data/balanceConfig")
 local StarMap = require("default_import_file/src/world/starMap") or require("src/world/starMap")
+local NodeEntity = require("default_import_file/src/world/nodeEntity") or require("src/world/nodeEntity")
 
 local RouteManager = {
     routes = {},           -- 活跃光轨列表: { fromId, toId, faction, sendTimer, boostedUntil }
@@ -45,7 +46,9 @@ function RouteManager.SetRoute(fromId, toId, faction, nodes)
         boostedUntil = 0
     })
 
-    BalanceConfig.PlayAudioSafe("ROUTE_LINK")
+    if faction == "player" then
+        BalanceConfig.PlayAudioSafe("ROUTE_LINK")
+    end
     return true
 end
 
@@ -73,7 +76,7 @@ function RouteManager.GetRouteFrom(fromId)
 end
 
 -- 每帧更新：物流发射与微粒航行
-function RouteManager.Update(dt, nodes, elapsedTime, onCombatHitCallback)
+function RouteManager.Update(dt, nodes, elapsedTime, onCombatHitCallback, onCaptureCallback, onRevertNeutralCallback)
     -- 1. 物流发射
     for _, route in ipairs(RouteManager.routes) do
         local fromNode = nodes[route.fromId + 1]
@@ -123,36 +126,28 @@ function RouteManager.Update(dt, nodes, elapsedTime, onCombatHitCallback)
             -- 到达目标节点
             local targetNode = nodes[p.toId + 1]
             if targetNode then
-                RouteManager.OnParticleArrive(p, targetNode, onCombatHitCallback)
+                RouteManager.OnParticleArrive(p, targetNode, onCombatHitCallback, onCaptureCallback, onRevertNeutralCallback, elapsedTime)
             end
             table.remove(RouteManager.movingParticles, i)
         end
     end
 end
 
--- 微粒到达目标节点结算
-function RouteManager.OnParticleArrive(particle, node, onCombatHitCallback)
-    if node.faction == particle.faction then
-        -- 友军增援汇入
-        local cap = (node.anomaly == "PLASMA") and BalanceConfig.PLASMA_CAP or BalanceConfig.MAX_NODE_CAP
-        if node.particles < cap then
-            node.particles = node.particles + 1
-        end
+-- 微粒到达目标节点结算 (委托至 NodeEntity.ApplyArrival 拔河对消决算)
+function RouteManager.OnParticleArrive(particle, node, onCombatHitCallback, onCaptureCallback, onRevertNeutralCallback, elapsedTime)
+    if NodeEntity and NodeEntity.ApplyArrival then
+        NodeEntity.ApplyArrival(node, particle.faction, onCombatHitCallback, onCaptureCallback, onRevertNeutralCallback, elapsedTime)
     else
-        -- 敌对交火与侵蚀 (固守减伤 30%，命中率 70%，兼顾防御阵地坚韧度与攻坚可行性)
-        if node.particles > 0 then
-            local defenseDamp = (node.isDefensive and 0.7 or 1.0)
-            if math.random() <= defenseDamp then
-                node.particles = node.particles - 1
-            end
-            BalanceConfig.PlayAudioSafe("COMBAT_HIT")
-            if onCombatHitCallback then
-                onCombatHitCallback(node)
-            end
-        else
-            -- 节点防守空虚，微粒转化为侵蚀共鸣点
-            node.contenderFaction = particle.faction
-            node.contenderParticles = (node.contenderParticles or 0) + 1
+        -- 兜底逻辑
+        if node.faction == particle.faction then
+            node.particles = node.particles + 1
+        elseif (node.protectedUntil or 0) > (elapsedTime or 0) then
+            -- 受千风庇护免疫
+            BalanceConfig.PlayAudioSafe("NODE_DEFEND")
+            if onCombatHitCallback then onCombatHitCallback(node) end
+        elseif node.particles > 0 then
+            node.particles = node.particles - 1
+            if onCombatHitCallback then onCombatHitCallback(node) end
         end
     end
 end

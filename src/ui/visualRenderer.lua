@@ -111,7 +111,7 @@ function VisualRenderer.UpdateNodes(nodeUIList, nodes, elapsedTime)
                 end
             end
 
-            -- 3. 兵力数值显示 (双重保障：标题附加括号数值 + 兵力行独立高对比呈现)
+            -- 3. 兵力与灵穴名称显示 (由 TitleText 居中统筹呈现：灵穴名称 (兵力)，如 西风前哨 (20))
             local currentParts = math.floor(node.particles or 0)
             if ui.titleText and ui.titleText.alive then
                 ui.titleText.text = string.format("%s (%d)", node.name, currentParts)
@@ -119,10 +119,9 @@ function VisualRenderer.UpdateNodes(nodeUIList, nodes, elapsedTime)
                 Layout.SetVisible(ui.titleText, true)
             end
 
+            -- particleText 隐藏，避免在 52px 紧凑圆盘中与 TitleText 产生双层重叠
             if ui.particleText and ui.particleText.alive then
-                ui.particleText.text = string.format("兵力: %d", currentParts)
-                ui.particleText.fontColor = factionColor
-                Layout.SetVisible(ui.particleText, true)
+                Layout.SetVisible(ui.particleText, false)
             end
 
             -- 4. 异象标识文本
@@ -158,16 +157,20 @@ function VisualRenderer.UpdateNodes(nodeUIList, nodes, elapsedTime)
 
             -- 5. 占领进度与状态标签 (占领中/动摇中/输送中/固守中/休眠中)
             if ui.statusText and ui.statusText.alive then
-                if node.faction == "neutral" and (node.control > 0 or (node.contenderParticles and node.contenderParticles > 0)) then
-                    local fName = Layout.GetFactionName(node.contenderFaction)
-                    local col = Layout.GetFactionColor(node.contenderFaction)
-                    ui.statusText.text = string.format("[%s占领中 %d%%]", fName, math.floor(node.control))
-                    ui.statusText.fontColor = col
-                    Layout.SetVisible(ui.statusText, true)
-                elseif node.faction ~= "neutral" and node.control < 100 then
+                if node.faction == "neutral" then
+                    if (node.control or 0) > 0 and node.contenderFaction then
+                        local fName = Layout.GetFactionName(node.contenderFaction)
+                        local col = Layout.GetFactionColor(node.contenderFaction)
+                        ui.statusText.text = string.format("[%s掌控 %d%%]", fName, math.floor(node.control))
+                        ui.statusText.fontColor = col
+                        Layout.SetVisible(ui.statusText, true)
+                    else
+                        Layout.SetVisible(ui.statusText, false)
+                    end
+                elseif node.faction ~= "neutral" and (node.control or 100) < 100 then
                     local fName = Layout.GetFactionName(node.faction)
                     local col = Layout.GetFactionColor(node.faction)
-                    ui.statusText.text = string.format("[%s动摇 %d%%]", fName, math.floor(node.control))
+                    ui.statusText.text = string.format("[%s动摇 %d%%]", fName, math.floor(node.control or 100))
                     ui.statusText.fontColor = col
                     Layout.SetVisible(ui.statusText, true)
                 elseif node.isIdle then

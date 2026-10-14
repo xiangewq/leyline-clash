@@ -97,6 +97,12 @@ local UI = {
     dlgSkipBtn     = nil,
     dlgNextBtn     = nil,
 
+    -- 模式选择弹窗
+    modeSelectModal    = nil,
+    modeStoryBtn       = nil,
+    modeChallengeBtn   = nil,
+    modeQuitBtn        = nil,
+
     -- 战前构筑弹窗
     prepareModal   = nil,
     prepBudgetText = nil,
@@ -106,13 +112,15 @@ local UI = {
     prepCards      = {},
 
     -- 结算弹窗
-    settleModal    = nil,
-    settleTitle    = nil,
-    settleDesc     = nil,
-    settleStats    = nil,
-    settleNextBtn  = nil,
-    settleRetryBtn = nil,
-    settleChapBtn  = nil
+    settleModal      = nil,
+    settleTitle      = nil,
+    settleDesc       = nil,
+    settleStats      = nil,
+    settleNextBtn    = nil,
+    settleRetryBtn   = nil,
+    settleChapBtn    = nil,
+    settleRestartBtn = nil,
+    settleQuitBtn    = nil
 }
 
 -- 初始化沙盘所有灵穴实体
@@ -177,6 +185,7 @@ local function CheckMatchEnd(isTimeout)
         VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
         Runtime.HideAllParticles()
         ChapterSelectView.UnlockNextStage(StarMap.currentStage)
+        BalanceConfig.StopAllAudios()
         BalanceConfig.PlayAudioSafe("MATCH_WIN")
         HudView.ShowSettlement(true, gameState.nodes, gameState.elapsedTime, UI.settleModal, UI.settleTitle, UI.settleDesc, UI.settleStats, UI.settleNextBtn)
     elseif pNodes == 0 and inFlightPlayer == 0 then
@@ -185,6 +194,7 @@ local function CheckMatchEnd(isTimeout)
         gameState.currentState = STATE_SETTLEMENT
         VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
         Runtime.HideAllParticles()
+        BalanceConfig.StopAllAudios()
         BalanceConfig.PlayAudioSafe("MATCH_LOSE")
         HudView.ShowSettlement(false, gameState.nodes, gameState.elapsedTime, UI.settleModal, UI.settleTitle, UI.settleDesc, UI.settleStats, UI.settleNextBtn)
     elseif isTimeout then
@@ -202,6 +212,7 @@ local function CheckMatchEnd(isTimeout)
                 break
             end
         end
+        BalanceConfig.StopAllAudios()
         if isWin then
             ChapterSelectView.UnlockNextStage(StarMap.currentStage)
             BalanceConfig.PlayAudioSafe("MATCH_WIN")
@@ -257,6 +268,7 @@ local function CacheUIControls()
     if UI.modeSelectModal then
         UI.modeStoryBtn     = FindDeepChild(UI.modeSelectModal, "ModeStoryBtn")
         UI.modeChallengeBtn = FindDeepChild(UI.modeSelectModal, "ModeChallengeBtn")
+        UI.modeQuitBtn      = FindDeepChild(UI.modeSelectModal, "ModeQuitBtn")
     end
 
     -- 关卡章节选择弹窗
@@ -287,7 +299,7 @@ local function CacheUIControls()
         end
     end
 
-    -- 光轨条带池与静态连线池
+    -- 光轨条带池与静态连线池 (25 条动态光轨 + 40 条静态底轨)
     UI.routeCtrls = {}
     UI.staticLinkCtrls = {}
     UI.linksLayer = FindDeepChild(root, "LinksLayer")
@@ -296,7 +308,7 @@ local function CacheUIControls()
             local line = FindDeepChild(UI.linksLayer, "RouteLine_" .. i)
             if line then table.insert(UI.routeCtrls, line) end
         end
-        for i = 0, 44 do
+        for i = 0, 39 do
             local sLine = FindDeepChild(UI.linksLayer, "StaticLink_" .. i)
             if sLine then table.insert(UI.staticLinkCtrls, sLine) end
         end
@@ -313,11 +325,11 @@ local function CacheUIControls()
     end
     Runtime.InitParticlePool(UI.particleCtrls)
 
-    -- 18 座地脉灵穴 UI 组
+    -- 22 座地脉灵穴 UI 组 (支持全5关剧情模式最大18座并预留富余预算)
     UI.nodeUIList = {}
     UI.nodesLayer = FindDeepChild(root, "NodesLayer")
     if UI.nodesLayer then
-        for i = 0, 17 do
+        for i = 0, 21 do
             local grp = FindDeepChild(UI.nodesLayer, "NodeGroup_" .. i)
             if grp then
                 table.insert(UI.nodeUIList, {
@@ -416,15 +428,34 @@ local function CacheUIControls()
         end
     end
 
+    -- 常驻侧边导航栏 (除剧情演播外常驻于左上角)
+    UI.quickNavLayer = FindDeepChild(root, "QuickNavLayer")
+    if UI.quickNavLayer then
+        UI.sideRestartBtn = FindDeepChild(UI.quickNavLayer, "SideRestartBtn")
+        UI.sideSettleBtn  = FindDeepChild(UI.quickNavLayer, "SideSettleBtn")
+    end
+
+    -- 官方风格退出挑战 / 游玩结算二次确认弹窗
+    UI.settleConfirmModal = FindDeepChild(root, "SettleConfirmModal")
+    if UI.settleConfirmModal then
+        UI.confirmResumeBtn  = FindDeepChild(UI.settleConfirmModal, "ConfirmResumeBtn")
+        UI.confirmRestartBtn = FindDeepChild(UI.settleConfirmModal, "ConfirmRestartBtn")
+        UI.confirmQuitBtn    = FindDeepChild(UI.settleConfirmModal, "ConfirmQuitBtn")
+        UI.confirmDesc       = FindDeepChild(UI.settleConfirmModal, "ConfirmDesc")
+        UI.confirmTitle      = FindDeepChild(UI.settleConfirmModal, "ConfirmTitle")
+    end
+
     -- 结算弹窗
     UI.settleModal = FindDeepChild(root, "SettleModal")
     if UI.settleModal then
-        UI.settleTitle    = FindDeepChild(UI.settleModal, "SettleTitle")
-        UI.settleDesc     = FindDeepChild(UI.settleModal, "SettleDesc")
-        UI.settleStats    = FindDeepChild(UI.settleModal, "SettleStats")
-        UI.settleNextBtn  = FindDeepChild(UI.settleModal, "SettleNextBtn")
-        UI.settleRetryBtn = FindDeepChild(UI.settleModal, "SettleRetryBtn")
-        UI.settleChapBtn  = FindDeepChild(UI.settleModal, "SettleChapterBtn")
+        UI.settleTitle      = FindDeepChild(UI.settleModal, "SettleTitle")
+        UI.settleDesc       = FindDeepChild(UI.settleModal, "SettleDesc")
+        UI.settleStats      = FindDeepChild(UI.settleModal, "SettleStats")
+        UI.settleNextBtn    = FindDeepChild(UI.settleModal, "SettleNextBtn")
+        UI.settleRetryBtn   = FindDeepChild(UI.settleModal, "SettleRetryBtn")
+        UI.settleChapBtn    = FindDeepChild(UI.settleModal, "SettleChapterBtn")
+        UI.settleRestartBtn = FindDeepChild(UI.settleModal, "SettleRestartBtn")
+        UI.settleQuitBtn    = FindDeepChild(UI.settleModal, "SettleQuitBtn")
     end
 end
 
@@ -497,12 +528,17 @@ local function StartStage(stageId)
     Layout.SetVisible(UI.settleModal, false)
     Layout.SetVisible(UI.prepareModal, false)
     Layout.SetVisible(UI.countdownModal, false)
+    CloseSettleConfirmModal()
+
+    -- 剧情演播阶段隐藏侧边常驻导航按钮，剧情结束后重新显示
+    Layout.SetVisible(UI.quickNavLayer, false)
 
     -- 1. 剧情演播
     DialoguePlayer.Init(chap.dialogues, function()
         print("[Starlink] 章节剧情完毕，进入战前符印调配...")
         Layout.SetVisible(UI.dialogueModal, false)
         Layout.SetVisible(UI.prepareModal, true)
+        Layout.SetVisible(UI.quickNavLayer, true)
         gameState.currentState = STATE_PREPARE
 
         -- 2. 调配面板初始化 (动态预算)
@@ -510,6 +546,7 @@ local function StartStage(stageId)
             print("[Starlink] 战前符印装配完成，进入战前 3 秒倒计时...")
             AbilitySystem.InitDeck(selectedDeck)
             Layout.SetVisible(UI.prepareModal, false)
+            Layout.SetVisible(UI.quickNavLayer, true)
             SetGameplayLayersVisible(true)
 
             -- 刷新左上角特殊灵穴说明与右上角战术操作指引
@@ -529,8 +566,140 @@ local function StartStage(stageId)
     Layout.SetVisible(UI.dialogueModal, true)
 end
 
+-- 关闭千星奇域退出挑战 / 游玩结算二次确认弹窗
+local function CloseSettleConfirmModal()
+    if UI.settleConfirmModal then
+        Layout.SetVisible(UI.settleConfirmModal, false)
+    end
+end
+
+-- 打开千星奇域退出挑战 / 游玩结算二次确认弹窗（动态提示当前进度与成功/失败判定预测）
+local function OpenSettleConfirmModal()
+    BalanceConfig.PlayAudioSafe("UI_CLICK")
+    local completed4 = ChapterSelectView.HasCompletedFirst4Stages()
+    local clearedCount = ChapterSelectView.GetClearedCount and ChapterSelectView.GetClearedCount() or 0
+    if UI.confirmDesc and UI.confirmDesc.alive then
+        if completed4 then
+            UI.confirmDesc.text = string.format("已通关 %d/4 关 · 当前中断将判定为【大捷成功】", clearedCount)
+            UI.confirmDesc.fontColor = Layout.PALETTE.GOLD
+        else
+            UI.confirmDesc.text = string.format("已通关 %d/4 关 · 未达成前4关，中断将判定为【失败】", clearedCount)
+            UI.confirmDesc.fontColor = Layout.PALETTE.ENEMY
+        end
+    end
+    if UI.settleConfirmModal then
+        Layout.SetVisible(UI.settleConfirmModal, true)
+    end
+end
+
+-- 触发千星奇域原生系统个人结算 (按规则判定成功/失败)
+local function TriggerNativePersonalSettlement()
+    CloseSettleConfirmModal()
+    local completed4 = ChapterSelectView.HasCompletedFirst4Stages()
+    local isSuccess = completed4
+    local clearedCount = ChapterSelectView.GetClearedCount and ChapterSelectView.GetClearedCount() or (isSuccess and 4 or 0)
+    print(string.format("[Starlink] 触发原生系统个人结算: completedFirst4Stages=%s (已通关%d关) => 结算状态: %s",
+        tostring(completed4), clearedCount, isSuccess and "成功" or "失败"))
+
+    gameState.isGameOver = true
+    gameState.currentState = STATE_SETTLEMENT
+
+    BalanceConfig.StopAllAudios()
+    if isSuccess then
+        BalanceConfig.PlayAudioSafe("MATCH_WIN")
+        HudView.ShowToast("【推衍圆满·结算成功】已达成前4关推衍，正在结算并退出...")
+    else
+        BalanceConfig.PlayAudioSafe("MATCH_LOSE")
+        HudView.ShowToast("【推衍未成·结算失败】未达成前4关推衍，已中断挑战...")
+    end
+
+    -- 停止战场动态
+    VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
+    Runtime.HideAllParticles()
+    Input.isDragging = false
+    Input.dragSourceId = nil
+    Input.ClearSelectedCard()
+
+    -- 展现终局全屏游玩结算演出（参考原神/千星奇域关卡结算弹窗大捷/未成界面）
+    if UI.settleModal then
+        Layout.SetVisible(UI.modeSelectModal, false)
+        Layout.SetVisible(UI.chapterSelectModal, false)
+        Layout.SetVisible(UI.prepareModal, false)
+        Layout.SetVisible(UI.dialogueModal, false)
+        Layout.SetVisible(UI.countdownModal, false)
+        SetGameplayLayersVisible(false)
+        HudView.ShowSettlement(isSuccess, gameState.nodes, gameState.elapsedTime, UI.settleModal, UI.settleTitle, UI.settleDesc, UI.settleStats, UI.settleNextBtn)
+        if UI.settleNextBtn then
+            -- 如果是退出挑战结算，下一关按钮改为不可用或直接隐藏，保留重开模式与重新挑战
+            Layout.SetVisible(UI.settleNextBtn, false)
+        end
+    end
+
+    -- 上报千星奇域原生系统结算 (个人结算)
+    if game then
+        pcall(function()
+            if game.ServerSignal then
+                game.ServerSignal("SettlePersonalGame", {
+                    isSuccess = isSuccess,
+                    result = isSuccess and 1 or 0,
+                    clearedCount = clearedCount,
+                    currentStage = StarMap.currentStage
+                })
+                game.ServerSignal("QuitGame", {
+                    isSuccess = isSuccess,
+                    result = isSuccess and 1 or 0
+                })
+            end
+        end)
+        pcall(function()
+            if game.SettleGame then
+                game.SettleGame(isSuccess)
+            end
+        end)
+        pcall(function()
+            if game.QuitGame then
+                game.QuitGame()
+            end
+        end)
+    end
+end
+
+-- 重开模式：回退到模式选择界面，保留剧情模式关卡解锁与通关进度
+local function HandleRestartToModeSelect()
+    CloseSettleConfirmModal()
+    print("[Starlink] 重开模式：回退到模式选择界面（保留剧情模式关卡进度: 已解锁第 " .. tostring(ChapterSelectView.unlockedStage) .. " 关）")
+    BalanceConfig.PlayAudioSafe("UI_CLICK")
+    BalanceConfig.StopAllAudios()
+    VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
+    Runtime.HideAllParticles()
+    Input.isDragging = false
+    Input.dragSourceId = nil
+    Input.ClearSelectedCard()
+
+    -- 隐藏所有战斗与演播面板
+    Layout.SetVisible(UI.chapterSelectModal, false)
+    Layout.SetVisible(UI.settleModal, false)
+    Layout.SetVisible(UI.prepareModal, false)
+    Layout.SetVisible(UI.dialogueModal, false)
+    Layout.SetVisible(UI.countdownModal, false)
+    SetGameplayLayersVisible(false)
+
+    -- 打开模式选择主面板并显示常驻快捷栏
+    Layout.SetVisible(UI.modeSelectModal, true)
+    Layout.SetVisible(UI.quickNavLayer, true)
+    gameState.currentState = STATE_MODE_SELECT
+    HudView.ShowToast("已返回模式选择界面，关卡进度已保留。")
+end
+
 -- 注册全屏与各面板交互监听
 local function SetupEventHandlers()
+    -- 辅助：静音原生按钮 clickAudioId，避免引擎底层默认点击音效与脚本 PlayAudioSafe 重叠双响
+    local function SilenceButton(btn)
+        if btn and btn.alive then
+            pcall(function() btn.clickAudioId = 0 end)
+        end
+    end
+
     -- 1. 全屏光标事件 (连线与轻点)
     if UI.cursorArea and UI.cursorArea.AddCursorEventListener then
         UI.cursorArea:AddCursorEventListener(Enum.CursorEventType.CursorDown, function(data)
@@ -610,6 +779,7 @@ local function SetupEventHandlers()
 
     -- 3. 模式选择按钮监听
     if UI.modeStoryBtn and UI.modeStoryBtn.AddCursorEventListener then
+        SilenceButton(UI.modeStoryBtn)
         UI.modeStoryBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
             BalanceConfig.PlayAudioSafe("UI_CLICK")
             print("[Starlink] 玩家选择【剧情模式】，打开战役章节选择面板...")
@@ -622,6 +792,7 @@ local function SetupEventHandlers()
     end
 
     if UI.modeChallengeBtn and UI.modeChallengeBtn.AddCursorEventListener then
+        SilenceButton(UI.modeChallengeBtn)
         UI.modeChallengeBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
             BalanceConfig.PlayAudioSafe("UI_CLICK")
             print("[Starlink] 玩家点击【挑战模式】（筹备中提示）...")
@@ -629,9 +800,17 @@ local function SetupEventHandlers()
         end)
     end
 
+    if UI.modeQuitBtn and UI.modeQuitBtn.AddCursorEventListener then
+        SilenceButton(UI.modeQuitBtn)
+        UI.modeQuitBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
+            TriggerNativePersonalSettlement()
+        end)
+    end
+
     -- 4. 章节选择按钮监听
     for idx, cardUI in ipairs(UI.chapterCards) do
         if cardUI.button and cardUI.button.AddCursorEventListener then
+            SilenceButton(cardUI.button)
             cardUI.button:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
                 BalanceConfig.PlayAudioSafe("UI_CLICK")
                 local ok, err = ChapterSelectView.SelectStage(idx)
@@ -645,6 +824,7 @@ local function SetupEventHandlers()
     end
 
     if UI.chapStartBtn and UI.chapStartBtn.AddCursorEventListener then
+        SilenceButton(UI.chapStartBtn)
         UI.chapStartBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
             BalanceConfig.PlayAudioSafe("UI_CLICK")
             StartStage(ChapterSelectView.selectedStage)
@@ -652,6 +832,7 @@ local function SetupEventHandlers()
     end
 
     if UI.chapBackBtn and UI.chapBackBtn.AddCursorEventListener then
+        SilenceButton(UI.chapBackBtn)
         UI.chapBackBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
             BalanceConfig.PlayAudioSafe("UI_CLICK")
             Layout.SetVisible(UI.chapterSelectModal, false)
@@ -663,11 +844,13 @@ local function SetupEventHandlers()
 
     -- 5. 剧情按钮监听
     if UI.dlgNextBtn and UI.dlgNextBtn.AddCursorEventListener then
+        SilenceButton(UI.dlgNextBtn)
         UI.dlgNextBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
             DialoguePlayer.Next()
         end)
     end
     if UI.dlgSkipBtn and UI.dlgSkipBtn.AddCursorEventListener then
+        SilenceButton(UI.dlgSkipBtn)
         UI.dlgSkipBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
             DialoguePlayer.Skip()
         end)
@@ -676,6 +859,7 @@ local function SetupEventHandlers()
     -- 6. 战前调配卡牌点击选择
     for idx, cardUI in ipairs(UI.prepCards) do
         if cardUI.button and cardUI.button.AddCursorEventListener then
+            SilenceButton(cardUI.button)
             local cardKey = PrepareView.POOL_ORDER[idx]
             cardUI.button:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
                 local ok, action, cardId = PrepareView.ToggleCard(cardKey)
@@ -698,6 +882,7 @@ local function SetupEventHandlers()
     end
 
     if UI.prepStartBtn and UI.prepStartBtn.AddCursorEventListener then
+        SilenceButton(UI.prepStartBtn)
         UI.prepStartBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
             local ok, err = PrepareView.ConfirmAndStart()
             if not ok and err then
@@ -709,6 +894,7 @@ local function SetupEventHandlers()
     -- 7. 符印槽位点击选择
     for idx, slot in ipairs(UI.cardSlots) do
         if slot.container and slot.container.AddCursorEventListener then
+            SilenceButton(slot.container)
             slot.container:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
                 if gameState.currentState == STATE_PLAYING then
                     local card = AbilitySystem.deck[idx]
@@ -749,11 +935,51 @@ local function SetupEventHandlers()
         end
     end
 
-    -- 8. 结算弹窗按钮
+    -- 8. 常驻侧边导航栏按钮监听 (重开推衍 & 结算退出)
+    if UI.sideRestartBtn and UI.sideRestartBtn.AddCursorEventListener then
+        SilenceButton(UI.sideRestartBtn)
+        UI.sideRestartBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
+            HandleRestartToModeSelect()
+        end)
+    end
+
+    if UI.sideSettleBtn and UI.sideSettleBtn.AddCursorEventListener then
+        SilenceButton(UI.sideSettleBtn)
+        UI.sideSettleBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
+            OpenSettleConfirmModal()
+        end)
+    end
+
+    -- 9. 退出挑战 / 游玩结算二次确认弹窗按钮监听
+    if UI.confirmResumeBtn and UI.confirmResumeBtn.AddCursorEventListener then
+        SilenceButton(UI.confirmResumeBtn)
+        UI.confirmResumeBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
+            BalanceConfig.PlayAudioSafe("UI_CLICK")
+            CloseSettleConfirmModal()
+        end)
+    end
+
+    if UI.confirmRestartBtn and UI.confirmRestartBtn.AddCursorEventListener then
+        SilenceButton(UI.confirmRestartBtn)
+        UI.confirmRestartBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
+            HandleRestartToModeSelect()
+        end)
+    end
+
+    if UI.confirmQuitBtn and UI.confirmQuitBtn.AddCursorEventListener then
+        SilenceButton(UI.confirmQuitBtn)
+        UI.confirmQuitBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
+            TriggerNativePersonalSettlement()
+        end)
+    end
+
+    -- 10. 结算弹窗按钮
     -- 进军下一关
     if UI.settleNextBtn and UI.settleNextBtn.AddCursorEventListener then
+        SilenceButton(UI.settleNextBtn)
         UI.settleNextBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
             BalanceConfig.PlayAudioSafe("UI_CLICK")
+            BalanceConfig.StopAllAudios()
             VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
             Runtime.HideAllParticles()
             local nextStageId = StarMap.currentStage + 1
@@ -774,8 +1000,10 @@ local function SetupEventHandlers()
 
     -- 重新演练
     if UI.settleRetryBtn and UI.settleRetryBtn.AddCursorEventListener then
+        SilenceButton(UI.settleRetryBtn)
         UI.settleRetryBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
             BalanceConfig.PlayAudioSafe("UI_CLICK")
+            BalanceConfig.StopAllAudios()
             VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
             Runtime.HideAllParticles()
             print(string.format("[Starlink] 重新演练当前关卡: 第 %d 关...", StarMap.currentStage))
@@ -785,8 +1013,10 @@ local function SetupEventHandlers()
 
     -- 返回章节选择
     if UI.settleChapBtn and UI.settleChapBtn.AddCursorEventListener then
+        SilenceButton(UI.settleChapBtn)
         UI.settleChapBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
             BalanceConfig.PlayAudioSafe("UI_CLICK")
+            BalanceConfig.StopAllAudios()
             VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
             Runtime.HideAllParticles()
             Layout.SetVisible(UI.settleModal, false)
@@ -794,6 +1024,22 @@ local function SetupEventHandlers()
             SetGameplayLayersVisible(false)
             gameState.currentState = STATE_CHAPTER_SELECT
             ChapterSelectView.Render(UI.chapterCards, UI.chapDesc, UI.chapStartTxt)
+        end)
+    end
+
+    -- 重开模式 (回退到模式选择界面并保留关卡进度)
+    if UI.settleRestartBtn and UI.settleRestartBtn.AddCursorEventListener then
+        SilenceButton(UI.settleRestartBtn)
+        UI.settleRestartBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
+            HandleRestartToModeSelect()
+        end)
+    end
+
+    -- 退出推衍 (原生系统个人结算)
+    if UI.settleQuitBtn and UI.settleQuitBtn.AddCursorEventListener then
+        SilenceButton(UI.settleQuitBtn)
+        UI.settleQuitBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
+            OpenSettleConfirmModal()
         end)
     end
 end
@@ -836,6 +1082,8 @@ function OnStart()
     VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
     Runtime.HideAllParticles()
     Layout.SetVisible(UI.modeSelectModal, true)
+    Layout.SetVisible(UI.quickNavLayer, true)
+    Layout.SetVisible(UI.settleConfirmModal, false)
     Layout.SetVisible(UI.chapterSelectModal, false)
     Layout.SetVisible(UI.dialogueModal, false)
     Layout.SetVisible(UI.prepareModal, false)
@@ -877,7 +1125,7 @@ function OnUpdate(dt)
             Layout.SetVisible(UI.countdownModal, false)
             gameState.currentState = STATE_PLAYING
             gameState.elapsedTime = 0
-            BalanceConfig.PlayAudioSafe("MATCH_WIN")
+            BalanceConfig.PlayAudioSafe("ROUTE_LINK")
             local chap = StarMap.currentChapterDef
             HudView.ShowToast(string.format("【%s】推衍启阵！全速进军！", chap and chap.title or "开战"))
         end
@@ -911,6 +1159,7 @@ function OnUpdate(dt)
                     function(capturedNode)
                         local facName = Layout.GetFactionName(capturedNode.faction)
                         HudView.ShowToast(string.format("【%s】已被【%s】完全掌控！", capturedNode.name, facName))
+                        BalanceConfig.PlayAudioSafe("NODE_CAPTURE")
                         CheckMatchEnd()
                     end,
                     function(lostNode)
@@ -920,10 +1169,23 @@ function OnUpdate(dt)
             end
         end
 
-        -- 3. 物流发射与微粒流动
-        RouteManager.Update(dt, gameState.nodes, gameState.elapsedTime, function(hitNode)
-            CombatResolver.AddSpark(hitNode.x, hitNode.y)
-        end)
+        -- 3. 物流发射与微粒流动 (包含微粒到达即时拔河对消占领决算)
+        RouteManager.Update(
+            dt,
+            gameState.nodes,
+            gameState.elapsedTime,
+            function(hitNode)
+                CombatResolver.AddSpark(hitNode.x, hitNode.y)
+            end,
+            function(capturedNode)
+                local facName = Layout.GetFactionName(capturedNode.faction)
+                HudView.ShowToast(string.format("【%s】已被【%s】完全掌控！", capturedNode.name, facName))
+                CheckMatchEnd()
+            end,
+            function(lostNode)
+                HudView.ShowToast(string.format("【%s】统治动摇，已沦为中立争夺！", lostNode.name))
+            end
+        )
 
         -- 4. 战火与威胁判定
         CombatResolver.Update(dt, gameState.nodes, RouteManager.movingParticles)

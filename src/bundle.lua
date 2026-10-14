@@ -52,16 +52,21 @@ local BalanceConfig = {
     -- 战前构筑预算
     MAX_BUDGET = 12,
 
-    -- 提瓦特音频 GUID 槽位映射表 (创作者可在编辑器中填入实机音频 GUID)
+    -- 提瓦特官方音效资产 ID 映射表 (基于官方 1,997 音效库精选匹配)
     AUDIO_SLOTS = {
-        UI_CLICK = 0,       -- 节点选定与按钮点击
-        ROUTE_LINK = 0,     -- 光轨连接建立
-        ROUTE_CUT = 0,      -- 光轨切断与结界激活
-        COMBAT_HIT = 0,     -- 微粒交火火花
-        SKILL_BLAST = 0,    -- 轰轰烈焰与神罚轰爆
-        MATCH_WIN = 0,      -- 全域大捷
-        MATCH_LOSE = 0      -- 灵脉耗竭
-    }
+        UI_CLICK     = 50888,    -- 界面按钮点击 / 节点选中 (轻脆通用反馈音)
+        ROUTE_LINK   = 40018,    -- 光轨连接建立 (能量脉冲流道激活)
+        ROUTE_CUT    = 50912,    -- 光轨切断与结界切换 (能量断开清爽音)
+        COMBAT_HIT   = 0,        -- 停用 70 秒长篇风声背景音(原10002)，交火采用纯净粒子光效与震颤
+        SKILL_BLAST  = 40001,    -- 符印轰爆 / 灵穴共鸣爆发 (元素充能大招)
+        MATCH_WIN    = 50961,    -- 全域大捷通关 (秘境挑战成功高昂号角)
+        MATCH_LOSE   = 50962,    -- 灵脉耗竭败退 (挑战失利低沉音)
+        NODE_CAPTURE = 40001,    -- 灵穴完全掌控 (核心充能爆发)
+        NODE_DEFEND  = 20004,    -- 结界护盾吸收抵挡
+        NODE_UPGRADE = 30005     -- 灵穴充能提升 / 强化清越音
+    },
+
+    activeAudioInstances = {}
 }
 
 -- 安全播放音效包装器 (若未配置或ID无效，安全静音运行并以视觉动效兜底)
@@ -69,10 +74,39 @@ function BalanceConfig.PlayAudioSafe(audioSlotKey)
     local audioId = BalanceConfig.AUDIO_SLOTS[audioSlotKey]
     if audioId and audioId > 0 and game and game.PlayAudio2D then
         pcall(function()
-            game.PlayAudio2D(audioId)
+            local instId = game.PlayAudio2D(audioId)
+            if instId and instId > 0 then
+                table.insert(BalanceConfig.activeAudioInstances, instId)
+                if #BalanceConfig.activeAudioInstances > 50 then
+                    table.remove(BalanceConfig.activeAudioInstances, 1)
+                end
+            end
         end)
     end
 end
+
+-- 彻底停止所有正在播放的音效实例 (对局结束、切换关卡或退出战斗时调用)
+function BalanceConfig.StopAllAudios()
+    if game and game.StopAudio then
+        pcall(function()
+            for _, instId in ipairs(BalanceConfig.activeAudioInstances or {}) do
+                if game.IsAudioAlive then
+                    if game.IsAudioAlive(instId) then
+                        game.StopAudio(instId)
+                    end
+                else
+                    game.StopAudio(instId)
+                end
+            end
+            BalanceConfig.activeAudioInstances = {}
+        end)
+    end
+end
+
+-- 背景音乐已移交关卡编辑器【背景音乐管理】与服务端节点图配置，客户端不再发送网络信号
+function BalanceConfig.SetBGM(bgmId) end
+function BalanceConfig.SetMenuBGM() end
+function BalanceConfig.SetStageBGM(stageId) end
 
 return BalanceConfig
 
@@ -192,6 +226,7 @@ local ChapterConfig = {
             factions = { "player", "enemy_red" },
             budget = 4,
             duration = 180,
+            bgm = 10035,
             desc = "清泉镇下汇聚着温和的地脉微粒。在此熟悉光轨铺设与驻阵固守，击溃愚人众前哨。",
             dialogues = {
                 {
@@ -212,16 +247,16 @@ local ChapterConfig = {
                 }
             },
             nodes = {
-                { id = 0, name = "西风前哨", x = 260, y = 450, radius = 42, faction = "player", particles = 20, control = 100, anomaly = "NORMAL", desc = "我方西风骑士前哨" },
-                { id = 1, name = "清泉北陵", x = 520, y = 580, radius = 36, faction = "neutral", particles = 7, control = 0, anomaly = "NORMAL", desc = "北侧灵泉高地 (侧翼拓展点)" },
-                { id = 2, name = "泉水祭坛", x = 800, y = 620, radius = 38, faction = "neutral", particles = 10, control = 0, anomaly = "NORMAL", desc = "清泉古祭坛" },
-                { id = 3, name = "晨曦峡口", x = 1080, y = 580, radius = 36, faction = "neutral", particles = 7, control = 0, anomaly = "NORMAL", desc = "近酒庄险隘" },
-                { id = 4, name = "清泉主脉", x = 620, y = 450, radius = 38, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "清泉核心灵脉 (战略枢纽)" },
-                { id = 5, name = "奔狼前驿", x = 980, y = 450, radius = 38, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "中路要冲 (战略枢纽)" },
-                { id = 6, name = "清泉南溪", x = 520, y = 320, radius = 36, faction = "neutral", particles = 7, control = 0, anomaly = "NORMAL", desc = "南侧支流草甸 (侧翼拓展点)" },
-                { id = 7, name = "杜拉夫猎场", x = 800, y = 280, radius = 38, faction = "neutral", particles = 10, control = 0, anomaly = "NORMAL", desc = "猎人歇脚营地" },
-                { id = 8, name = "达达乌帕口", x = 1080, y = 320, radius = 36, faction = "neutral", particles = 7, control = 0, anomaly = "NORMAL", desc = "近部落前沿" },
-                { id = 9, name = "愚人驻地", x = 1340, y = 450, radius = 42, faction = "enemy_red", particles = 20, control = 100, anomaly = "NORMAL", desc = "愚人众前线营地" }
+                { id = 0, name = "西风前哨", x = 240, y = 490, radius = 26, faction = "player", particles = 20, control = 100, anomaly = "NORMAL", desc = "我方西风骑士前哨" },
+                { id = 1, name = "清泉北陵", x = 480, y = 650, radius = 26, faction = "neutral", particles = 7, control = 0, anomaly = "NORMAL", desc = "北侧灵泉高地 (侧翼拓展点)" },
+                { id = 2, name = "泉水祭坛", x = 760, y = 590, radius = 26, faction = "neutral", particles = 10, control = 0, anomaly = "NORMAL", desc = "清泉古祭坛" },
+                { id = 3, name = "晨曦峡口", x = 1120, y = 620, radius = 26, faction = "neutral", particles = 7, control = 0, anomaly = "NORMAL", desc = "近酒庄险隘" },
+                { id = 4, name = "清泉主脉", x = 580, y = 430, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "清泉核心灵脉 (战略枢纽)" },
+                { id = 5, name = "奔狼前驿", x = 950, y = 390, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "中路要冲 (战略枢纽)" },
+                { id = 6, name = "清泉南溪", x = 490, y = 250, radius = 26, faction = "neutral", particles = 7, control = 0, anomaly = "NORMAL", desc = "南侧支流草甸 (侧翼拓展点)" },
+                { id = 7, name = "杜拉夫猎场", x = 790, y = 210, radius = 26, faction = "neutral", particles = 10, control = 0, anomaly = "NORMAL", desc = "猎人歇脚营地" },
+                { id = 8, name = "达达乌帕口", x = 1110, y = 270, radius = 26, faction = "neutral", particles = 7, control = 0, anomaly = "NORMAL", desc = "近部落前沿" },
+                { id = 9, name = "愚人驻地", x = 1360, y = 430, radius = 26, faction = "enemy_red", particles = 20, control = 100, anomaly = "NORMAL", desc = "愚人众前线营地" }
             },
             links = {
                 { 0, 1 }, { 0, 4 }, { 0, 6 },
@@ -245,6 +280,7 @@ local ChapterConfig = {
             factions = { "player", "enemy_red" },
             budget = 6,
             duration = 240,
+            bgm = 10068,
             desc = "千风神殿周边狂风肆虐。抢占千风隘口激活双倍流速，避开迷雾荒墟的产速衰减。",
             dialogues = {
                 {
@@ -261,18 +297,18 @@ local ChapterConfig = {
                 }
             },
             nodes = {
-                { id = 0, name = "风起营地", x = 220, y = 450, radius = 40, faction = "player", particles = 24, control = 100, anomaly = "NORMAL", desc = "蒙德西风阵地" },
-                { id = 1, name = "低语树林", x = 440, y = 600, radius = 34, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "北路树影屏障" },
-                { id = 2, name = "星落湖畔", x = 440, y = 300, radius = 34, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "南路清澈湖滨" },
-                { id = 3, name = "千风隘口", x = 700, y = 650, radius = 36, faction = "neutral", particles = 15, control = 0, anomaly = "WIND_FLOW", desc = "千风汇聚（输送翻倍）" },
-                { id = 4, name = "石珀晶矿", x = 700, y = 250, radius = 36, faction = "neutral", particles = 14, control = 0, anomaly = "AMBER_MINE", desc = "石珀富矿（产能翻倍）" },
-                { id = 5, name = "望风山地", x = 960, y = 650, radius = 34, faction = "neutral", particles = 14, control = 0, anomaly = "NORMAL", desc = "俯瞰北境高崖" },
-                { id = 6, name = "摘星崖底", x = 960, y = 250, radius = 34, faction = "neutral", particles = 14, control = 0, anomaly = "NORMAL", desc = "悬崖南麓险隘" },
-                { id = 7, name = "千风神殿", x = 700, y = 450, radius = 38, faction = "neutral", particles = 16, control = 0, anomaly = "NORMAL", desc = "远古神殿遗址" },
-                { id = 8, name = "迷雾荒墟", x = 960, y = 450, radius = 34, faction = "neutral", particles = 10, control = 0, anomaly = "MIST_RUINS", desc = "迷雾衰减（产能减半）" },
-                { id = 9, name = "急冻悬崖", x = 1180, y = 600, radius = 34, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "北侧霜寒关卡" },
-                { id = 10, name = "誓言岬哨", x = 1180, y = 300, radius = 34, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "南侧海风前哨" },
-                { id = 11, name = "千风绝壁", x = 1380, y = 450, radius = 40, faction = "enemy_red", particles = 26, control = 100, anomaly = "NORMAL", desc = "愚人众千风要塞" }
+                { id = 0, name = "风起营地", x = 200, y = 420, radius = 26, faction = "player", particles = 24, control = 100, anomaly = "NORMAL", desc = "蒙德西风阵地" },
+                { id = 1, name = "低语树林", x = 430, y = 640, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "北路树影屏障" },
+                { id = 2, name = "星落湖畔", x = 420, y = 230, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "南路清澈湖滨" },
+                { id = 3, name = "千风隘口", x = 730, y = 690, radius = 26, faction = "neutral", particles = 15, control = 0, anomaly = "WIND_FLOW", desc = "千风汇聚（输送翻倍）" },
+                { id = 4, name = "石珀晶矿", x = 710, y = 200, radius = 26, faction = "neutral", particles = 14, control = 0, anomaly = "AMBER_MINE", desc = "石珀富矿（产能翻倍）" },
+                { id = 5, name = "望风山地", x = 990, y = 660, radius = 26, faction = "neutral", particles = 14, control = 0, anomaly = "NORMAL", desc = "俯瞰北境高崖" },
+                { id = 6, name = "摘星崖底", x = 980, y = 180, radius = 26, faction = "neutral", particles = 14, control = 0, anomaly = "NORMAL", desc = "悬崖南麓险隘" },
+                { id = 7, name = "千风神殿", x = 680, y = 470, radius = 26, faction = "neutral", particles = 16, control = 0, anomaly = "NORMAL", desc = "远古神殿遗址" },
+                { id = 8, name = "迷雾荒墟", x = 950, y = 380, radius = 26, faction = "neutral", particles = 10, control = 0, anomaly = "MIST_RUINS", desc = "迷雾衰减（产能减半）" },
+                { id = 9, name = "急冻悬崖", x = 1210, y = 580, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "北侧霜寒关卡" },
+                { id = 10, name = "誓言岬哨", x = 1200, y = 260, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "南侧海风前哨" },
+                { id = 11, name = "千风绝壁", x = 1400, y = 460, radius = 26, faction = "enemy_red", particles = 26, control = 100, anomaly = "NORMAL", desc = "愚人众千风要塞" }
             },
             links = {
                 { 0, 1 }, { 0, 7 }, { 0, 2 },
@@ -298,6 +334,7 @@ local ChapterConfig = {
             factions = { "player", "enemy_red", "enemy_purple" },
             budget = 8,
             duration = 300,
+            bgm = 10099,
             desc = "璃月层岩巨渊深处，不仅有愚人众驻军，更有盘踞多时的渊影盗宝团。三方势力互相争夺！",
             dialogues = {
                 {
@@ -318,20 +355,20 @@ local ChapterConfig = {
                 }
             },
             nodes = {
-                { id = 0, name = "西风先锋", x = 240, y = 240, radius = 38, faction = "player", particles = 24, control = 100, anomaly = "NORMAL", desc = "我方西南先锋大营" },
-                { id = 1, name = "黑岩关隘", x = 640, y = 600, radius = 32, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "北路悬石关卡" },
-                { id = 2, name = "天工峡口", x = 960, y = 600, radius = 32, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "北路绝壁隘口" },
-                { id = 3, name = "伏鳌谷地", x = 440, y = 380, radius = 32, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "西南峡谷要道" },
-                { id = 4, name = "琉璃晶矿", x = 440, y = 180, radius = 32, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "琉璃晶砂浅坑" },
-                { id = 5, name = "石珀富矿", x = 800, y = 490, radius = 36, faction = "neutral", particles = 15, control = 0, anomaly = "AMBER_MINE", desc = "石珀富矿（产能翻倍）" },
-                { id = 6, name = "雷暴要塞", x = 800, y = 330, radius = 36, faction = "neutral", particles = 18, control = 0, anomaly = "DEFENSE_BASTION", desc = "雷暴灵障（战损减半）" },
-                { id = 7, name = "层岩中继", x = 620, y = 380, radius = 32, faction = "neutral", particles = 14, control = 0, anomaly = "WIND_FLOW", desc = "西翼疾风流道" },
-                { id = 8, name = "悬木吊桥", x = 980, y = 380, radius = 32, faction = "neutral", particles = 14, control = 0, anomaly = "NORMAL", desc = "东翼古矿吊桥" },
-                { id = 9, name = "无名遗迹", x = 800, y = 170, radius = 32, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "渊底远古废墟" },
-                { id = 10, name = "巨渊之口", x = 1160, y = 380, radius = 32, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "东南盗宝前沿" },
-                { id = 11, name = "丹砂矿脉", x = 1160, y = 180, radius = 32, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "东南丹砂坑洞" },
-                { id = 12, name = "愚人巨垒", x = 800, y = 730, radius = 38, faction = "enemy_red", particles = 26, control = 100, anomaly = "NORMAL", desc = "愚人众北山巨垒" },
-                { id = 13, name = "盗宝匪巢", x = 1360, y = 240, radius = 38, faction = "enemy_purple", particles = 26, control = 100, anomaly = "NORMAL", desc = "渊影盗宝总寨" }
+                { id = 0, name = "西风先锋", x = 220, y = 250, radius = 26, faction = "player", particles = 24, control = 100, anomaly = "NORMAL", desc = "我方西南先锋大营" },
+                { id = 1, name = "黑岩关隘", x = 580, y = 630, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "北路悬石关卡" },
+                { id = 2, name = "天工峡口", x = 990, y = 650, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "北路绝壁隘口" },
+                { id = 3, name = "伏鳌谷地", x = 390, y = 410, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "西南峡谷要道" },
+                { id = 4, name = "琉璃晶矿", x = 440, y = 170, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "琉璃晶砂浅坑" },
+                { id = 5, name = "石珀富矿", x = 790, y = 530, radius = 26, faction = "neutral", particles = 15, control = 0, anomaly = "AMBER_MINE", desc = "石珀富矿（产能翻倍）" },
+                { id = 6, name = "雷暴要塞", x = 840, y = 320, radius = 26, faction = "neutral", particles = 18, control = 0, anomaly = "DEFENSE_BASTION", desc = "雷暴灵障（战损减半）" },
+                { id = 7, name = "层岩中继", x = 610, y = 370, radius = 26, faction = "neutral", particles = 14, control = 0, anomaly = "WIND_FLOW", desc = "西翼疾风流道" },
+                { id = 8, name = "悬木吊桥", x = 1020, y = 420, radius = 26, faction = "neutral", particles = 14, control = 0, anomaly = "NORMAL", desc = "东翼古矿吊桥" },
+                { id = 9, name = "无名遗迹", x = 740, y = 150, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "渊底远古废墟" },
+                { id = 10, name = "巨渊之口", x = 1210, y = 440, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "东南盗宝前沿" },
+                { id = 11, name = "丹砂矿脉", x = 1170, y = 190, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "东南丹砂坑洞" },
+                { id = 12, name = "愚人巨垒", x = 770, y = 740, radius = 26, faction = "enemy_red", particles = 26, control = 100, anomaly = "NORMAL", desc = "愚人众北山巨垒" },
+                { id = 13, name = "盗宝匪巢", x = 1380, y = 280, radius = 26, faction = "enemy_purple", particles = 26, control = 100, anomaly = "NORMAL", desc = "渊影盗宝总寨" }
             },
             links = {
                 { 0, 3 }, { 0, 4 }, { 3, 4 },
@@ -356,6 +393,7 @@ local ChapterConfig = {
             factions = { "player", "enemy_red", "enemy_purple", "enemy_green" },
             budget = 10,
             duration = 360,
+            bgm = 10113,
             desc = "枫丹水下暗流涌动。红方愚人众、紫方盗宝团与苍翠遗迹机关全境交战，争夺中央双生纯水枢纽！",
             dialogues = {
                 {
@@ -376,22 +414,22 @@ local ChapterConfig = {
                 }
             },
             nodes = {
-                { id = 0, name = "西风水港", x = 200, y = 450, radius = 36, faction = "player", particles = 28, control = 100, anomaly = "NORMAL", desc = "我方西港母基" },
-                { id = 1, name = "枫丹前哨", x = 400, y = 570, radius = 30, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "西北水下前沿" },
-                { id = 2, name = "海露平原", x = 400, y = 330, radius = 30, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "西南海草平原" },
-                { id = 3, name = "伊黎耶港", x = 620, y = 630, radius = 30, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "北侧水闸港湾" },
-                { id = 4, name = "白露隘口", x = 980, y = 630, radius = 30, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "东北水下窄谷" },
-                { id = 5, name = "枫丹激流", x = 1200, y = 570, radius = 30, faction = "neutral", particles = 14, control = 0, anomaly = "WIND_FLOW", desc = "激流通道（输送翻倍）" },
-                { id = 6, name = "苍晶矿脉", x = 1200, y = 330, radius = 30, faction = "neutral", particles = 14, control = 0, anomaly = "AMBER_MINE", desc = "苍晶富矿（产能翻倍）" },
-                { id = 7, name = "纯水阳核", x = 700, y = 450, radius = 34, faction = "neutral", particles = 16, control = 0, anomaly = "PURE_WATER", desc = "中央纯水西枢纽" },
-                { id = 8, name = "纯水阴核", x = 900, y = 450, radius = 34, faction = "neutral", particles = 16, control = 0, anomaly = "PURE_WATER", desc = "中央纯水东枢纽" },
-                { id = 9, name = "沉玉古墟", x = 550, y = 450, radius = 30, faction = "neutral", particles = 10, control = 0, anomaly = "MIST_RUINS", desc = "迷雾残垣（产能减半）" },
-                { id = 10, name = "水色要塞", x = 1050, y = 450, radius = 32, faction = "neutral", particles = 16, control = 0, anomaly = "DEFENSE_BASTION", desc = "深水灵障（战损减半）" },
-                { id = 11, name = "秋泉隐所", x = 620, y = 270, radius = 30, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "南侧暗流溶洞" },
-                { id = 12, name = "柔灯要道", x = 980, y = 270, radius = 30, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "东南深水通道" },
-                { id = 13, name = "愚人潜艇", x = 800, y = 740, radius = 36, faction = "enemy_red", particles = 24, control = 100, anomaly = "NORMAL", desc = "愚人众北境母舰" },
-                { id = 14, name = "盗宝暗礁", x = 800, y = 160, radius = 36, faction = "enemy_purple", particles = 24, control = 100, anomaly = "NORMAL", desc = "盗宝团南礁老巢" },
-                { id = 15, name = "机关工坊", x = 1400, y = 450, radius = 36, faction = "enemy_green", particles = 24, control = 100, anomaly = "NORMAL", desc = "遗迹机关核心中枢" }
+                { id = 0, name = "西风水港", x = 180, y = 410, radius = 26, faction = "player", particles = 28, control = 100, anomaly = "NORMAL", desc = "我方西港母基" },
+                { id = 1, name = "枫丹前哨", x = 380, y = 590, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "西北水下前沿" },
+                { id = 2, name = "海露平原", x = 370, y = 250, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "西南海草平原" },
+                { id = 3, name = "伊黎耶港", x = 620, y = 670, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "北侧水闸港湾" },
+                { id = 4, name = "白露隘口", x = 1030, y = 660, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "东北水下窄谷" },
+                { id = 5, name = "枫丹激流", x = 1240, y = 620, radius = 26, faction = "neutral", particles = 14, control = 0, anomaly = "WIND_FLOW", desc = "激流通道（输送翻倍）" },
+                { id = 6, name = "苍晶矿脉", x = 1250, y = 280, radius = 26, faction = "neutral", particles = 14, control = 0, anomaly = "AMBER_MINE", desc = "苍晶富矿（产能翻倍）" },
+                { id = 7, name = "纯水阳核", x = 720, y = 480, radius = 26, faction = "neutral", particles = 16, control = 0, anomaly = "PURE_WATER", desc = "中央纯水西枢纽" },
+                { id = 8, name = "纯水阴核", x = 930, y = 390, radius = 26, faction = "neutral", particles = 16, control = 0, anomaly = "PURE_WATER", desc = "中央纯水东枢纽" },
+                { id = 9, name = "沉玉古墟", x = 540, y = 420, radius = 26, faction = "neutral", particles = 10, control = 0, anomaly = "MIST_RUINS", desc = "迷雾残垣（产能减半）" },
+                { id = 10, name = "水色要塞", x = 1090, y = 470, radius = 26, faction = "neutral", particles = 16, control = 0, anomaly = "DEFENSE_BASTION", desc = "深水灵障（战损减半）" },
+                { id = 11, name = "秋泉隐所", x = 590, y = 220, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "南侧暗流溶洞" },
+                { id = 12, name = "柔灯要道", x = 1010, y = 210, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "东南深水通道" },
+                { id = 13, name = "愚人潜艇", x = 830, y = 750, radius = 26, faction = "enemy_red", particles = 24, control = 100, anomaly = "NORMAL", desc = "愚人众北境母舰" },
+                { id = 14, name = "盗宝暗礁", x = 790, y = 140, radius = 26, faction = "enemy_purple", particles = 24, control = 100, anomaly = "NORMAL", desc = "盗宝团南礁老巢" },
+                { id = 15, name = "机关工坊", x = 1420, y = 460, radius = 26, faction = "enemy_green", particles = 24, control = 100, anomaly = "NORMAL", desc = "遗迹机关核心中枢" }
             },
             links = {
                 { 0, 1 }, { 0, 2 }, { 1, 2 },
@@ -417,6 +455,7 @@ local ChapterConfig = {
             factions = { "player", "enemy_red", "enemy_purple", "enemy_green" },
             budget = 12,
             duration = 360,
+            bgm = 10184,
             desc = "龙脊雪山之巅，远古推衍机全功率觉醒！18 座灵穴交织成网，双核赤阳熔核限制25微粒极速绞杀。",
             dialogues = {
                 {
@@ -437,24 +476,24 @@ local ChapterConfig = {
                 }
             },
             nodes = {
-                { id = 0, name = "西风终焉", x = 190, y = 220, radius = 35, faction = "player", particles = 28, control = 100, anomaly = "NORMAL", desc = "我方西南极境大营" },
-                { id = 1, name = "忍冬废墟", x = 370, y = 680, radius = 28, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "西北废墟要冲" },
-                { id = 2, name = "覆雪咽喉", x = 370, y = 450, radius = 30, faction = "neutral", particles = 16, control = 0, anomaly = "DEFENSE_BASTION", desc = "西翼要塞（战损减半）" },
-                { id = 3, name = "眠龙前哨", x = 370, y = 220, radius = 28, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "西南峡谷前哨" },
-                { id = 4, name = "寒天隘口", x = 650, y = 680, radius = 28, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "北境高寒关隘" },
-                { id = 5, name = "苍白防线", x = 950, y = 680, radius = 28, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "东北绝壁关防" },
-                { id = 6, name = "寒天激流", x = 650, y = 520, radius = 30, faction = "neutral", particles = 14, control = 0, anomaly = "WIND_FLOW", desc = "疾风通道（输送翻倍）" },
-                { id = 7, name = "雪山要塞", x = 950, y = 520, radius = 30, faction = "neutral", particles = 16, control = 0, anomaly = "DEFENSE_BASTION", desc = "东北壁垒（战损减半）" },
-                { id = 8, name = "熔核之北", x = 720, y = 410, radius = 32, faction = "neutral", particles = 15, control = 0, anomaly = "PLASMA", desc = "赤阳熔核（上限25粒，绞肉）" },
-                { id = 9, name = "熔核之南", x = 880, y = 410, radius = 32, faction = "neutral", particles = 15, control = 0, anomaly = "PLASMA", desc = "赤阳熔核（上限25粒，绞肉）" },
-                { id = 10, name = "覆雪迷雾", x = 650, y = 300, radius = 28, faction = "neutral", particles = 10, control = 0, anomaly = "MIST_RUINS", desc = "迷雾残迹（产能减半）" },
-                { id = 11, name = "星银富矿", x = 950, y = 300, radius = 30, faction = "neutral", particles = 15, control = 0, anomaly = "AMBER_MINE", desc = "星银富矿（产能翻倍）" },
-                { id = 12, name = "积雪小径", x = 1230, y = 220, radius = 28, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "东南雪径要道" },
-                { id = 13, name = "冰封哨卡", x = 1230, y = 450, radius = 30, faction = "neutral", particles = 16, control = 0, anomaly = "NORMAL", desc = "东翼防线枢纽" },
-                { id = 14, name = "冰封棱堡", x = 1230, y = 680, radius = 28, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "东北棱堡哨站" },
-                { id = 15, name = "愚人霜核", x = 190, y = 680, radius = 35, faction = "enemy_red", particles = 26, control = 100, anomaly = "NORMAL", desc = "愚人众西北霜核" },
-                { id = 16, name = "盗宝残党", x = 1410, y = 220, radius = 35, faction = "enemy_purple", particles = 26, control = 100, anomaly = "NORMAL", desc = "盗宝团东南匪寨" },
-                { id = 17, name = "遗迹主控", x = 1410, y = 680, radius = 35, faction = "enemy_green", particles = 26, control = 100, anomaly = "NORMAL", desc = "遗迹防卫主控主机" }
+                { id = 0, name = "西风终焉", x = 180, y = 210, radius = 26, faction = "player", particles = 28, control = 100, anomaly = "NORMAL", desc = "我方西南极境大营" },
+                { id = 1, name = "忍冬废墟", x = 350, y = 680, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "西北废墟要冲" },
+                { id = 2, name = "覆雪咽喉", x = 390, y = 470, radius = 26, faction = "neutral", particles = 16, control = 0, anomaly = "DEFENSE_BASTION", desc = "西翼要塞（战损减半）" },
+                { id = 3, name = "眠龙前哨", x = 360, y = 250, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "西南峡谷前哨" },
+                { id = 4, name = "寒天隘口", x = 680, y = 720, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "北境高寒关隘" },
+                { id = 5, name = "苍白防线", x = 970, y = 720, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "东北绝壁关防" },
+                { id = 6, name = "寒天激流", x = 610, y = 530, radius = 26, faction = "neutral", particles = 14, control = 0, anomaly = "WIND_FLOW", desc = "疾风通道（输送翻倍）" },
+                { id = 7, name = "雪山要塞", x = 980, y = 570, radius = 26, faction = "neutral", particles = 16, control = 0, anomaly = "DEFENSE_BASTION", desc = "东北壁垒（战损减半）" },
+                { id = 8, name = "熔核之北", x = 730, y = 440, radius = 26, faction = "neutral", particles = 15, control = 0, anomaly = "PLASMA", desc = "赤阳熔核（上限25粒，绞肉）" },
+                { id = 9, name = "熔核之南", x = 900, y = 380, radius = 26, faction = "neutral", particles = 15, control = 0, anomaly = "PLASMA", desc = "赤阳熔核（上限25粒，绞肉）" },
+                { id = 10, name = "覆雪迷雾", x = 620, y = 250, radius = 26, faction = "neutral", particles = 10, control = 0, anomaly = "MIST_RUINS", desc = "迷雾残迹（产能减半）" },
+                { id = 11, name = "星银富矿", x = 970, y = 230, radius = 26, faction = "neutral", particles = 15, control = 0, anomaly = "AMBER_MINE", desc = "星银富矿（产能翻倍）" },
+                { id = 12, name = "积雪小径", x = 1220, y = 240, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "东南雪径要道" },
+                { id = 13, name = "冰封哨卡", x = 1240, y = 470, radius = 26, faction = "neutral", particles = 16, control = 0, anomaly = "NORMAL", desc = "东翼防线枢纽" },
+                { id = 14, name = "冰封棱堡", x = 1210, y = 690, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "东北棱堡哨站" },
+                { id = 15, name = "愚人霜核", x = 180, y = 700, radius = 26, faction = "enemy_red", particles = 26, control = 100, anomaly = "NORMAL", desc = "愚人众西北霜核" },
+                { id = 16, name = "盗宝残党", x = 1420, y = 210, radius = 26, faction = "enemy_purple", particles = 26, control = 100, anomaly = "NORMAL", desc = "盗宝团东南匪寨" },
+                { id = 17, name = "遗迹主控", x = 1420, y = 700, radius = 26, faction = "enemy_green", particles = 26, control = 100, anomaly = "NORMAL", desc = "遗迹防卫主控主机" }
             },
             links = {
                 { 15, 1 }, { 1, 2 }, { 1, 4 },
@@ -887,7 +926,7 @@ function NodeEntity.Create(def)
         radius = def.radius,
         faction = def.faction,
         particles = def.particles or 0,
-        control = def.control or 0,
+        control = def.control or (def.faction == "neutral" and 0 or 100),
         anomaly = def.anomaly or "NORMAL",
 
         -- 状态标签
@@ -966,7 +1005,7 @@ function NodeEntity.TickSpawn(node, dt, allNodes, elapsedTime)
     end
 
     -- 共鸣度衰减曲线（底线提高至 0.6，防止受创灵穴产兵完全停摆）
-    local effRatio = math.max(0.6, node.control / 100)
+    local effRatio = math.max(0.6, (node.control or 100) / 100)
     local actualInterval = baseInterval / effRatio
 
     node.spawnTimer = node.spawnTimer + dt
@@ -979,51 +1018,125 @@ function NodeEntity.TickSpawn(node, dt, allNodes, elapsedTime)
     end
 end
 
--- 占领共鸣度步进结算 (0.8s 周期)
-function NodeEntity.TickCapture(node, elapsedTime, onCaptureCallback, onRevertNeutralCallback)
-    if (node.protectedUntil or 0) > (elapsedTime or 0) then
-        return -- 受千风庇护免疫侵蚀
+-- 微粒到达时对灵穴归属与占领度的拔河对消结算 (Tug-of-War / Influence Pool)
+function NodeEntity.ApplyArrival(node, particleFaction, onCombatHitCallback, onCaptureCallback, onRevertNeutralCallback, elapsedTime)
+    if node.faction == particleFaction then
+        -- 1. 友军微粒汇入
+        local cap = (node.anomaly == "PLASMA") and BalanceConfig.PLASMA_CAP or BalanceConfig.MAX_NODE_CAP
+        if node.particles < cap then
+            node.particles = node.particles + 1
+        end
+        -- 若据点此前受创但未失守，友军微粒同时修复防守共鸣度
+        if (node.control or 100) < 100 then
+            node.control = math.min(100, (node.control or 100) + 5)
+        end
+        if node.particles > 0 then
+            node.contenderFaction = nil
+        end
+        return
     end
 
-    if node.contenderFaction and node.contenderParticles > 0 then
-        local excess = node.contenderParticles
-        local baseGrowth = math.min(BalanceConfig.MAX_RESONANCE_GROWTH, math.max(1, math.floor(excess / 5 + 0.5)))
+    -- 2. 敌对微粒进攻结算
+    -- 核心防御保障：检查目标灵穴是否处于【千风庇护/守护】神圣保护期间
+    if (node.protectedUntil or 0) > (elapsedTime or 0) then
+        -- 千风结界绝对阻挡与湮灭一切敌方微粒！
+        -- 守备兵力不扣减、控制度不扣减、绝不沦陷为中立态！
+        BalanceConfig.PlayAudioSafe("NODE_DEFEND")
+        if type(onCombatHitCallback) == "function" then
+            onCombatHitCallback(node)
+        end
+        return
+    end
 
-        if node.faction == "neutral" then
-            -- 中立节点占领进度平衡：每轮 +14~20 共鸣度，需 5~6 轮 (约 4 秒) 完成掌控
-            node.control = math.min(100, node.control + 14 + baseGrowth * 3)
-            if node.control >= 100 then
-                node.faction = node.contenderFaction
-                -- 占领后初始守军：侵蚀微粒按 25% 比例转化，保底 2 粒，上限 5 粒 (防止瞬间获得满编大军继续碾压)
-                node.particles = math.min(5, math.max(2, math.floor(node.contenderParticles * 0.25) + 2))
-                node.contenderParticles = 0
-                node.contenderFaction = nil
-                node.isDefensive = true
-                if onCaptureCallback then
-                    onCaptureCallback(node)
-                end
-            end
-        elseif node.faction ~= node.contenderFaction then
-            -- 削减原主控方控制度：每轮削减 10 + baseGrowth * 3
-            node.control = math.max(0, node.control - (10 + baseGrowth * 3))
-            if node.control <= BalanceConfig.NEUTRAL_THRESHOLD then
-                -- 沦为中立争夺态，控制度清零以便攻占方迅速掌控
-                node.faction = "neutral"
-                node.control = 0
-                node.routeTo = nil
-                node.isDefensive = false
-                if onRevertNeutralCallback then
-                    onRevertNeutralCallback(node)
-                end
+    if node.particles > 0 then
+        -- 仍有驻军守备：交火决算
+        local defenseDamp = (node.isDefensive and 0.7 or 1.0)
+        if math.random() <= defenseDamp then
+            node.particles = node.particles - 1
+            -- COMBAT_HIT 保持静音，依靠视觉闪烁
+        else
+            BalanceConfig.PlayAudioSafe("NODE_DEFEND")
+        end
+        if onCombatHitCallback then
+            onCombatHitCallback(node)
+        end
+        return
+    end
+
+    -- 3. 守军已清零，进入侵蚀与占领结算 (防守空虚)
+    if node.faction ~= "neutral" then
+        -- 3.1 敌对微粒侵蚀现有掌控者 (动摇沦陷阶段)
+        -- 每颗微粒削减 10% 控制度
+        node.control = math.max(0, (node.control or 100) - 10)
+        node.contenderFaction = particleFaction
+        if node.control <= (BalanceConfig.NEUTRAL_THRESHOLD or 20) then
+            -- 彻底沦为中立争夺态！
+            node.faction = "neutral"
+            node.control = 0
+            node.routeTo = nil
+            node.isDefensive = false
+            node.contenderFaction = particleFaction -- 攻破者确立为中立争夺先锋
+            if onRevertNeutralCallback then
+                onRevertNeutralCallback(node)
             end
         end
+        if onCombatHitCallback then
+            onCombatHitCallback(node)
+        end
+        return
+    end
 
-        node.contenderParticles = math.max(0, node.contenderParticles - 1)
+    -- 3.2 中立争夺态：多阵营拔河对消模型 (Tug-of-War)
+    -- node.control 统一表示当前主导方 (node.contenderFaction) 的占领进度 (0 ~ 100)
+    if node.contenderFaction == nil or (node.control or 0) <= 0 then
+        -- 当前无主导方：该阵营微粒直接确立为主导方
+        node.contenderFaction = particleFaction
+        node.control = 10
+    elseif node.contenderFaction == particleFaction then
+        -- 同阵营微粒：推进占领进度
+        node.control = math.min(100, (node.control or 0) + 10)
+        if node.control >= 100 then
+            -- 占领成功！成为正式据点
+            node.faction = particleFaction
+            node.control = 100
+            node.particles = 2 -- 初始赠予 2 粒守军
+            node.contenderFaction = nil
+            node.isDefensive = true
+            if onCaptureCallback then
+                onCaptureCallback(node)
+            end
+            if particleFaction == "player" then
+                BalanceConfig.PlayAudioSafe("NODE_CAPTURE")
+            end
+        end
     else
-        -- 核心机制修复：已占领灵穴在无敌军侵蚀且防守稳固时，共鸣度自然逐步回满至 100%
-        if node.faction ~= "neutral" and node.control < 100 then
-            node.control = math.min(100, node.control + 10)
+        -- 异阵营微粒：拔河对消！反向削减当前主导方的占领度
+        node.control = (node.control or 0) - 10
+        if node.control < 0 then
+            -- 彻底击穿原主导方！新阵营确立并继承穿透进度
+            node.contenderFaction = particleFaction
+            node.control = math.abs(node.control)
+        elseif node.control == 0 then
+            -- 正好完全抵消归零，阵地重归中立争夺态
+            node.contenderFaction = nil
+            node.control = 0
         end
+    end
+
+    if onCombatHitCallback then
+        onCombatHitCallback(node)
+    end
+end
+
+-- 占领共鸣度周期自然维稳 (0.8s 周期)
+function NodeEntity.TickCapture(node, elapsedTime, onCaptureCallback, onRevertNeutralCallback)
+    local isProtected = (node.protectedUntil or 0) > (elapsedTime or 0)
+
+    -- 若已有主据点守军充裕且无敌情侵蚀，受损控制度逐步平稳回满
+    -- 若处于【千风庇护】守护期，即使兵力空虚也受神圣结界庇护并享受双倍共鸣恢复 (每次恢复 20%)
+    if node.faction ~= "neutral" and (node.control or 0) < 100 and ((node.particles or 0) > 0 or isProtected) then
+        local healRate = isProtected and 20 or 10
+        node.control = math.min(100, (node.control or 0) + healRate)
     end
 end
 
@@ -1038,6 +1151,7 @@ _MODULES["src/world/routeManager"] = function()
 
 local BalanceConfig = require("default_import_file/src/data/balanceConfig") or require("src/data/balanceConfig")
 local StarMap = require("default_import_file/src/world/starMap") or require("src/world/starMap")
+local NodeEntity = require("default_import_file/src/world/nodeEntity") or require("src/world/nodeEntity")
 
 local RouteManager = {
     routes = {},           -- 活跃光轨列表: { fromId, toId, faction, sendTimer, boostedUntil }
@@ -1080,7 +1194,9 @@ function RouteManager.SetRoute(fromId, toId, faction, nodes)
         boostedUntil = 0
     })
 
-    BalanceConfig.PlayAudioSafe("ROUTE_LINK")
+    if faction == "player" then
+        BalanceConfig.PlayAudioSafe("ROUTE_LINK")
+    end
     return true
 end
 
@@ -1108,7 +1224,7 @@ function RouteManager.GetRouteFrom(fromId)
 end
 
 -- 每帧更新：物流发射与微粒航行
-function RouteManager.Update(dt, nodes, elapsedTime, onCombatHitCallback)
+function RouteManager.Update(dt, nodes, elapsedTime, onCombatHitCallback, onCaptureCallback, onRevertNeutralCallback)
     -- 1. 物流发射
     for _, route in ipairs(RouteManager.routes) do
         local fromNode = nodes[route.fromId + 1]
@@ -1158,36 +1274,28 @@ function RouteManager.Update(dt, nodes, elapsedTime, onCombatHitCallback)
             -- 到达目标节点
             local targetNode = nodes[p.toId + 1]
             if targetNode then
-                RouteManager.OnParticleArrive(p, targetNode, onCombatHitCallback)
+                RouteManager.OnParticleArrive(p, targetNode, onCombatHitCallback, onCaptureCallback, onRevertNeutralCallback, elapsedTime)
             end
             table.remove(RouteManager.movingParticles, i)
         end
     end
 end
 
--- 微粒到达目标节点结算
-function RouteManager.OnParticleArrive(particle, node, onCombatHitCallback)
-    if node.faction == particle.faction then
-        -- 友军增援汇入
-        local cap = (node.anomaly == "PLASMA") and BalanceConfig.PLASMA_CAP or BalanceConfig.MAX_NODE_CAP
-        if node.particles < cap then
-            node.particles = node.particles + 1
-        end
+-- 微粒到达目标节点结算 (委托至 NodeEntity.ApplyArrival 拔河对消决算)
+function RouteManager.OnParticleArrive(particle, node, onCombatHitCallback, onCaptureCallback, onRevertNeutralCallback, elapsedTime)
+    if NodeEntity and NodeEntity.ApplyArrival then
+        NodeEntity.ApplyArrival(node, particle.faction, onCombatHitCallback, onCaptureCallback, onRevertNeutralCallback, elapsedTime)
     else
-        -- 敌对交火与侵蚀 (固守减伤 30%，命中率 70%，兼顾防御阵地坚韧度与攻坚可行性)
-        if node.particles > 0 then
-            local defenseDamp = (node.isDefensive and 0.7 or 1.0)
-            if math.random() <= defenseDamp then
-                node.particles = node.particles - 1
-            end
-            BalanceConfig.PlayAudioSafe("COMBAT_HIT")
-            if onCombatHitCallback then
-                onCombatHitCallback(node)
-            end
-        else
-            -- 节点防守空虚，微粒转化为侵蚀共鸣点
-            node.contenderFaction = particle.faction
-            node.contenderParticles = (node.contenderParticles or 0) + 1
+        -- 兜底逻辑
+        if node.faction == particle.faction then
+            node.particles = node.particles + 1
+        elseif (node.protectedUntil or 0) > (elapsedTime or 0) then
+            -- 受千风庇护免疫
+            BalanceConfig.PlayAudioSafe("NODE_DEFEND")
+            if onCombatHitCallback then onCombatHitCallback(node) end
+        elseif node.particles > 0 then
+            node.particles = node.particles - 1
+            if onCombatHitCallback then onCombatHitCallback(node) end
         end
     end
 end
@@ -1461,25 +1569,45 @@ _MODULES["world/abilitySystem"] = _MODULES["src/world/abilitySystem"]
 
 _MODULES["src/world/factionAI"] = function()
 -- src/world/factionAI.lua
--- 坎瑞亚遗迹推衍机（多阵营全员大乱斗 AI 智能调度与争端决策）
+-- 坎瑞亚遗迹推衍机（多阵营全员大乱斗 AI 智能调度与梯次争端决策）
 
 local StarMap = require("default_import_file/src/world/starMap") or require("src/world/starMap")
 
 local FactionAI = {
     aiTimer = 0,
-    AI_INTERVAL = 1.5 -- 1.5 秒决策一轮，反应敏捷
+    AI_INTERVAL = 1.2 -- 1.2 秒决策一轮，反应敏捷高效
 }
 
--- 辅助判定灵穴是否处于接敌前线 (拥有非己方邻居)
-local function HasHostileNeighbor(node, allNodes, fac)
-    local neighbors = StarMap.GetNeighbors(node.id)
-    for _, nId in ipairs(neighbors) do
-        local n = allNodes[nId + 1]
-        if n and n.faction ~= fac then
-            return true
+-- 辅助：广度优先遍历计算每个节点到最近非己方节点的最短跳数 (战线梯度)
+local function ComputeFrontierDistances(allNodes, fac)
+    local distMap = {}
+    local queue = {}
+
+    -- 1. 所有非己方节点作为距离源点 (距离为 0)
+    for _, node in ipairs(allNodes) do
+        if node.faction ~= fac then
+            distMap[node.id] = 0
+            table.insert(queue, node.id)
         end
     end
-    return false
+
+    -- 2. BFS 向内陆扩散标记跳数
+    local head = 1
+    while head <= #queue do
+        local currId = queue[head]
+        head = head + 1
+        local currDist = distMap[currId]
+
+        local neighbors = StarMap.GetNeighbors(currId)
+        for _, nId in ipairs(neighbors) do
+            if distMap[nId] == nil then
+                distMap[nId] = currDist + 1
+                table.insert(queue, nId)
+            end
+        end
+    end
+
+    return distMap
 end
 
 function FactionAI.Update(dt, nodes, routeManager)
@@ -1489,90 +1617,151 @@ function FactionAI.Update(dt, nodes, routeManager)
     end
     FactionAI.aiTimer = 0
 
-    -- 遍历所有非玩家、非中立的敌对势力节点 (enemy_red / enemy_purple / enemy_green / enemy)
-    for _, eNode in ipairs(nodes) do
-        local fac = eNode.faction
-        if fac ~= "player" and fac ~= "neutral" then
+    -- 1. 收集当前场上所有活跃的 AI 势力阵营
+    local activeFactions = {}
+    for _, node in ipairs(nodes) do
+        local fac = node.faction
+        if fac ~= "player" and fac ~= "neutral" and not activeFactions[fac] then
+            activeFactions[fac] = true
+        end
+    end
 
-            -- 1. 活跃光轨动态监测与适时切断 (核心防死循环机制)
-            if eNode.routeTo ~= nil then
-                local targetNode = nodes[eNode.routeTo + 1]
-                local shouldCut = false
+    -- 2. 针对每个 AI 阵营独立推衍战局
+    for fac, _ in pairs(activeFactions) do
+        local distMap = ComputeFrontierDistances(nodes, fac)
 
-                if targetNode then
-                    if targetNode.faction == fac then
-                        -- 目标为友军据点：
-                        -- a) 目标守军充裕 (已达 14 粒) -> 增援任务圆满达成，立即切断，防止持续抽干源节点
-                        -- b) 源节点自身兵力降至 8 粒 -> 保留自身驻防底线，停止无底洞抽血
-                        -- c) 目标节点正向源节点反向输送 -> 严重对冲，立即切断
-                        if targetNode.particles >= 14 or eNode.particles <= 8 or targetNode.routeTo == eNode.id then
-                            shouldCut = true
+        for _, eNode in ipairs(nodes) do
+            if eNode.faction == fac then
+                local nodeDist = distMap[eNode.id] or 99
+
+                -- ========================================================
+                -- 阶段 1：活跃光轨动态监测与适时切断 (防止死循环抽干)
+                -- ========================================================
+                if eNode.routeTo ~= nil then
+                    local targetNode = nodes[eNode.routeTo + 1]
+                    local shouldCut = false
+
+                    if targetNode then
+                        if targetNode.faction == fac then
+                            -- 目标为友军据点：
+                            -- a) 目标守军已极大饱和 (>= 22 粒) -> 增援圆满达成
+                            -- b) 源节点兵力降至防守底线 (<= 4 粒) -> 停止抽血
+                            -- c) 目标节点正向源节点反向输送 -> 严重对冲死锁
+                            if targetNode.particles >= 22 or eNode.particles <= 4 or targetNode.routeTo == eNode.id then
+                                shouldCut = true
+                            end
+                        else
+                            -- 目标为敌方/中立据点：
+                            -- a) 自身兵力消耗至危急水平 (< 3 粒) -> 进攻受挫，撤退固守
+                            if eNode.particles < 3 then
+                                shouldCut = true
+                            end
                         end
                     else
-                        -- 目标为敌方/中立据点：
-                        -- a) 自身兵力消耗至危急水平 (< 5 粒) -> 进攻受挫，撤退固守
-                        if eNode.particles < 5 then
-                            shouldCut = true
-                        end
+                        shouldCut = true
                     end
+
+                    if shouldCut then
+                        routeManager.RemoveRouteFrom(eNode.id, nodes)
+                        eNode.isDefensive = true
+                    end
+
+                -- ========================================================
+                -- 阶段 2：空闲节点决策与目标选择 (当 routeTo 为 nil 时执行)
+                -- ========================================================
                 else
-                    shouldCut = true
-                end
+                    local neighbors = StarMap.GetNeighbors(eNode.id)
 
-                if shouldCut then
-                    routeManager.RemoveRouteFrom(eNode.id, nodes)
-                    eNode.isDefensive = true
-                end
+                    if nodeDist > 1 then
+                        -- ----------------------------------------------------
+                        -- 分支 A：后方腹地节点 (战线跳数 > 1，远离前线)
+                        -- 核心策略：梯次推进输送带 (Conveyor Belt)
+                        -- 只要兵力充足 (>= 12 粒)，向更靠近前线的友军邻居调兵！
+                        -- ----------------------------------------------------
+                        if eNode.particles >= 12 then
+                            local bestForwardAlly = nil
+                            local minAllyParts = 999
 
-            -- 2. 空闲节点决策与目标选择 (仅当 routeTo 为 nil 时执行)
-            elseif eNode.particles >= 10 then
-                local neighbors = StarMap.GetNeighbors(eNode.id)
+                            for _, nId in ipairs(neighbors) do
+                                local n = nodes[nId + 1]
+                                local nDist = distMap[nId] or 99
+                                -- 必须是同阵营友军，且距离前线更近 (nDist < nodeDist)
+                                if n and n.faction == fac and nDist < nodeDist then
+                                    if n.routeTo ~= eNode.id and n.particles < 22 then
+                                        if n.particles < minAllyParts then
+                                            minAllyParts = n.particles
+                                            bestForwardAlly = n
+                                        end
+                                    end
+                                end
+                            end
 
-                -- 2.1 战术互援判定 (严格前线受困条件，杜绝后方无意义对流)
-                local needAlly = nil
-                -- 只有当自身兵力充裕 (>= 16 粒) 且自身未面临直接受袭威胁时，才考虑增援邻近友军
-                if eNode.particles >= 16 and not eNode.hasEnemyThreat then
-                    for _, nId in ipairs(neighbors) do
-                        local n = nodes[nId + 1]
-                        if n and n.faction == fac and n.id ~= eNode.id then
-                            -- 关键约束：
-                            -- a) 友军不能已经在向我输送 (杜绝互援死锁)
-                            -- b) 友军处于前线或面临敌情
-                            -- c) 友军兵力确实不足 (< 8 粒)
-                            if n.routeTo ~= eNode.id and n.particles < 8 and (n.hasEnemyThreat or HasHostileNeighbor(n, nodes, fac)) then
-                                needAlly = n
-                                break
+                            if bestForwardAlly then
+                                routeManager.SetRoute(eNode.id, bestForwardAlly.id, fac, nodes)
                             end
                         end
-                    end
-                end
 
-                if needAlly then
-                    routeManager.SetRoute(eNode.id, needAlly.id, fac, nodes)
-                else
-                    -- 2.2 战线拓展与针对性进攻
-                    local targets = {}
-                    for _, nId in ipairs(neighbors) do
-                        local n = nodes[nId + 1]
-                        if n and n.faction ~= fac then
-                            table.insert(targets, n)
-                        end
-                    end
-
-                    if #targets > 0 then
-                        -- 优先级：优先夺取中立薄弱灵穴，其次进攻弱势敌对/玩家据点
-                        table.sort(targets, function(a, b)
-                            if a.faction == "neutral" and b.faction ~= "neutral" then
-                                return true
-                            elseif a.faction ~= "neutral" and b.faction == "neutral" then
-                                return false
-                            else
-                                return a.particles < b.particles
+                    else
+                        -- ----------------------------------------------------
+                        -- 分支 B：前线接触据点 (nodeDist == 1，直接毗邻敌方/中立)
+                        -- 核心策略：动态斩首突击与战线拓展
+                        -- ----------------------------------------------------
+                        local hostileTargets = {}
+                        for _, nId in ipairs(neighbors) do
+                            local n = nodes[nId + 1]
+                            if n and n.faction ~= fac then
+                                table.insert(hostileTargets, n)
                             end
-                        end)
+                        end
 
-                        local chosen = targets[1]
-                        routeManager.SetRoute(eNode.id, chosen.id, fac, nodes)
+                        local chosenTarget = nil
+                        if #hostileTargets > 0 and eNode.particles >= 4 then
+                            -- 优先夺取中立据点
+                            local neutralTargets = {}
+                            local enemyTargets = {}
+                            for _, t in ipairs(hostileTargets) do
+                                if t.faction == "neutral" then
+                                    table.insert(neutralTargets, t)
+                                else
+                                    table.insert(enemyTargets, t)
+                                end
+                            end
+
+                            if #neutralTargets > 0 then
+                                -- 抢占中立：优先兵力较少的
+                                table.sort(neutralTargets, function(a, b) return a.particles < b.particles end)
+                                chosenTarget = neutralTargets[1]
+                            elseif #enemyTargets > 0 then
+                                table.sort(enemyTargets, function(a, b) return a.particles < b.particles end)
+                                local weakestEnemy = enemyTargets[1]
+
+                                -- 动态门槛斩首判定：
+                                -- 1) 敌方据点极为空虚 (<= 3 粒，甚至 0 粒无防守)：只要我方 >= 4 粒且多于敌方，果断斩首！
+                                -- 2) 敌方据点防守充裕 (> 3 粒)：我方集结达到 8 粒以上且占优，发起总攻！
+                                if weakestEnemy.particles <= 3 then
+                                    if eNode.particles >= 4 and eNode.particles > weakestEnemy.particles then
+                                        chosenTarget = weakestEnemy
+                                    end
+                                else
+                                    if eNode.particles >= 8 and eNode.particles >= weakestEnemy.particles then
+                                        chosenTarget = weakestEnemy
+                                    end
+                                end
+                            end
+                        end
+
+                        if chosenTarget then
+                            routeManager.SetRoute(eNode.id, chosenTarget.id, fac, nodes)
+                        elseif eNode.particles >= 14 then
+                            -- 前线防守充沛但无合适进攻机会时，协助相邻受困的前线友军
+                            for _, nId in ipairs(neighbors) do
+                                local n = nodes[nId + 1]
+                                if n and n.faction == fac and n.particles < 8 and n.routeTo ~= eNode.id then
+                                    routeManager.SetRoute(eNode.id, n.id, fac, nodes)
+                                    break
+                                end
+                            end
+                        end
                     end
                 end
             end
@@ -1699,7 +1888,7 @@ function VisualRenderer.UpdateNodes(nodeUIList, nodes, elapsedTime)
                 end
             end
 
-            -- 3. 兵力数值显示 (双重保障：标题附加括号数值 + 兵力行独立高对比呈现)
+            -- 3. 兵力与灵穴名称显示 (由 TitleText 居中统筹呈现：灵穴名称 (兵力)，如 西风前哨 (20))
             local currentParts = math.floor(node.particles or 0)
             if ui.titleText and ui.titleText.alive then
                 ui.titleText.text = string.format("%s (%d)", node.name, currentParts)
@@ -1707,10 +1896,9 @@ function VisualRenderer.UpdateNodes(nodeUIList, nodes, elapsedTime)
                 Layout.SetVisible(ui.titleText, true)
             end
 
+            -- particleText 隐藏，避免在 52px 紧凑圆盘中与 TitleText 产生双层重叠
             if ui.particleText and ui.particleText.alive then
-                ui.particleText.text = string.format("兵力: %d", currentParts)
-                ui.particleText.fontColor = factionColor
-                Layout.SetVisible(ui.particleText, true)
+                Layout.SetVisible(ui.particleText, false)
             end
 
             -- 4. 异象标识文本
@@ -1746,16 +1934,20 @@ function VisualRenderer.UpdateNodes(nodeUIList, nodes, elapsedTime)
 
             -- 5. 占领进度与状态标签 (占领中/动摇中/输送中/固守中/休眠中)
             if ui.statusText and ui.statusText.alive then
-                if node.faction == "neutral" and (node.control > 0 or (node.contenderParticles and node.contenderParticles > 0)) then
-                    local fName = Layout.GetFactionName(node.contenderFaction)
-                    local col = Layout.GetFactionColor(node.contenderFaction)
-                    ui.statusText.text = string.format("[%s占领中 %d%%]", fName, math.floor(node.control))
-                    ui.statusText.fontColor = col
-                    Layout.SetVisible(ui.statusText, true)
-                elseif node.faction ~= "neutral" and node.control < 100 then
+                if node.faction == "neutral" then
+                    if (node.control or 0) > 0 and node.contenderFaction then
+                        local fName = Layout.GetFactionName(node.contenderFaction)
+                        local col = Layout.GetFactionColor(node.contenderFaction)
+                        ui.statusText.text = string.format("[%s掌控 %d%%]", fName, math.floor(node.control))
+                        ui.statusText.fontColor = col
+                        Layout.SetVisible(ui.statusText, true)
+                    else
+                        Layout.SetVisible(ui.statusText, false)
+                    end
+                elseif node.faction ~= "neutral" and (node.control or 100) < 100 then
                     local fName = Layout.GetFactionName(node.faction)
                     local col = Layout.GetFactionColor(node.faction)
-                    ui.statusText.text = string.format("[%s动摇 %d%%]", fName, math.floor(node.control))
+                    ui.statusText.text = string.format("[%s动摇 %d%%]", fName, math.floor(node.control or 100))
                     ui.statusText.fontColor = col
                     Layout.SetVisible(ui.statusText, true)
                 elseif node.isIdle then
@@ -2560,6 +2752,13 @@ local BalanceConfig = require("default_import_file/src/data/balanceConfig") or r
 local ChapterSelectView = {
     unlockedStage = 1,
     selectedStage = 1,
+    clearedStages = {
+        [1] = false,
+        [2] = false,
+        [3] = false,
+        [4] = false,
+        [5] = false
+    },
     onStartStage = nil,
     onBack = nil
 }
@@ -2570,9 +2769,35 @@ function ChapterSelectView.Init(onStartStageCb, onBackCb)
 end
 
 function ChapterSelectView.UnlockNextStage(completedStage)
-    if completedStage and completedStage >= ChapterSelectView.unlockedStage then
-        ChapterSelectView.unlockedStage = math.min(5, completedStage + 1)
+    if completedStage then
+        ChapterSelectView.clearedStages[completedStage] = true
+        if completedStage >= ChapterSelectView.unlockedStage then
+            ChapterSelectView.unlockedStage = math.min(5, completedStage + 1)
+        end
     end
+end
+
+-- 判定是否已完成剧情模式前4关
+function ChapterSelectView.HasCompletedFirst4Stages()
+    if (ChapterSelectView.unlockedStage or 1) >= 5 then
+        return true
+    end
+    local cleared = ChapterSelectView.clearedStages
+    if cleared and cleared[1] and cleared[2] and cleared[3] and cleared[4] then
+        return true
+    end
+    return false
+end
+
+-- 获取已通关章节总数
+function ChapterSelectView.GetClearedCount()
+    local cnt = 0
+    for i = 1, 5 do
+        if ChapterSelectView.clearedStages and ChapterSelectView.clearedStages[i] then
+            cnt = cnt + 1
+        end
+    end
+    return cnt
 end
 
 function ChapterSelectView.SelectStage(stageId)
@@ -2765,6 +2990,12 @@ local UI = {
     dlgSkipBtn     = nil,
     dlgNextBtn     = nil,
 
+    -- 模式选择弹窗
+    modeSelectModal    = nil,
+    modeStoryBtn       = nil,
+    modeChallengeBtn   = nil,
+    modeQuitBtn        = nil,
+
     -- 战前构筑弹窗
     prepareModal   = nil,
     prepBudgetText = nil,
@@ -2774,13 +3005,15 @@ local UI = {
     prepCards      = {},
 
     -- 结算弹窗
-    settleModal    = nil,
-    settleTitle    = nil,
-    settleDesc     = nil,
-    settleStats    = nil,
-    settleNextBtn  = nil,
-    settleRetryBtn = nil,
-    settleChapBtn  = nil
+    settleModal      = nil,
+    settleTitle      = nil,
+    settleDesc       = nil,
+    settleStats      = nil,
+    settleNextBtn    = nil,
+    settleRetryBtn   = nil,
+    settleChapBtn    = nil,
+    settleRestartBtn = nil,
+    settleQuitBtn    = nil
 }
 
 -- 初始化沙盘所有灵穴实体
@@ -2845,6 +3078,7 @@ local function CheckMatchEnd(isTimeout)
         VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
         Runtime.HideAllParticles()
         ChapterSelectView.UnlockNextStage(StarMap.currentStage)
+        BalanceConfig.StopAllAudios()
         BalanceConfig.PlayAudioSafe("MATCH_WIN")
         HudView.ShowSettlement(true, gameState.nodes, gameState.elapsedTime, UI.settleModal, UI.settleTitle, UI.settleDesc, UI.settleStats, UI.settleNextBtn)
     elseif pNodes == 0 and inFlightPlayer == 0 then
@@ -2853,6 +3087,7 @@ local function CheckMatchEnd(isTimeout)
         gameState.currentState = STATE_SETTLEMENT
         VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
         Runtime.HideAllParticles()
+        BalanceConfig.StopAllAudios()
         BalanceConfig.PlayAudioSafe("MATCH_LOSE")
         HudView.ShowSettlement(false, gameState.nodes, gameState.elapsedTime, UI.settleModal, UI.settleTitle, UI.settleDesc, UI.settleStats, UI.settleNextBtn)
     elseif isTimeout then
@@ -2870,6 +3105,7 @@ local function CheckMatchEnd(isTimeout)
                 break
             end
         end
+        BalanceConfig.StopAllAudios()
         if isWin then
             ChapterSelectView.UnlockNextStage(StarMap.currentStage)
             BalanceConfig.PlayAudioSafe("MATCH_WIN")
@@ -2925,6 +3161,7 @@ local function CacheUIControls()
     if UI.modeSelectModal then
         UI.modeStoryBtn     = FindDeepChild(UI.modeSelectModal, "ModeStoryBtn")
         UI.modeChallengeBtn = FindDeepChild(UI.modeSelectModal, "ModeChallengeBtn")
+        UI.modeQuitBtn      = FindDeepChild(UI.modeSelectModal, "ModeQuitBtn")
     end
 
     -- 关卡章节选择弹窗
@@ -2955,7 +3192,7 @@ local function CacheUIControls()
         end
     end
 
-    -- 光轨条带池与静态连线池
+    -- 光轨条带池与静态连线池 (25 条动态光轨 + 40 条静态底轨)
     UI.routeCtrls = {}
     UI.staticLinkCtrls = {}
     UI.linksLayer = FindDeepChild(root, "LinksLayer")
@@ -2964,7 +3201,7 @@ local function CacheUIControls()
             local line = FindDeepChild(UI.linksLayer, "RouteLine_" .. i)
             if line then table.insert(UI.routeCtrls, line) end
         end
-        for i = 0, 44 do
+        for i = 0, 39 do
             local sLine = FindDeepChild(UI.linksLayer, "StaticLink_" .. i)
             if sLine then table.insert(UI.staticLinkCtrls, sLine) end
         end
@@ -2981,11 +3218,11 @@ local function CacheUIControls()
     end
     Runtime.InitParticlePool(UI.particleCtrls)
 
-    -- 18 座地脉灵穴 UI 组
+    -- 22 座地脉灵穴 UI 组 (支持全5关剧情模式最大18座并预留富余预算)
     UI.nodeUIList = {}
     UI.nodesLayer = FindDeepChild(root, "NodesLayer")
     if UI.nodesLayer then
-        for i = 0, 17 do
+        for i = 0, 21 do
             local grp = FindDeepChild(UI.nodesLayer, "NodeGroup_" .. i)
             if grp then
                 table.insert(UI.nodeUIList, {
@@ -3084,15 +3321,34 @@ local function CacheUIControls()
         end
     end
 
+    -- 常驻侧边导航栏 (除剧情演播外常驻于左上角)
+    UI.quickNavLayer = FindDeepChild(root, "QuickNavLayer")
+    if UI.quickNavLayer then
+        UI.sideRestartBtn = FindDeepChild(UI.quickNavLayer, "SideRestartBtn")
+        UI.sideSettleBtn  = FindDeepChild(UI.quickNavLayer, "SideSettleBtn")
+    end
+
+    -- 官方风格退出挑战 / 游玩结算二次确认弹窗
+    UI.settleConfirmModal = FindDeepChild(root, "SettleConfirmModal")
+    if UI.settleConfirmModal then
+        UI.confirmResumeBtn  = FindDeepChild(UI.settleConfirmModal, "ConfirmResumeBtn")
+        UI.confirmRestartBtn = FindDeepChild(UI.settleConfirmModal, "ConfirmRestartBtn")
+        UI.confirmQuitBtn    = FindDeepChild(UI.settleConfirmModal, "ConfirmQuitBtn")
+        UI.confirmDesc       = FindDeepChild(UI.settleConfirmModal, "ConfirmDesc")
+        UI.confirmTitle      = FindDeepChild(UI.settleConfirmModal, "ConfirmTitle")
+    end
+
     -- 结算弹窗
     UI.settleModal = FindDeepChild(root, "SettleModal")
     if UI.settleModal then
-        UI.settleTitle    = FindDeepChild(UI.settleModal, "SettleTitle")
-        UI.settleDesc     = FindDeepChild(UI.settleModal, "SettleDesc")
-        UI.settleStats    = FindDeepChild(UI.settleModal, "SettleStats")
-        UI.settleNextBtn  = FindDeepChild(UI.settleModal, "SettleNextBtn")
-        UI.settleRetryBtn = FindDeepChild(UI.settleModal, "SettleRetryBtn")
-        UI.settleChapBtn  = FindDeepChild(UI.settleModal, "SettleChapterBtn")
+        UI.settleTitle      = FindDeepChild(UI.settleModal, "SettleTitle")
+        UI.settleDesc       = FindDeepChild(UI.settleModal, "SettleDesc")
+        UI.settleStats      = FindDeepChild(UI.settleModal, "SettleStats")
+        UI.settleNextBtn    = FindDeepChild(UI.settleModal, "SettleNextBtn")
+        UI.settleRetryBtn   = FindDeepChild(UI.settleModal, "SettleRetryBtn")
+        UI.settleChapBtn    = FindDeepChild(UI.settleModal, "SettleChapterBtn")
+        UI.settleRestartBtn = FindDeepChild(UI.settleModal, "SettleRestartBtn")
+        UI.settleQuitBtn    = FindDeepChild(UI.settleModal, "SettleQuitBtn")
     end
 end
 
@@ -3165,12 +3421,17 @@ local function StartStage(stageId)
     Layout.SetVisible(UI.settleModal, false)
     Layout.SetVisible(UI.prepareModal, false)
     Layout.SetVisible(UI.countdownModal, false)
+    CloseSettleConfirmModal()
+
+    -- 剧情演播阶段隐藏侧边常驻导航按钮，剧情结束后重新显示
+    Layout.SetVisible(UI.quickNavLayer, false)
 
     -- 1. 剧情演播
     DialoguePlayer.Init(chap.dialogues, function()
         print("[Starlink] 章节剧情完毕，进入战前符印调配...")
         Layout.SetVisible(UI.dialogueModal, false)
         Layout.SetVisible(UI.prepareModal, true)
+        Layout.SetVisible(UI.quickNavLayer, true)
         gameState.currentState = STATE_PREPARE
 
         -- 2. 调配面板初始化 (动态预算)
@@ -3178,6 +3439,7 @@ local function StartStage(stageId)
             print("[Starlink] 战前符印装配完成，进入战前 3 秒倒计时...")
             AbilitySystem.InitDeck(selectedDeck)
             Layout.SetVisible(UI.prepareModal, false)
+            Layout.SetVisible(UI.quickNavLayer, true)
             SetGameplayLayersVisible(true)
 
             -- 刷新左上角特殊灵穴说明与右上角战术操作指引
@@ -3197,8 +3459,140 @@ local function StartStage(stageId)
     Layout.SetVisible(UI.dialogueModal, true)
 end
 
+-- 关闭千星奇域退出挑战 / 游玩结算二次确认弹窗
+local function CloseSettleConfirmModal()
+    if UI.settleConfirmModal then
+        Layout.SetVisible(UI.settleConfirmModal, false)
+    end
+end
+
+-- 打开千星奇域退出挑战 / 游玩结算二次确认弹窗（动态提示当前进度与成功/失败判定预测）
+local function OpenSettleConfirmModal()
+    BalanceConfig.PlayAudioSafe("UI_CLICK")
+    local completed4 = ChapterSelectView.HasCompletedFirst4Stages()
+    local clearedCount = ChapterSelectView.GetClearedCount and ChapterSelectView.GetClearedCount() or 0
+    if UI.confirmDesc and UI.confirmDesc.alive then
+        if completed4 then
+            UI.confirmDesc.text = string.format("已通关 %d/4 关 · 当前中断将判定为【大捷成功】", clearedCount)
+            UI.confirmDesc.fontColor = Layout.PALETTE.GOLD
+        else
+            UI.confirmDesc.text = string.format("已通关 %d/4 关 · 未达成前4关，中断将判定为【失败】", clearedCount)
+            UI.confirmDesc.fontColor = Layout.PALETTE.ENEMY
+        end
+    end
+    if UI.settleConfirmModal then
+        Layout.SetVisible(UI.settleConfirmModal, true)
+    end
+end
+
+-- 触发千星奇域原生系统个人结算 (按规则判定成功/失败)
+local function TriggerNativePersonalSettlement()
+    CloseSettleConfirmModal()
+    local completed4 = ChapterSelectView.HasCompletedFirst4Stages()
+    local isSuccess = completed4
+    local clearedCount = ChapterSelectView.GetClearedCount and ChapterSelectView.GetClearedCount() or (isSuccess and 4 or 0)
+    print(string.format("[Starlink] 触发原生系统个人结算: completedFirst4Stages=%s (已通关%d关) => 结算状态: %s",
+        tostring(completed4), clearedCount, isSuccess and "成功" or "失败"))
+
+    gameState.isGameOver = true
+    gameState.currentState = STATE_SETTLEMENT
+
+    BalanceConfig.StopAllAudios()
+    if isSuccess then
+        BalanceConfig.PlayAudioSafe("MATCH_WIN")
+        HudView.ShowToast("【推衍圆满·结算成功】已达成前4关推衍，正在结算并退出...")
+    else
+        BalanceConfig.PlayAudioSafe("MATCH_LOSE")
+        HudView.ShowToast("【推衍未成·结算失败】未达成前4关推衍，已中断挑战...")
+    end
+
+    -- 停止战场动态
+    VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
+    Runtime.HideAllParticles()
+    Input.isDragging = false
+    Input.dragSourceId = nil
+    Input.ClearSelectedCard()
+
+    -- 展现终局全屏游玩结算演出（参考原神/千星奇域关卡结算弹窗大捷/未成界面）
+    if UI.settleModal then
+        Layout.SetVisible(UI.modeSelectModal, false)
+        Layout.SetVisible(UI.chapterSelectModal, false)
+        Layout.SetVisible(UI.prepareModal, false)
+        Layout.SetVisible(UI.dialogueModal, false)
+        Layout.SetVisible(UI.countdownModal, false)
+        SetGameplayLayersVisible(false)
+        HudView.ShowSettlement(isSuccess, gameState.nodes, gameState.elapsedTime, UI.settleModal, UI.settleTitle, UI.settleDesc, UI.settleStats, UI.settleNextBtn)
+        if UI.settleNextBtn then
+            -- 如果是退出挑战结算，下一关按钮改为不可用或直接隐藏，保留重开模式与重新挑战
+            Layout.SetVisible(UI.settleNextBtn, false)
+        end
+    end
+
+    -- 上报千星奇域原生系统结算 (个人结算)
+    if game then
+        pcall(function()
+            if game.ServerSignal then
+                game.ServerSignal("SettlePersonalGame", {
+                    isSuccess = isSuccess,
+                    result = isSuccess and 1 or 0,
+                    clearedCount = clearedCount,
+                    currentStage = StarMap.currentStage
+                })
+                game.ServerSignal("QuitGame", {
+                    isSuccess = isSuccess,
+                    result = isSuccess and 1 or 0
+                })
+            end
+        end)
+        pcall(function()
+            if game.SettleGame then
+                game.SettleGame(isSuccess)
+            end
+        end)
+        pcall(function()
+            if game.QuitGame then
+                game.QuitGame()
+            end
+        end)
+    end
+end
+
+-- 重开模式：回退到模式选择界面，保留剧情模式关卡解锁与通关进度
+local function HandleRestartToModeSelect()
+    CloseSettleConfirmModal()
+    print("[Starlink] 重开模式：回退到模式选择界面（保留剧情模式关卡进度: 已解锁第 " .. tostring(ChapterSelectView.unlockedStage) .. " 关）")
+    BalanceConfig.PlayAudioSafe("UI_CLICK")
+    BalanceConfig.StopAllAudios()
+    VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
+    Runtime.HideAllParticles()
+    Input.isDragging = false
+    Input.dragSourceId = nil
+    Input.ClearSelectedCard()
+
+    -- 隐藏所有战斗与演播面板
+    Layout.SetVisible(UI.chapterSelectModal, false)
+    Layout.SetVisible(UI.settleModal, false)
+    Layout.SetVisible(UI.prepareModal, false)
+    Layout.SetVisible(UI.dialogueModal, false)
+    Layout.SetVisible(UI.countdownModal, false)
+    SetGameplayLayersVisible(false)
+
+    -- 打开模式选择主面板并显示常驻快捷栏
+    Layout.SetVisible(UI.modeSelectModal, true)
+    Layout.SetVisible(UI.quickNavLayer, true)
+    gameState.currentState = STATE_MODE_SELECT
+    HudView.ShowToast("已返回模式选择界面，关卡进度已保留。")
+end
+
 -- 注册全屏与各面板交互监听
 local function SetupEventHandlers()
+    -- 辅助：静音原生按钮 clickAudioId，避免引擎底层默认点击音效与脚本 PlayAudioSafe 重叠双响
+    local function SilenceButton(btn)
+        if btn and btn.alive then
+            pcall(function() btn.clickAudioId = 0 end)
+        end
+    end
+
     -- 1. 全屏光标事件 (连线与轻点)
     if UI.cursorArea and UI.cursorArea.AddCursorEventListener then
         UI.cursorArea:AddCursorEventListener(Enum.CursorEventType.CursorDown, function(data)
@@ -3278,6 +3672,7 @@ local function SetupEventHandlers()
 
     -- 3. 模式选择按钮监听
     if UI.modeStoryBtn and UI.modeStoryBtn.AddCursorEventListener then
+        SilenceButton(UI.modeStoryBtn)
         UI.modeStoryBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
             BalanceConfig.PlayAudioSafe("UI_CLICK")
             print("[Starlink] 玩家选择【剧情模式】，打开战役章节选择面板...")
@@ -3290,6 +3685,7 @@ local function SetupEventHandlers()
     end
 
     if UI.modeChallengeBtn and UI.modeChallengeBtn.AddCursorEventListener then
+        SilenceButton(UI.modeChallengeBtn)
         UI.modeChallengeBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
             BalanceConfig.PlayAudioSafe("UI_CLICK")
             print("[Starlink] 玩家点击【挑战模式】（筹备中提示）...")
@@ -3297,9 +3693,17 @@ local function SetupEventHandlers()
         end)
     end
 
+    if UI.modeQuitBtn and UI.modeQuitBtn.AddCursorEventListener then
+        SilenceButton(UI.modeQuitBtn)
+        UI.modeQuitBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
+            TriggerNativePersonalSettlement()
+        end)
+    end
+
     -- 4. 章节选择按钮监听
     for idx, cardUI in ipairs(UI.chapterCards) do
         if cardUI.button and cardUI.button.AddCursorEventListener then
+            SilenceButton(cardUI.button)
             cardUI.button:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
                 BalanceConfig.PlayAudioSafe("UI_CLICK")
                 local ok, err = ChapterSelectView.SelectStage(idx)
@@ -3313,6 +3717,7 @@ local function SetupEventHandlers()
     end
 
     if UI.chapStartBtn and UI.chapStartBtn.AddCursorEventListener then
+        SilenceButton(UI.chapStartBtn)
         UI.chapStartBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
             BalanceConfig.PlayAudioSafe("UI_CLICK")
             StartStage(ChapterSelectView.selectedStage)
@@ -3320,6 +3725,7 @@ local function SetupEventHandlers()
     end
 
     if UI.chapBackBtn and UI.chapBackBtn.AddCursorEventListener then
+        SilenceButton(UI.chapBackBtn)
         UI.chapBackBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
             BalanceConfig.PlayAudioSafe("UI_CLICK")
             Layout.SetVisible(UI.chapterSelectModal, false)
@@ -3331,11 +3737,13 @@ local function SetupEventHandlers()
 
     -- 5. 剧情按钮监听
     if UI.dlgNextBtn and UI.dlgNextBtn.AddCursorEventListener then
+        SilenceButton(UI.dlgNextBtn)
         UI.dlgNextBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
             DialoguePlayer.Next()
         end)
     end
     if UI.dlgSkipBtn and UI.dlgSkipBtn.AddCursorEventListener then
+        SilenceButton(UI.dlgSkipBtn)
         UI.dlgSkipBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
             DialoguePlayer.Skip()
         end)
@@ -3344,6 +3752,7 @@ local function SetupEventHandlers()
     -- 6. 战前调配卡牌点击选择
     for idx, cardUI in ipairs(UI.prepCards) do
         if cardUI.button and cardUI.button.AddCursorEventListener then
+            SilenceButton(cardUI.button)
             local cardKey = PrepareView.POOL_ORDER[idx]
             cardUI.button:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
                 local ok, action, cardId = PrepareView.ToggleCard(cardKey)
@@ -3366,6 +3775,7 @@ local function SetupEventHandlers()
     end
 
     if UI.prepStartBtn and UI.prepStartBtn.AddCursorEventListener then
+        SilenceButton(UI.prepStartBtn)
         UI.prepStartBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
             local ok, err = PrepareView.ConfirmAndStart()
             if not ok and err then
@@ -3377,6 +3787,7 @@ local function SetupEventHandlers()
     -- 7. 符印槽位点击选择
     for idx, slot in ipairs(UI.cardSlots) do
         if slot.container and slot.container.AddCursorEventListener then
+            SilenceButton(slot.container)
             slot.container:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
                 if gameState.currentState == STATE_PLAYING then
                     local card = AbilitySystem.deck[idx]
@@ -3417,11 +3828,51 @@ local function SetupEventHandlers()
         end
     end
 
-    -- 8. 结算弹窗按钮
+    -- 8. 常驻侧边导航栏按钮监听 (重开推衍 & 结算退出)
+    if UI.sideRestartBtn and UI.sideRestartBtn.AddCursorEventListener then
+        SilenceButton(UI.sideRestartBtn)
+        UI.sideRestartBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
+            HandleRestartToModeSelect()
+        end)
+    end
+
+    if UI.sideSettleBtn and UI.sideSettleBtn.AddCursorEventListener then
+        SilenceButton(UI.sideSettleBtn)
+        UI.sideSettleBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
+            OpenSettleConfirmModal()
+        end)
+    end
+
+    -- 9. 退出挑战 / 游玩结算二次确认弹窗按钮监听
+    if UI.confirmResumeBtn and UI.confirmResumeBtn.AddCursorEventListener then
+        SilenceButton(UI.confirmResumeBtn)
+        UI.confirmResumeBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
+            BalanceConfig.PlayAudioSafe("UI_CLICK")
+            CloseSettleConfirmModal()
+        end)
+    end
+
+    if UI.confirmRestartBtn and UI.confirmRestartBtn.AddCursorEventListener then
+        SilenceButton(UI.confirmRestartBtn)
+        UI.confirmRestartBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
+            HandleRestartToModeSelect()
+        end)
+    end
+
+    if UI.confirmQuitBtn and UI.confirmQuitBtn.AddCursorEventListener then
+        SilenceButton(UI.confirmQuitBtn)
+        UI.confirmQuitBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
+            TriggerNativePersonalSettlement()
+        end)
+    end
+
+    -- 10. 结算弹窗按钮
     -- 进军下一关
     if UI.settleNextBtn and UI.settleNextBtn.AddCursorEventListener then
+        SilenceButton(UI.settleNextBtn)
         UI.settleNextBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
             BalanceConfig.PlayAudioSafe("UI_CLICK")
+            BalanceConfig.StopAllAudios()
             VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
             Runtime.HideAllParticles()
             local nextStageId = StarMap.currentStage + 1
@@ -3442,8 +3893,10 @@ local function SetupEventHandlers()
 
     -- 重新演练
     if UI.settleRetryBtn and UI.settleRetryBtn.AddCursorEventListener then
+        SilenceButton(UI.settleRetryBtn)
         UI.settleRetryBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
             BalanceConfig.PlayAudioSafe("UI_CLICK")
+            BalanceConfig.StopAllAudios()
             VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
             Runtime.HideAllParticles()
             print(string.format("[Starlink] 重新演练当前关卡: 第 %d 关...", StarMap.currentStage))
@@ -3453,8 +3906,10 @@ local function SetupEventHandlers()
 
     -- 返回章节选择
     if UI.settleChapBtn and UI.settleChapBtn.AddCursorEventListener then
+        SilenceButton(UI.settleChapBtn)
         UI.settleChapBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
             BalanceConfig.PlayAudioSafe("UI_CLICK")
+            BalanceConfig.StopAllAudios()
             VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
             Runtime.HideAllParticles()
             Layout.SetVisible(UI.settleModal, false)
@@ -3462,6 +3917,22 @@ local function SetupEventHandlers()
             SetGameplayLayersVisible(false)
             gameState.currentState = STATE_CHAPTER_SELECT
             ChapterSelectView.Render(UI.chapterCards, UI.chapDesc, UI.chapStartTxt)
+        end)
+    end
+
+    -- 重开模式 (回退到模式选择界面并保留关卡进度)
+    if UI.settleRestartBtn and UI.settleRestartBtn.AddCursorEventListener then
+        SilenceButton(UI.settleRestartBtn)
+        UI.settleRestartBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
+            HandleRestartToModeSelect()
+        end)
+    end
+
+    -- 退出推衍 (原生系统个人结算)
+    if UI.settleQuitBtn and UI.settleQuitBtn.AddCursorEventListener then
+        SilenceButton(UI.settleQuitBtn)
+        UI.settleQuitBtn:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
+            OpenSettleConfirmModal()
         end)
     end
 end
@@ -3504,6 +3975,8 @@ function OnStart()
     VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
     Runtime.HideAllParticles()
     Layout.SetVisible(UI.modeSelectModal, true)
+    Layout.SetVisible(UI.quickNavLayer, true)
+    Layout.SetVisible(UI.settleConfirmModal, false)
     Layout.SetVisible(UI.chapterSelectModal, false)
     Layout.SetVisible(UI.dialogueModal, false)
     Layout.SetVisible(UI.prepareModal, false)
@@ -3545,7 +4018,7 @@ function OnUpdate(dt)
             Layout.SetVisible(UI.countdownModal, false)
             gameState.currentState = STATE_PLAYING
             gameState.elapsedTime = 0
-            BalanceConfig.PlayAudioSafe("MATCH_WIN")
+            BalanceConfig.PlayAudioSafe("ROUTE_LINK")
             local chap = StarMap.currentChapterDef
             HudView.ShowToast(string.format("【%s】推衍启阵！全速进军！", chap and chap.title or "开战"))
         end
@@ -3579,6 +4052,7 @@ function OnUpdate(dt)
                     function(capturedNode)
                         local facName = Layout.GetFactionName(capturedNode.faction)
                         HudView.ShowToast(string.format("【%s】已被【%s】完全掌控！", capturedNode.name, facName))
+                        BalanceConfig.PlayAudioSafe("NODE_CAPTURE")
                         CheckMatchEnd()
                     end,
                     function(lostNode)
@@ -3588,10 +4062,23 @@ function OnUpdate(dt)
             end
         end
 
-        -- 3. 物流发射与微粒流动
-        RouteManager.Update(dt, gameState.nodes, gameState.elapsedTime, function(hitNode)
-            CombatResolver.AddSpark(hitNode.x, hitNode.y)
-        end)
+        -- 3. 物流发射与微粒流动 (包含微粒到达即时拔河对消占领决算)
+        RouteManager.Update(
+            dt,
+            gameState.nodes,
+            gameState.elapsedTime,
+            function(hitNode)
+                CombatResolver.AddSpark(hitNode.x, hitNode.y)
+            end,
+            function(capturedNode)
+                local facName = Layout.GetFactionName(capturedNode.faction)
+                HudView.ShowToast(string.format("【%s】已被【%s】完全掌控！", capturedNode.name, facName))
+                CheckMatchEnd()
+            end,
+            function(lostNode)
+                HudView.ShowToast(string.format("【%s】统治动摇，已沦为中立争夺！", lostNode.name))
+            end
+        )
 
         -- 4. 战火与威胁判定
         CombatResolver.Update(dt, gameState.nodes, RouteManager.movingParticles)

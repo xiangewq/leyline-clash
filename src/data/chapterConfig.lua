@@ -14,6 +14,7 @@ local ChapterConfig = {
             factions = { "player", "enemy_red" },
             budget = 4,
             duration = 180,
+            bgm = 10035,
             desc = "清泉镇下汇聚着温和的地脉微粒。在此熟悉光轨铺设与驻阵固守，击溃愚人众前哨。",
             dialogues = {
                 {
@@ -34,16 +35,16 @@ local ChapterConfig = {
                 }
             },
             nodes = {
-                { id = 0, name = "西风前哨", x = 260, y = 450, radius = 42, faction = "player", particles = 20, control = 100, anomaly = "NORMAL", desc = "我方西风骑士前哨" },
-                { id = 1, name = "清泉北陵", x = 520, y = 580, radius = 36, faction = "neutral", particles = 7, control = 0, anomaly = "NORMAL", desc = "北侧灵泉高地 (侧翼拓展点)" },
-                { id = 2, name = "泉水祭坛", x = 800, y = 620, radius = 38, faction = "neutral", particles = 10, control = 0, anomaly = "NORMAL", desc = "清泉古祭坛" },
-                { id = 3, name = "晨曦峡口", x = 1080, y = 580, radius = 36, faction = "neutral", particles = 7, control = 0, anomaly = "NORMAL", desc = "近酒庄险隘" },
-                { id = 4, name = "清泉主脉", x = 620, y = 450, radius = 38, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "清泉核心灵脉 (战略枢纽)" },
-                { id = 5, name = "奔狼前驿", x = 980, y = 450, radius = 38, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "中路要冲 (战略枢纽)" },
-                { id = 6, name = "清泉南溪", x = 520, y = 320, radius = 36, faction = "neutral", particles = 7, control = 0, anomaly = "NORMAL", desc = "南侧支流草甸 (侧翼拓展点)" },
-                { id = 7, name = "杜拉夫猎场", x = 800, y = 280, radius = 38, faction = "neutral", particles = 10, control = 0, anomaly = "NORMAL", desc = "猎人歇脚营地" },
-                { id = 8, name = "达达乌帕口", x = 1080, y = 320, radius = 36, faction = "neutral", particles = 7, control = 0, anomaly = "NORMAL", desc = "近部落前沿" },
-                { id = 9, name = "愚人驻地", x = 1340, y = 450, radius = 42, faction = "enemy_red", particles = 20, control = 100, anomaly = "NORMAL", desc = "愚人众前线营地" }
+                { id = 0, name = "西风前哨", x = 240, y = 490, radius = 26, faction = "player", particles = 20, control = 100, anomaly = "NORMAL", desc = "我方西风骑士前哨" },
+                { id = 1, name = "清泉北陵", x = 480, y = 650, radius = 26, faction = "neutral", particles = 7, control = 0, anomaly = "NORMAL", desc = "北侧灵泉高地 (侧翼拓展点)" },
+                { id = 2, name = "泉水祭坛", x = 760, y = 590, radius = 26, faction = "neutral", particles = 10, control = 0, anomaly = "NORMAL", desc = "清泉古祭坛" },
+                { id = 3, name = "晨曦峡口", x = 1120, y = 620, radius = 26, faction = "neutral", particles = 7, control = 0, anomaly = "NORMAL", desc = "近酒庄险隘" },
+                { id = 4, name = "清泉主脉", x = 580, y = 430, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "清泉核心灵脉 (战略枢纽)" },
+                { id = 5, name = "奔狼前驿", x = 950, y = 390, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "中路要冲 (战略枢纽)" },
+                { id = 6, name = "清泉南溪", x = 490, y = 250, radius = 26, faction = "neutral", particles = 7, control = 0, anomaly = "NORMAL", desc = "南侧支流草甸 (侧翼拓展点)" },
+                { id = 7, name = "杜拉夫猎场", x = 790, y = 210, radius = 26, faction = "neutral", particles = 10, control = 0, anomaly = "NORMAL", desc = "猎人歇脚营地" },
+                { id = 8, name = "达达乌帕口", x = 1110, y = 270, radius = 26, faction = "neutral", particles = 7, control = 0, anomaly = "NORMAL", desc = "近部落前沿" },
+                { id = 9, name = "愚人驻地", x = 1360, y = 430, radius = 26, faction = "enemy_red", particles = 20, control = 100, anomaly = "NORMAL", desc = "愚人众前线营地" }
             },
             links = {
                 { 0, 1 }, { 0, 4 }, { 0, 6 },
@@ -67,6 +68,7 @@ local ChapterConfig = {
             factions = { "player", "enemy_red" },
             budget = 6,
             duration = 240,
+            bgm = 10068,
             desc = "千风神殿周边狂风肆虐。抢占千风隘口激活双倍流速，避开迷雾荒墟的产速衰减。",
             dialogues = {
                 {
@@ -83,18 +85,18 @@ local ChapterConfig = {
                 }
             },
             nodes = {
-                { id = 0, name = "风起营地", x = 220, y = 450, radius = 40, faction = "player", particles = 24, control = 100, anomaly = "NORMAL", desc = "蒙德西风阵地" },
-                { id = 1, name = "低语树林", x = 440, y = 600, radius = 34, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "北路树影屏障" },
-                { id = 2, name = "星落湖畔", x = 440, y = 300, radius = 34, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "南路清澈湖滨" },
-                { id = 3, name = "千风隘口", x = 700, y = 650, radius = 36, faction = "neutral", particles = 15, control = 0, anomaly = "WIND_FLOW", desc = "千风汇聚（输送翻倍）" },
-                { id = 4, name = "石珀晶矿", x = 700, y = 250, radius = 36, faction = "neutral", particles = 14, control = 0, anomaly = "AMBER_MINE", desc = "石珀富矿（产能翻倍）" },
-                { id = 5, name = "望风山地", x = 960, y = 650, radius = 34, faction = "neutral", particles = 14, control = 0, anomaly = "NORMAL", desc = "俯瞰北境高崖" },
-                { id = 6, name = "摘星崖底", x = 960, y = 250, radius = 34, faction = "neutral", particles = 14, control = 0, anomaly = "NORMAL", desc = "悬崖南麓险隘" },
-                { id = 7, name = "千风神殿", x = 700, y = 450, radius = 38, faction = "neutral", particles = 16, control = 0, anomaly = "NORMAL", desc = "远古神殿遗址" },
-                { id = 8, name = "迷雾荒墟", x = 960, y = 450, radius = 34, faction = "neutral", particles = 10, control = 0, anomaly = "MIST_RUINS", desc = "迷雾衰减（产能减半）" },
-                { id = 9, name = "急冻悬崖", x = 1180, y = 600, radius = 34, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "北侧霜寒关卡" },
-                { id = 10, name = "誓言岬哨", x = 1180, y = 300, radius = 34, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "南侧海风前哨" },
-                { id = 11, name = "千风绝壁", x = 1380, y = 450, radius = 40, faction = "enemy_red", particles = 26, control = 100, anomaly = "NORMAL", desc = "愚人众千风要塞" }
+                { id = 0, name = "风起营地", x = 200, y = 420, radius = 26, faction = "player", particles = 24, control = 100, anomaly = "NORMAL", desc = "蒙德西风阵地" },
+                { id = 1, name = "低语树林", x = 430, y = 640, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "北路树影屏障" },
+                { id = 2, name = "星落湖畔", x = 420, y = 230, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "南路清澈湖滨" },
+                { id = 3, name = "千风隘口", x = 730, y = 690, radius = 26, faction = "neutral", particles = 15, control = 0, anomaly = "WIND_FLOW", desc = "千风汇聚（输送翻倍）" },
+                { id = 4, name = "石珀晶矿", x = 710, y = 200, radius = 26, faction = "neutral", particles = 14, control = 0, anomaly = "AMBER_MINE", desc = "石珀富矿（产能翻倍）" },
+                { id = 5, name = "望风山地", x = 990, y = 660, radius = 26, faction = "neutral", particles = 14, control = 0, anomaly = "NORMAL", desc = "俯瞰北境高崖" },
+                { id = 6, name = "摘星崖底", x = 980, y = 180, radius = 26, faction = "neutral", particles = 14, control = 0, anomaly = "NORMAL", desc = "悬崖南麓险隘" },
+                { id = 7, name = "千风神殿", x = 680, y = 470, radius = 26, faction = "neutral", particles = 16, control = 0, anomaly = "NORMAL", desc = "远古神殿遗址" },
+                { id = 8, name = "迷雾荒墟", x = 950, y = 380, radius = 26, faction = "neutral", particles = 10, control = 0, anomaly = "MIST_RUINS", desc = "迷雾衰减（产能减半）" },
+                { id = 9, name = "急冻悬崖", x = 1210, y = 580, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "北侧霜寒关卡" },
+                { id = 10, name = "誓言岬哨", x = 1200, y = 260, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "南侧海风前哨" },
+                { id = 11, name = "千风绝壁", x = 1400, y = 460, radius = 26, faction = "enemy_red", particles = 26, control = 100, anomaly = "NORMAL", desc = "愚人众千风要塞" }
             },
             links = {
                 { 0, 1 }, { 0, 7 }, { 0, 2 },
@@ -120,6 +122,7 @@ local ChapterConfig = {
             factions = { "player", "enemy_red", "enemy_purple" },
             budget = 8,
             duration = 300,
+            bgm = 10099,
             desc = "璃月层岩巨渊深处，不仅有愚人众驻军，更有盘踞多时的渊影盗宝团。三方势力互相争夺！",
             dialogues = {
                 {
@@ -140,20 +143,20 @@ local ChapterConfig = {
                 }
             },
             nodes = {
-                { id = 0, name = "西风先锋", x = 240, y = 240, radius = 38, faction = "player", particles = 24, control = 100, anomaly = "NORMAL", desc = "我方西南先锋大营" },
-                { id = 1, name = "黑岩关隘", x = 640, y = 600, radius = 32, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "北路悬石关卡" },
-                { id = 2, name = "天工峡口", x = 960, y = 600, radius = 32, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "北路绝壁隘口" },
-                { id = 3, name = "伏鳌谷地", x = 440, y = 380, radius = 32, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "西南峡谷要道" },
-                { id = 4, name = "琉璃晶矿", x = 440, y = 180, radius = 32, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "琉璃晶砂浅坑" },
-                { id = 5, name = "石珀富矿", x = 800, y = 490, radius = 36, faction = "neutral", particles = 15, control = 0, anomaly = "AMBER_MINE", desc = "石珀富矿（产能翻倍）" },
-                { id = 6, name = "雷暴要塞", x = 800, y = 330, radius = 36, faction = "neutral", particles = 18, control = 0, anomaly = "DEFENSE_BASTION", desc = "雷暴灵障（战损减半）" },
-                { id = 7, name = "层岩中继", x = 620, y = 380, radius = 32, faction = "neutral", particles = 14, control = 0, anomaly = "WIND_FLOW", desc = "西翼疾风流道" },
-                { id = 8, name = "悬木吊桥", x = 980, y = 380, radius = 32, faction = "neutral", particles = 14, control = 0, anomaly = "NORMAL", desc = "东翼古矿吊桥" },
-                { id = 9, name = "无名遗迹", x = 800, y = 170, radius = 32, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "渊底远古废墟" },
-                { id = 10, name = "巨渊之口", x = 1160, y = 380, radius = 32, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "东南盗宝前沿" },
-                { id = 11, name = "丹砂矿脉", x = 1160, y = 180, radius = 32, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "东南丹砂坑洞" },
-                { id = 12, name = "愚人巨垒", x = 800, y = 730, radius = 38, faction = "enemy_red", particles = 26, control = 100, anomaly = "NORMAL", desc = "愚人众北山巨垒" },
-                { id = 13, name = "盗宝匪巢", x = 1360, y = 240, radius = 38, faction = "enemy_purple", particles = 26, control = 100, anomaly = "NORMAL", desc = "渊影盗宝总寨" }
+                { id = 0, name = "西风先锋", x = 220, y = 250, radius = 26, faction = "player", particles = 24, control = 100, anomaly = "NORMAL", desc = "我方西南先锋大营" },
+                { id = 1, name = "黑岩关隘", x = 580, y = 630, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "北路悬石关卡" },
+                { id = 2, name = "天工峡口", x = 990, y = 650, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "北路绝壁隘口" },
+                { id = 3, name = "伏鳌谷地", x = 390, y = 410, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "西南峡谷要道" },
+                { id = 4, name = "琉璃晶矿", x = 440, y = 170, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "琉璃晶砂浅坑" },
+                { id = 5, name = "石珀富矿", x = 790, y = 530, radius = 26, faction = "neutral", particles = 15, control = 0, anomaly = "AMBER_MINE", desc = "石珀富矿（产能翻倍）" },
+                { id = 6, name = "雷暴要塞", x = 840, y = 320, radius = 26, faction = "neutral", particles = 18, control = 0, anomaly = "DEFENSE_BASTION", desc = "雷暴灵障（战损减半）" },
+                { id = 7, name = "层岩中继", x = 610, y = 370, radius = 26, faction = "neutral", particles = 14, control = 0, anomaly = "WIND_FLOW", desc = "西翼疾风流道" },
+                { id = 8, name = "悬木吊桥", x = 1020, y = 420, radius = 26, faction = "neutral", particles = 14, control = 0, anomaly = "NORMAL", desc = "东翼古矿吊桥" },
+                { id = 9, name = "无名遗迹", x = 740, y = 150, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "渊底远古废墟" },
+                { id = 10, name = "巨渊之口", x = 1210, y = 440, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "东南盗宝前沿" },
+                { id = 11, name = "丹砂矿脉", x = 1170, y = 190, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "东南丹砂坑洞" },
+                { id = 12, name = "愚人巨垒", x = 770, y = 740, radius = 26, faction = "enemy_red", particles = 26, control = 100, anomaly = "NORMAL", desc = "愚人众北山巨垒" },
+                { id = 13, name = "盗宝匪巢", x = 1380, y = 280, radius = 26, faction = "enemy_purple", particles = 26, control = 100, anomaly = "NORMAL", desc = "渊影盗宝总寨" }
             },
             links = {
                 { 0, 3 }, { 0, 4 }, { 3, 4 },
@@ -178,6 +181,7 @@ local ChapterConfig = {
             factions = { "player", "enemy_red", "enemy_purple", "enemy_green" },
             budget = 10,
             duration = 360,
+            bgm = 10113,
             desc = "枫丹水下暗流涌动。红方愚人众、紫方盗宝团与苍翠遗迹机关全境交战，争夺中央双生纯水枢纽！",
             dialogues = {
                 {
@@ -198,22 +202,22 @@ local ChapterConfig = {
                 }
             },
             nodes = {
-                { id = 0, name = "西风水港", x = 200, y = 450, radius = 36, faction = "player", particles = 28, control = 100, anomaly = "NORMAL", desc = "我方西港母基" },
-                { id = 1, name = "枫丹前哨", x = 400, y = 570, radius = 30, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "西北水下前沿" },
-                { id = 2, name = "海露平原", x = 400, y = 330, radius = 30, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "西南海草平原" },
-                { id = 3, name = "伊黎耶港", x = 620, y = 630, radius = 30, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "北侧水闸港湾" },
-                { id = 4, name = "白露隘口", x = 980, y = 630, radius = 30, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "东北水下窄谷" },
-                { id = 5, name = "枫丹激流", x = 1200, y = 570, radius = 30, faction = "neutral", particles = 14, control = 0, anomaly = "WIND_FLOW", desc = "激流通道（输送翻倍）" },
-                { id = 6, name = "苍晶矿脉", x = 1200, y = 330, radius = 30, faction = "neutral", particles = 14, control = 0, anomaly = "AMBER_MINE", desc = "苍晶富矿（产能翻倍）" },
-                { id = 7, name = "纯水阳核", x = 700, y = 450, radius = 34, faction = "neutral", particles = 16, control = 0, anomaly = "PURE_WATER", desc = "中央纯水西枢纽" },
-                { id = 8, name = "纯水阴核", x = 900, y = 450, radius = 34, faction = "neutral", particles = 16, control = 0, anomaly = "PURE_WATER", desc = "中央纯水东枢纽" },
-                { id = 9, name = "沉玉古墟", x = 550, y = 450, radius = 30, faction = "neutral", particles = 10, control = 0, anomaly = "MIST_RUINS", desc = "迷雾残垣（产能减半）" },
-                { id = 10, name = "水色要塞", x = 1050, y = 450, radius = 32, faction = "neutral", particles = 16, control = 0, anomaly = "DEFENSE_BASTION", desc = "深水灵障（战损减半）" },
-                { id = 11, name = "秋泉隐所", x = 620, y = 270, radius = 30, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "南侧暗流溶洞" },
-                { id = 12, name = "柔灯要道", x = 980, y = 270, radius = 30, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "东南深水通道" },
-                { id = 13, name = "愚人潜艇", x = 800, y = 740, radius = 36, faction = "enemy_red", particles = 24, control = 100, anomaly = "NORMAL", desc = "愚人众北境母舰" },
-                { id = 14, name = "盗宝暗礁", x = 800, y = 160, radius = 36, faction = "enemy_purple", particles = 24, control = 100, anomaly = "NORMAL", desc = "盗宝团南礁老巢" },
-                { id = 15, name = "机关工坊", x = 1400, y = 450, radius = 36, faction = "enemy_green", particles = 24, control = 100, anomaly = "NORMAL", desc = "遗迹机关核心中枢" }
+                { id = 0, name = "西风水港", x = 180, y = 410, radius = 26, faction = "player", particles = 28, control = 100, anomaly = "NORMAL", desc = "我方西港母基" },
+                { id = 1, name = "枫丹前哨", x = 380, y = 590, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "西北水下前沿" },
+                { id = 2, name = "海露平原", x = 370, y = 250, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "西南海草平原" },
+                { id = 3, name = "伊黎耶港", x = 620, y = 670, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "北侧水闸港湾" },
+                { id = 4, name = "白露隘口", x = 1030, y = 660, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "东北水下窄谷" },
+                { id = 5, name = "枫丹激流", x = 1240, y = 620, radius = 26, faction = "neutral", particles = 14, control = 0, anomaly = "WIND_FLOW", desc = "激流通道（输送翻倍）" },
+                { id = 6, name = "苍晶矿脉", x = 1250, y = 280, radius = 26, faction = "neutral", particles = 14, control = 0, anomaly = "AMBER_MINE", desc = "苍晶富矿（产能翻倍）" },
+                { id = 7, name = "纯水阳核", x = 720, y = 480, radius = 26, faction = "neutral", particles = 16, control = 0, anomaly = "PURE_WATER", desc = "中央纯水西枢纽" },
+                { id = 8, name = "纯水阴核", x = 930, y = 390, radius = 26, faction = "neutral", particles = 16, control = 0, anomaly = "PURE_WATER", desc = "中央纯水东枢纽" },
+                { id = 9, name = "沉玉古墟", x = 540, y = 420, radius = 26, faction = "neutral", particles = 10, control = 0, anomaly = "MIST_RUINS", desc = "迷雾残垣（产能减半）" },
+                { id = 10, name = "水色要塞", x = 1090, y = 470, radius = 26, faction = "neutral", particles = 16, control = 0, anomaly = "DEFENSE_BASTION", desc = "深水灵障（战损减半）" },
+                { id = 11, name = "秋泉隐所", x = 590, y = 220, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "南侧暗流溶洞" },
+                { id = 12, name = "柔灯要道", x = 1010, y = 210, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "东南深水通道" },
+                { id = 13, name = "愚人潜艇", x = 830, y = 750, radius = 26, faction = "enemy_red", particles = 24, control = 100, anomaly = "NORMAL", desc = "愚人众北境母舰" },
+                { id = 14, name = "盗宝暗礁", x = 790, y = 140, radius = 26, faction = "enemy_purple", particles = 24, control = 100, anomaly = "NORMAL", desc = "盗宝团南礁老巢" },
+                { id = 15, name = "机关工坊", x = 1420, y = 460, radius = 26, faction = "enemy_green", particles = 24, control = 100, anomaly = "NORMAL", desc = "遗迹机关核心中枢" }
             },
             links = {
                 { 0, 1 }, { 0, 2 }, { 1, 2 },
@@ -239,6 +243,7 @@ local ChapterConfig = {
             factions = { "player", "enemy_red", "enemy_purple", "enemy_green" },
             budget = 12,
             duration = 360,
+            bgm = 10184,
             desc = "龙脊雪山之巅，远古推衍机全功率觉醒！18 座灵穴交织成网，双核赤阳熔核限制25微粒极速绞杀。",
             dialogues = {
                 {
@@ -259,24 +264,24 @@ local ChapterConfig = {
                 }
             },
             nodes = {
-                { id = 0, name = "西风终焉", x = 190, y = 220, radius = 35, faction = "player", particles = 28, control = 100, anomaly = "NORMAL", desc = "我方西南极境大营" },
-                { id = 1, name = "忍冬废墟", x = 370, y = 680, radius = 28, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "西北废墟要冲" },
-                { id = 2, name = "覆雪咽喉", x = 370, y = 450, radius = 30, faction = "neutral", particles = 16, control = 0, anomaly = "DEFENSE_BASTION", desc = "西翼要塞（战损减半）" },
-                { id = 3, name = "眠龙前哨", x = 370, y = 220, radius = 28, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "西南峡谷前哨" },
-                { id = 4, name = "寒天隘口", x = 650, y = 680, radius = 28, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "北境高寒关隘" },
-                { id = 5, name = "苍白防线", x = 950, y = 680, radius = 28, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "东北绝壁关防" },
-                { id = 6, name = "寒天激流", x = 650, y = 520, radius = 30, faction = "neutral", particles = 14, control = 0, anomaly = "WIND_FLOW", desc = "疾风通道（输送翻倍）" },
-                { id = 7, name = "雪山要塞", x = 950, y = 520, radius = 30, faction = "neutral", particles = 16, control = 0, anomaly = "DEFENSE_BASTION", desc = "东北壁垒（战损减半）" },
-                { id = 8, name = "熔核之北", x = 720, y = 410, radius = 32, faction = "neutral", particles = 15, control = 0, anomaly = "PLASMA", desc = "赤阳熔核（上限25粒，绞肉）" },
-                { id = 9, name = "熔核之南", x = 880, y = 410, radius = 32, faction = "neutral", particles = 15, control = 0, anomaly = "PLASMA", desc = "赤阳熔核（上限25粒，绞肉）" },
-                { id = 10, name = "覆雪迷雾", x = 650, y = 300, radius = 28, faction = "neutral", particles = 10, control = 0, anomaly = "MIST_RUINS", desc = "迷雾残迹（产能减半）" },
-                { id = 11, name = "星银富矿", x = 950, y = 300, radius = 30, faction = "neutral", particles = 15, control = 0, anomaly = "AMBER_MINE", desc = "星银富矿（产能翻倍）" },
-                { id = 12, name = "积雪小径", x = 1230, y = 220, radius = 28, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "东南雪径要道" },
-                { id = 13, name = "冰封哨卡", x = 1230, y = 450, radius = 30, faction = "neutral", particles = 16, control = 0, anomaly = "NORMAL", desc = "东翼防线枢纽" },
-                { id = 14, name = "冰封棱堡", x = 1230, y = 680, radius = 28, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "东北棱堡哨站" },
-                { id = 15, name = "愚人霜核", x = 190, y = 680, radius = 35, faction = "enemy_red", particles = 26, control = 100, anomaly = "NORMAL", desc = "愚人众西北霜核" },
-                { id = 16, name = "盗宝残党", x = 1410, y = 220, radius = 35, faction = "enemy_purple", particles = 26, control = 100, anomaly = "NORMAL", desc = "盗宝团东南匪寨" },
-                { id = 17, name = "遗迹主控", x = 1410, y = 680, radius = 35, faction = "enemy_green", particles = 26, control = 100, anomaly = "NORMAL", desc = "遗迹防卫主控主机" }
+                { id = 0, name = "西风终焉", x = 180, y = 210, radius = 26, faction = "player", particles = 28, control = 100, anomaly = "NORMAL", desc = "我方西南极境大营" },
+                { id = 1, name = "忍冬废墟", x = 350, y = 680, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "西北废墟要冲" },
+                { id = 2, name = "覆雪咽喉", x = 390, y = 470, radius = 26, faction = "neutral", particles = 16, control = 0, anomaly = "DEFENSE_BASTION", desc = "西翼要塞（战损减半）" },
+                { id = 3, name = "眠龙前哨", x = 360, y = 250, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "西南峡谷前哨" },
+                { id = 4, name = "寒天隘口", x = 680, y = 720, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "北境高寒关隘" },
+                { id = 5, name = "苍白防线", x = 970, y = 720, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "东北绝壁关防" },
+                { id = 6, name = "寒天激流", x = 610, y = 530, radius = 26, faction = "neutral", particles = 14, control = 0, anomaly = "WIND_FLOW", desc = "疾风通道（输送翻倍）" },
+                { id = 7, name = "雪山要塞", x = 980, y = 570, radius = 26, faction = "neutral", particles = 16, control = 0, anomaly = "DEFENSE_BASTION", desc = "东北壁垒（战损减半）" },
+                { id = 8, name = "熔核之北", x = 730, y = 440, radius = 26, faction = "neutral", particles = 15, control = 0, anomaly = "PLASMA", desc = "赤阳熔核（上限25粒，绞肉）" },
+                { id = 9, name = "熔核之南", x = 900, y = 380, radius = 26, faction = "neutral", particles = 15, control = 0, anomaly = "PLASMA", desc = "赤阳熔核（上限25粒，绞肉）" },
+                { id = 10, name = "覆雪迷雾", x = 620, y = 250, radius = 26, faction = "neutral", particles = 10, control = 0, anomaly = "MIST_RUINS", desc = "迷雾残迹（产能减半）" },
+                { id = 11, name = "星银富矿", x = 970, y = 230, radius = 26, faction = "neutral", particles = 15, control = 0, anomaly = "AMBER_MINE", desc = "星银富矿（产能翻倍）" },
+                { id = 12, name = "积雪小径", x = 1220, y = 240, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "东南雪径要道" },
+                { id = 13, name = "冰封哨卡", x = 1240, y = 470, radius = 26, faction = "neutral", particles = 16, control = 0, anomaly = "NORMAL", desc = "东翼防线枢纽" },
+                { id = 14, name = "冰封棱堡", x = 1210, y = 690, radius = 26, faction = "neutral", particles = 12, control = 0, anomaly = "NORMAL", desc = "东北棱堡哨站" },
+                { id = 15, name = "愚人霜核", x = 180, y = 700, radius = 26, faction = "enemy_red", particles = 26, control = 100, anomaly = "NORMAL", desc = "愚人众西北霜核" },
+                { id = 16, name = "盗宝残党", x = 1420, y = 210, radius = 26, faction = "enemy_purple", particles = 26, control = 100, anomaly = "NORMAL", desc = "盗宝团东南匪寨" },
+                { id = 17, name = "遗迹主控", x = 1420, y = 700, radius = 26, faction = "enemy_green", particles = 26, control = 100, anomaly = "NORMAL", desc = "遗迹防卫主控主机" }
             },
             links = {
                 { 15, 1 }, { 1, 2 }, { 1, 4 },

@@ -8,6 +8,13 @@ local BalanceConfig = require("default_import_file/src/data/balanceConfig") or r
 local ChapterSelectView = {
     unlockedStage = 1,
     selectedStage = 1,
+    clearedStages = {
+        [1] = false,
+        [2] = false,
+        [3] = false,
+        [4] = false,
+        [5] = false
+    },
     onStartStage = nil,
     onBack = nil
 }
@@ -18,9 +25,35 @@ function ChapterSelectView.Init(onStartStageCb, onBackCb)
 end
 
 function ChapterSelectView.UnlockNextStage(completedStage)
-    if completedStage and completedStage >= ChapterSelectView.unlockedStage then
-        ChapterSelectView.unlockedStage = math.min(5, completedStage + 1)
+    if completedStage then
+        ChapterSelectView.clearedStages[completedStage] = true
+        if completedStage >= ChapterSelectView.unlockedStage then
+            ChapterSelectView.unlockedStage = math.min(5, completedStage + 1)
+        end
     end
+end
+
+-- 判定是否已完成剧情模式前4关
+function ChapterSelectView.HasCompletedFirst4Stages()
+    if (ChapterSelectView.unlockedStage or 1) >= 5 then
+        return true
+    end
+    local cleared = ChapterSelectView.clearedStages
+    if cleared and cleared[1] and cleared[2] and cleared[3] and cleared[4] then
+        return true
+    end
+    return false
+end
+
+-- 获取已通关章节总数
+function ChapterSelectView.GetClearedCount()
+    local cnt = 0
+    for i = 1, 5 do
+        if ChapterSelectView.clearedStages and ChapterSelectView.clearedStages[i] then
+            cnt = cnt + 1
+        end
+    end
+    return cnt
 end
 
 function ChapterSelectView.SelectStage(stageId)
