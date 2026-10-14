@@ -4022,12 +4022,13 @@ local function TriggerNativePersonalSettlement()
         end)
     end
 
-    -- 1. 若满足已通关前 4 关，发送 SetPlayerWinStatus 通知服务端节点图设置玩家胜利状态
+    -- 1. 明确向服务端同步结算状态（胜利 / 失败）
     if isSuccess then
         print("[Starlink] 判定已通关前4关 (成功) -> 发送服务端信号: SetPlayerWinStatus (设置玩家结算成功状态: 胜利)")
         EmitServerSignal("SetPlayerWinStatus")
     else
-        print("[Starlink] 未通关前4关 (失败) -> 保持未胜利状态，不发送 SetPlayerWinStatus")
+        print("[Starlink] 未通关前4关 (失败) -> 发送服务端信号: SetPlayerLoseStatus (设置玩家结算状态: 失败)")
+        EmitServerSignal("SetPlayerLoseStatus")
     end
 
     -- 2. 发送 RequestQuitChallenge 通知服务端节点图执行【结算关卡】原生逻辑，真正退出奇域关卡
