@@ -1108,18 +1108,18 @@ const cardSlots = [1, 2, 3, 4].map(idx => {
   });
 });
 
-// 常驻侧边导航层 QuickNavLayer (除剧情演播外，随时挂载于屏幕左侧情报面板下方，支持随时重开模式与退出结算)
+// 常驻侧边导航层 QuickNavLayer (微型像素级重启 ⟳ 与关机 ⏻ 图标按钮，初始菜单隐藏，战斗中挂载于地脉情报面板正下方空旷区)
 const quickNavLayer = createNode('container', {
   id: 'quick_nav_layer',
   name: 'QuickNavLayer',
-  visible: true,
+  visible: false, // 初始在模式选择与章节选择界面隐藏，避免遮挡任何选关UI
   transformByPlatform: makeTransform({
-    offset: [-710, 275],
-    size: [280, 48],
+    offset: [-720, 270],
+    size: [84, 40],
     pivot: [0, 0.5]
   }),
   children: [
-    // 侧边重开按钮
+    // 微型像素重启按钮 (⟳)
     createNode('button', {
       id: 'side_restart_btn',
       name: 'SideRestartBtn',
@@ -1127,28 +1127,27 @@ const quickNavLayer = createNode('container', {
       interactable: true,
       clickAudioId: 0,
       transformByPlatform: makeTransform({
-        offset: [-65, 0],
-        size: [120, 36],
+        offset: [-21, 0],
+        size: [34, 34],
         pivot: [0.5, 0.5]
       }),
       children: [
         createTextbox({
           id: 'side_restart_txt',
           name: 'Text',
-          text: '⟳ 重开推衍',
-          fontSize: 13,
-          adaptiveFontSize: true,
-          minimumFontSize: 10,
-          fontColor: parseColor('#f8fafc'),
+          text: '⟳',
+          fontSize: 20,
+          adaptiveFontSize: false,
+          fontColor: parseColor('#38bdf8'),
           horizontalAlignment: 'Middle',
           verticalAlignment: 'Middle',
-          transformByPlatform: makeTransform({ offset: [0, 0], size: [120, 36], pivot: [0.5, 0.5] })
+          transformByPlatform: makeTransform({ offset: [0, 0], size: [34, 34], pivot: [0.5, 0.5] })
         }),
         createNode('image', {
           id: 'side_restart_bg',
           name: 'BtnBg',
           imageId: 100001,
-          imageColor: parseColor('#1e293b', 0.9),
+          imageColor: parseColor('#0f172a', 0.9),
           transformByPlatform: makeTransform({ layout: 'stretch' })
         }),
         createNode('image', {
@@ -1161,7 +1160,7 @@ const quickNavLayer = createNode('container', {
       ]
     }),
 
-    // 侧边退出/结算按钮
+    // 微型像素关机/退出按钮 (⏻)
     createNode('button', {
       id: 'side_settle_btn',
       name: 'SideSettleBtn',
@@ -1169,22 +1168,21 @@ const quickNavLayer = createNode('container', {
       interactable: true,
       clickAudioId: 0,
       transformByPlatform: makeTransform({
-        offset: [65, 0],
-        size: [120, 36],
+        offset: [21, 0],
+        size: [34, 34],
         pivot: [0.5, 0.5]
       }),
       children: [
         createTextbox({
           id: 'side_settle_txt',
           name: 'Text',
-          text: '⎋ 结算退出',
-          fontSize: 13,
-          adaptiveFontSize: true,
-          minimumFontSize: 10,
-          fontColor: parseColor('#fca5a5'),
+          text: '⏻',
+          fontSize: 18,
+          adaptiveFontSize: false,
+          fontColor: parseColor('#f43f5e'),
           horizontalAlignment: 'Middle',
           verticalAlignment: 'Middle',
-          transformByPlatform: makeTransform({ offset: [0, 0], size: [120, 36], pivot: [0.5, 0.5] })
+          transformByPlatform: makeTransform({ offset: [0, 0], size: [34, 34], pivot: [0.5, 0.5] })
         }),
         createNode('image', {
           id: 'side_settle_bg',
@@ -1197,7 +1195,7 @@ const quickNavLayer = createNode('container', {
           id: 'side_settle_border',
           name: 'BtnBorder',
           imageId: 100001,
-          imageColor: parseColor('#f87171', 0.8),
+          imageColor: parseColor('#f43f5e', 0.8),
           transformByPlatform: makeTransform({ layout: 'stretch' })
         })
       ]

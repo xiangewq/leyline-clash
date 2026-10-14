@@ -375,11 +375,9 @@ local function HandleRestartToModeSelect()
     Layout.SetVisible(UI.prepareModal, false)
     Layout.SetVisible(UI.dialogueModal, false)
     Layout.SetVisible(UI.countdownModal, false)
-    SetGameplayLayersVisible(false)
-
-    -- 打开模式选择主面板并显示常驻快捷栏
+    -- 打开模式选择主面板（在主菜单时隐藏快捷栏）
     Layout.SetVisible(UI.modeSelectModal, true)
-    Layout.SetVisible(UI.quickNavLayer, true)
+    Layout.SetVisible(UI.quickNavLayer, false)
     gameState.currentState = STATE_MODE_SELECT
     HudView.ShowToast("已返回模式选择界面，关卡进度已保留。")
 end
@@ -775,7 +773,7 @@ function OnStart()
     VisualRenderer.HideAllRoutes(UI.routeCtrls, UI.dragLine)
     Runtime.HideAllParticles()
     Layout.SetVisible(UI.modeSelectModal, true)
-    Layout.SetVisible(UI.quickNavLayer, true)
+    Layout.SetVisible(UI.quickNavLayer, false)
     Layout.SetVisible(UI.settleConfirmModal, false)
     Layout.SetVisible(UI.chapterSelectModal, false)
     Layout.SetVisible(UI.dialogueModal, false)
